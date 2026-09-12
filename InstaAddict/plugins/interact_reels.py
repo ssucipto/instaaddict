@@ -57,7 +57,7 @@ class InteractReelsPlugin(Plugin):
                 device.back()
                 sleep(3)
                 logger.info("Flinging away from the Ad Reel...")
-                d.swipe(w // 2, int(h * 0.8), w // 2, int(h * 0.1), 0.05)
+                device.swipe(Direction.UP, 0.7)
                 random_sleep(2, 4)
                 continue
                 
@@ -97,9 +97,8 @@ class InteractReelsPlugin(Plugin):
 
             # 2. FIXED ADVANCED SWIPE (Avoid rubber-banding)
             logger.info("Swiping to next Reel...")
-            # We use absolute coordinates with a rapid swipe (duration=0.05) to ensure it triggers the page-flip 
-            # rather than a slow scroll that springs back.
-            d.swipe(w // 2, int(h * 0.8), w // 2, int(h * 0.1), 0.05)
+            # Use native structural swipe to ensure adequate momentum physics.
+            device.swipe(Direction.UP, 0.7)
             
             # Anti-rubber-band grace period
             random_sleep(2, 4)
