@@ -744,7 +744,8 @@ class DeviceFacade:
                             self.deviceV2.send_keys("\n")
 
                     typed_text = self.viewV2.get_text()
-                    if typed_text != text:
+                    # Instagram strips spaces out of hashtag searches, so we don't need to throw an error if the stripped version matches
+                    if typed_text.replace(" ", "") != text.replace(" ", ""):
                         logger.warning(
                             "Failed to write in text field, let's try in the old way.."
                         )
