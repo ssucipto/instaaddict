@@ -554,7 +554,11 @@ class PostsViewList:
                     "bottom": displayHeight * 0.75,
                 }
 
-            obj2 = (media_bounds["bottom"] + media_bounds["top"]) * 1 / 3
+            ac_exists, _, ac_bottom = PostsViewList(self.device)._get_action_bar_position()
+            if ac_exists:
+                obj2 = ac_bottom + 20
+            else:
+                obj2 = media_bounds["top"] if media_bounds else displayHeight * 0.25
 
             self.device.swipe_points(
                 displayWidth / 2,

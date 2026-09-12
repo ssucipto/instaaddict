@@ -317,8 +317,8 @@ class DeviceFacade:
             ey = int(ey * uniform(0.98, 1.02))
         sy = int(sy)
         try:
-            logger.debug(f"Swipe from: ({sx},{sy}) to ({ex},{ey}).")
-            self.deviceV2.swipe_points([[sx, sy], [ex, ey]], uniform(0.20, 0.35))
+            logger.debug(f"Drag (No-Fling) from ({sx},{sy}) to ({ex},{ey}).")
+            self.deviceV2.drag(sx, sy, ex, ey, duration=0.25)
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e)
@@ -461,7 +461,7 @@ class DeviceFacade:
                 y_offset = uniform(0.8, 0.9)
 
             elif mode == Location.TOPLEFT:
-                x_offset = uniform(0.20, 0.35)
+                x_offset = uniform(0.12, 0.18)
                 y_offset = uniform(0.05, 0.25)
             elif mode == Location.CUSTOM:
                 try:
