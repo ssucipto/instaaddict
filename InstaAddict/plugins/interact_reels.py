@@ -48,10 +48,13 @@ class InteractReelsPlugin(Plugin):
             
             w, h = d.info['displayWidth'], d.info['displayHeight']
             
+
             # Anti-Ad Trapping Mechanism
+            import re
             from InstaAddict.core.resources import ResourceID
-            from InstaAddict.core.utils import case_insensitive_re
-            clips = device.find(resourceIdMatches=case_insensitive_re(ResourceID.CLIPS_VIDEO_CONTAINER))
+            # Build the regex manually to avoid import errors
+            clips = device.find(resourceIdMatches=re.compile(r"^%s$" % ResourceID.CLIPS_VIDEO_CONTAINER, re.IGNORECASE))
+
             if not clips.exists():
                 logger.warning("Reels UI Missing! Trapped in an Ad Webview. Escaping via BACK...")
                 device.back()
