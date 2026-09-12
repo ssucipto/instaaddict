@@ -45,6 +45,16 @@ class InteractReelsPlugin(Plugin):
         
         for i in range(target_amount):
             logger.info(f"Watching Reel {i+1}/{target_amount}...")
+            
+            # Anti-Ad Trapping Mechanism
+            from InstaAddict.core.resources import ResourceID
+            from InstaAddict.core.utils import case_insensitive_re
+            clips = device.find(resourceIdMatches=case_insensitive_re(ResourceID.CLIPS_VIDEO_CONTAINER))
+            if not clips.exists():
+                logger.warning("Reels UI Missing! Trapped in an Ad Webview. Escaping via BACK...")
+                device.back()
+                sleep(3)
+                
             # Brief pause to let video render for classification
             sleep(2)
             
