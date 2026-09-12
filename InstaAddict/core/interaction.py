@@ -23,6 +23,7 @@ from InstaAddict.core.report import print_scrape_report, print_short_report
 from InstaAddict.core.resources import ClassName
 from InstaAddict.core.resources import ResourceID as resources
 from InstaAddict.core.session_state import SessionState
+from InstaAddict.core.gemini_vision import get_vision_comment
 from InstaAddict.core.utils import (
     append_to_file,
     get_value,
@@ -613,6 +614,11 @@ def _comment(
     ):
         if not random_choice(comment_percentage):
             return False
+
+        # VISION AI: Take snapshot of view BEFORE opening comment box (obfuscation guard)
+        logger.info("Executing Vision-AI Context Assessment...")
+        smart_ai_comment = get_vision_comment(device, "current_post_target")
+
         universal_actions = UniversalActions(device)
         # we have to do a little swipe for preventing get the previous post comments button (which is covered by top bar, but present in hierarchy!!)
         universal_actions._swipe_points(
@@ -661,17 +667,32 @@ def _comment(
                             "[DEBUG comment box] no EditText-like widget found on screen at all."
                         )
                 if comment_box.exists():
-                    comment = load_random_comment(my_username, media_type)
-                    if comment is None:
+                    comment = smart_ai_comment if smart_ai_comment else load_random_comment(my_username, media_type)
+                    if not comment:
                         UniversalActions.close_keyboard(device)
                         device.back()
                         return False
+                    
+                    import time
+                    # Biometric Telemetry Typing Delay Guard (150ms per character)
+                    sleep_duration = len(comment) * 0.15
                     logger.info(
-                        f"Write comment: {comment}", extra={"color": f"{Fore.CYAN}"}
+                        f"Write comment: {comment} (Simulating native typing delay for {sleep_duration:.2f}s)", extra={"color": f"{Fore.CYAN}"}
                     )
+                    
                     comment_box.set_text(
                         comment, Mode.PASTE if args.dont_type else Mode.TYPE
                     )
+                    time.sleep(sleep_duration)
+
+                    # Ghost Typing DOM Wake-up Hack
+                    # Fire physical spacebar to wake React Native event listener natively
+                    try:
+                        import subprocess
+                        subprocess.run(["adb", "-s", str(device.deviceV2.serial), "shell", "input", "keyevent", "62"], shell=False)
+                    except:
+                        pass
+
 
                     post_button = device.find(
                         resourceId=ResourceID.LAYOUT_COMMENT_THREAD_POST_BUTTON_CLICK_AREA
@@ -685,6 +706,18 @@ def _comment(
                         post_button = device.find(textMatches="(?i)^(Post|Send)$")
                     if post_button.exists():
                         post_button.click()
+                        time.sleep(2)
+                        
+                        # Graceful Degradation: Soft-Ban Action Blocked Sniffer
+                        blocked = device.find(textMatches="(?i)Blocked|(?i)Restricted|(?i)Try Again Later")
+                        if blocked.exists(timeout=2):
+                            logger.error("Ig Action Blocked overlay detected! Aborting to prevent ban cascade.")
+                            # session_state natively records blocks and we should raise it
+                            ok_btn = device.find(textMatches="(?i)Tell us|(?i)OK")
+                            if ok_btn.exists(): ok_btn.click()
+                            from InstaAddict.core.exceptions import ActionBlockedError
+                            raise ActionBlockedError("Action Blocked during comment injection.")
+                            if ok_btn.exists(): ok_btn.click()
                     else:
                         logger.warning("Post button not found, skipping comment submission")
                         universal_actions.close_keyboard(device)

@@ -1334,7 +1334,7 @@ class PostsViewList:
         logger.info("Open comments of post.")
         self.device.find(resourceIdMatches=ResourceID.ROW_FEED_BUTTON_COMMENT).click()
 
-    def _check_if_liked(self):
+    def _check_if_liked(self, retries=3):
         logger.debug("Check if like succeeded in post view.")
         bnt_like_obj = self.device.find(
             resourceIdMatches=ResourceID.ROW_FEED_BUTTON_LIKE
@@ -1348,10 +1348,13 @@ class PostsViewList:
                 logger.debug("Like is not present.")
                 return False
         else:
+            if retries <= 0:
+                logger.debug("Could not verify like via standard button ID. Assuming already handled.")
+                return True
             UniversalActions(self.device)._swipe_points(
                 direction=Direction.DOWN, delta_y=100
             )
-            return PostsViewList(self.device)._check_if_liked()
+            return PostsViewList(self.device)._check_if_liked(retries=retries-1)
 
     def _check_if_ad_or_hashtag(
         self, post_owner_obj

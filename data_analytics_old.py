@@ -10,7 +10,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.dates as mdates
 import sys
 
-from InstaAddict.core.plugin_loader import Plugin
+from GramAddict.core.plugin_loader import Plugin
 
 A4_WIDTH_INCHES = 8.27
 A4_HEIGHT_INCHES = 11.69
