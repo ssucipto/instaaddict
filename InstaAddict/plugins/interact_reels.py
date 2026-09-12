@@ -46,6 +46,8 @@ class InteractReelsPlugin(Plugin):
         for i in range(target_amount):
             logger.info(f"Watching Reel {i+1}/{target_amount}...")
             
+            w, h = d.info['displayWidth'], d.info['displayHeight']
+            
             # Anti-Ad Trapping Mechanism
             from InstaAddict.core.resources import ResourceID
             from InstaAddict.core.utils import case_insensitive_re
@@ -54,6 +56,10 @@ class InteractReelsPlugin(Plugin):
                 logger.warning("Reels UI Missing! Trapped in an Ad Webview. Escaping via BACK...")
                 device.back()
                 sleep(3)
+                logger.info("Flinging away from the Ad Reel...")
+                d.swipe(w // 2, int(h * 0.8), w // 2, int(h * 0.1), 0.05)
+                random_sleep(2, 4)
+                continue
                 
             # Brief pause to let video render for classification
             sleep(2)
@@ -61,8 +67,6 @@ class InteractReelsPlugin(Plugin):
             # 1. SCREENSHOT & FILTER
             raw_png = d.screenshot(format='raw')
             is_valid_topic = evaluate_reel_content(raw_png, topic=configs.args.reels_topic or "dogs or animals")
-            
-            w, h = d.info['displayWidth'], d.info['displayHeight']
             
             if is_valid_topic:
                 logger.info("?? Vision AI Detected Animal! Engaging with targeting algorithm...")
