@@ -6,6 +6,7 @@ from InstaAddict.core.plugin_loader import Plugin
 from InstaAddict.core.views import TabBarView, UniversalActions, Direction
 from InstaAddict.core.interaction import _comment
 from InstaAddict.core.utils import random_sleep
+from InstaAddict.core.gemini_vision import evaluate_reel_content
 
 logger = logging.getLogger(__name__)
 
@@ -44,38 +45,51 @@ class InteractReelsPlugin(Plugin):
         
         for i in range(target_amount):
             logger.info(f"Watching Reel {i+1}/{target_amount}...")
-            # Enforced Temporal Video Bounds (Doom Scrolling Simulation)
-            random_sleep(12, 35)
-
-            # Double Tap to Like
+            # Brief pause to let video render for classification
+            sleep(2)
+            
+            # 1. SCREENSHOT & FILTER
+            raw_png = d.screenshot(format='raw')
+            is_valid_topic = evaluate_reel_content(raw_png, topic="dogs, puppies, or animals")
+            
             w, h = d.info['displayWidth'], d.info['displayHeight']
-            d.click(w // 2, h // 2)
-            sleep(0.1)
-            d.click(w // 2, h // 2)
-            logger.info("Liked Reel via double-tap.")
+            
+            if is_valid_topic:
+                logger.info("?? Vision AI Detected Animal! Engaging with targeting algorithm...")
+                random_sleep(10, 25)
 
-            # Trigger AI Contextual Comment
-            # Passing MediaType.REEL (value 3 natively in most enums but we can just pass literal)
-            # We call the modified `_comment` function natively hooking our Vision AI
-            try:
-                from InstaAddict.core.views import MediaType
-                # Note: args expects comment_percentage mapping, we bypass by giving native truthy
-                _comment(
-                    device,
-                    my_username="REEL_STALKER",
-                    comment_percentage=100,
-                    args=configs.args,
-                    session_state=sessions[-1],
-                    media_type=MediaType.REEL
-                )
-            except Exception as e:
-                import traceback
-                logger.error(f"Reels Stalker Comment Error: {e}\n{traceback.format_exc()}")
+                # Double Tap to Like
+                d.click(w // 2, h // 2)
+                sleep(0.1)
+                d.click(w // 2, h // 2)
+                logger.info("Liked Reel via double-tap.")
 
-            # Swipe to next reel natively
+                try:
+                    from InstaAddict.core.views import MediaType
+                    _comment(
+                        device,
+                        my_username="REEL_STALKER",
+                        comment_percentage=100,
+                        args=configs.args,
+                        session_state=sessions[-1],
+                        media_type=MediaType.REEL
+                    )
+                except Exception as e:
+                    import traceback
+                    logger.error(f"Reels Stalker Comment Error: {e}")
+            else:
+                logger.info("?? Non-Animal Reel. Skipping immediately to train our feed algorithm!")
+                random_sleep(1, 2)
+
+            # 2. FIXED ADVANCED SWIPE (Avoid rubber-banding)
             logger.info("Swiping to next Reel...")
-            universal._swipe_points(direction=Direction.UP, delta_y=600)
-            random_sleep(1, 3)
+            # We use absolute coordinates with a rapid swipe (duration=0.05) to ensure it triggers the page-flip 
+            # rather than a slow scroll that springs back.
+            d.swipe(w // 2, int(h * 0.8), w // 2, int(h * 0.1), 0.05)
+            
+            # Anti-rubber-band grace period
+            random_sleep(2, 4)
             
         logger.info("Reels Stalker job completed! Returning Home.")
         tab_bar.navigateToHome()
+
