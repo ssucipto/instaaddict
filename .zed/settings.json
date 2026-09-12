@@ -1,0 +1,306 @@
+{
+  "assistant": {
+    "slash_commands": {
+      "acp-artifact-glossary": {
+        "description": "Create and maintain project glossaries through auto-extraction and interactive refinement",
+        "text": "Execute ACP Enhanced command `/acp-artifact-glossary`.\n\n1. Read and follow **every step** in `agent/commands/acp.artifact-glossary.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.artifact-glossary.md`"
+      },
+      "acp-artifact-reference": {
+        "description": "Create reference guides for passive information after command-first principle check",
+        "text": "Execute ACP Enhanced command `/acp-artifact-reference`.\n\n1. Read and follow **every step** in `agent/commands/acp.artifact-reference.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.artifact-reference.md`"
+      },
+      "acp-artifact-research": {
+        "description": "Create long-lived research artifacts via systematic investigation with web/MCP integration and quality standards",
+        "text": "Execute ACP Enhanced command `/acp-artifact-research`.\n\n1. Read and follow **every step** in `agent/commands/acp.artifact-research.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.artifact-research.md`"
+      },
+      "acp-audit": {
+        "description": "Deep-dive investigation of a subject, producing a structured report in `agent/reports/` (local only; **do not commit** \u2014 ADR-27). This is **not** a PR review and **not** a CodeRabbit replacement \u2014 use `/acp-review` (optionally `--pr-diff`) for standards enforcement on a diff.",
+        "text": "Execute ACP Enhanced command `/acp-audit`.\n\n1. Read and follow **every step** in `agent/commands/acp.audit.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.audit.md`"
+      },
+      "acp-carryover-query": {
+        "description": "Search and filter audit carryovers from `agent/memory/audit-carryovers.md`",
+        "text": "Execute ACP Enhanced command `/acp-carryover-query`.\n\n1. Read and follow **every step** in `agent/commands/acp.carryover-query.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.carryover-query.md`"
+      },
+      "acp-ci": {
+        "description": "Run the gates GitHub Actions runs, locally, before pushing",
+        "text": "Execute ACP Enhanced command `/acp-ci`.\n\n1. Read and follow **every step** in `agent/commands/acp.ci.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.ci.md`"
+      },
+      "acp-clarification-address": {
+        "description": "Address clarification responses by researching, exploring code/web, using tools, and presenting recommendations",
+        "text": "Execute ACP Enhanced command `/acp-clarification-address`.\n\n1. Read and follow **every step** in `agent/commands/acp.clarification-address.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.clarification-address.md`"
+      },
+      "acp-clarification-capture": {
+        "description": "Capture decisions from ephemeral clarification files and chat context into permanent entity documents",
+        "text": "Execute ACP Enhanced command `/acp-clarification-capture`.\n\n1. Read and follow **every step** in `agent/commands/acp.clarification-capture.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.clarification-capture.md`"
+      },
+      "acp-clarification-create": {
+        "description": "Create clarification documents from file input or chat to gather detailed requirements",
+        "text": "Execute ACP Enhanced command `/acp-clarification-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.clarification-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.clarification-create.md`"
+      },
+      "acp-command-create": {
+        "description": "Create command files with namespace enforcement, draft support, and automatic package updates",
+        "text": "Execute ACP Enhanced command `/acp-command-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.command-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.command-create.md`"
+      },
+      "acp-commit": {
+        "description": "End-of-session memory commit \u2014 write session summary, stamp completed tasks, compact memory if needed, auto-sync session and pattern documents",
+        "text": "Execute ACP Enhanced command `/acp-commit`.\n\n1. Read and follow **every step** in `agent/commands/acp.commit.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.commit.md`"
+      },
+      "acp-cost-report": {
+        "description": "Generate a weekly token spend report from `agent/routing/ledger.md` with taxonomy improvement suggestions",
+        "text": "Execute ACP Enhanced command `/acp-cost-report`.\n\n1. Read and follow **every step** in `agent/commands/acp.cost-report.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.cost-report.md`"
+      },
+      "acp-decide": {
+        "description": "Create a new Architecture Decision Record (ADR) in `agent/memory/decisions.md`",
+        "text": "Execute ACP Enhanced command `/acp-decide`.\n\n1. Read and follow **every step** in `agent/commands/acp.decide.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.decide.md`"
+      },
+      "acp-design-create": {
+        "description": "Create design documents with namespace enforcement, draft support, and automatic package updates",
+        "text": "Execute ACP Enhanced command `/acp-design-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.design-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.design-create.md`"
+      },
+      "acp-design-reference": {
+        "description": "Discover and cross-reference design documents to ensure tasks have complete implementation detail",
+        "text": "Execute ACP Enhanced command `/acp-design-reference`.\n\n1. Read and follow **every step** in `agent/commands/acp.design-reference.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.design-reference.md`"
+      },
+      "acp-design-spec": {
+        "description": "Generate a structured Application Interface & Data-Flow Design Specification from the live codebase",
+        "text": "Execute ACP Enhanced command `/acp-design-spec`.\n\n1. Read and follow **every step** in `agent/commands/acp.design-spec.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.design-spec.md`"
+      },
+      "acp-dispatch": {
+        "description": "Invoke the ACP dispatch engine to execute a routing task with a configured LLM executor (Persona B/C workflow)",
+        "text": "Execute ACP Enhanced command `/acp-dispatch`.\n\n1. Read and follow **every step** in `agent/commands/acp.dispatch.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.dispatch.md`"
+      },
+      "acp-feedback": {
+        "description": "Capture structured developer feedback about ACP Enhanced system failures, gaps, or improvements; write to `agent/feedback/feedback-NNN.md`",
+        "text": "Execute ACP Enhanced command `/acp-feedback`.\n\n1. Read and follow **every step** in `agent/commands/acp.feedback.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.feedback.md`"
+      },
+      "acp-handoff": {
+        "description": "Generate a context-aware handoff for transferring work to another agent context \u2014 same-repo executor transfer (plan \u2192 implement) or cross-repository problem transfer",
+        "text": "Execute ACP Enhanced command `/acp-handoff`.\n\n1. Read and follow **every step** in `agent/commands/acp.handoff.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.handoff.md`"
+      },
+      "acp-index": {
+        "description": "Manage the key file index \u2014 list, add, remove, explore, and show indexed key files",
+        "text": "Execute ACP Enhanced command `/acp-index`.\n\n1. Read and follow **every step** in `agent/commands/acp.index.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.index.md`"
+      },
+      "acp-init": {
+        "description": "Initialize agent context by loading all documentation, reviewing source code, and preparing for work",
+        "text": "Execute ACP Enhanced command `/acp-init`.\n\n1. Read and follow **every step** in `agent/commands/acp.init.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.init.md`"
+      },
+      "acp-install": {
+        "description": "Install or upgrade ACP Enhanced in the current project directory",
+        "text": "Execute ACP Enhanced command `/acp-install`.\n\n1. Read and follow **every step** in `agent/commands/acp.install.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.install.md`"
+      },
+      "acp-integrity": {
+        "description": "Verify AI-generated code **trustworthiness and provenance** \u2014 detect malicious patterns, hidden Unicode, exfiltration vectors, supply chain risks, and CI injection surfaces. Distinct from `/acp-review` which verifies code **quality**.",
+        "text": "Execute ACP Enhanced command `/acp-integrity`.\n\n1. Read and follow **every step** in `agent/commands/acp.integrity.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.integrity.md`"
+      },
+      "acp-memory-sync": {
+        "description": "Monthly memory compaction \u2014 compress old session summaries, flag stale patterns, verify wiki freshness",
+        "text": "Execute ACP Enhanced command `/acp-memory-sync`.\n\n1. Read and follow **every step** in `agent/commands/acp.memory-sync.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.memory-sync.md`"
+      },
+      "acp-package-create": {
+        "description": "Create a new ACP package with full ACP installation, release branch configuration, and pre-commit hooks",
+        "text": "Execute ACP Enhanced command `/acp-package-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-create.md`"
+      },
+      "acp-package-info": {
+        "description": "Display detailed information about a specific installed package (local or global)",
+        "text": "Execute ACP Enhanced command `/acp-package-info`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-info.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-info.md`"
+      },
+      "acp-package-install": {
+        "description": "Install third-party command packages from git repositories using the package-install script",
+        "text": "Execute ACP Enhanced command `/acp-package-install`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-install.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-install.md`"
+      },
+      "acp-package-list": {
+        "description": "List installed ACP packages with versions, file counts, and optional details",
+        "text": "Execute ACP Enhanced command `/acp-package-list`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-list.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-list.md`"
+      },
+      "acp-package-publish": {
+        "description": "Automated package publishing with validation, version detection, CHANGELOG generation, and testing",
+        "text": "Execute ACP Enhanced command `/acp-package-publish`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-publish.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-publish.md`"
+      },
+      "acp-package-remove": {
+        "description": "Remove installed ACP packages and clean up manifest",
+        "text": "Execute ACP Enhanced command `/acp-package-remove`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-remove.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-remove.md`"
+      },
+      "acp-package-search": {
+        "description": "Discover ACP packages on GitHub using the GitHub API",
+        "text": "Execute ACP Enhanced command `/acp-package-search`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-search.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-search.md`"
+      },
+      "acp-package-update": {
+        "description": "Update installed ACP packages to their latest versions with smart conflict detection",
+        "text": "Execute ACP Enhanced command `/acp-package-update`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-update.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-update.md`"
+      },
+      "acp-package-validate": {
+        "description": "Comprehensive package validation with shell and LLM checks, auto-fix, and test installation",
+        "text": "Execute ACP Enhanced command `/acp-package-validate`.\n\n1. Read and follow **every step** in `agent/commands/acp.package-validate.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.package-validate.md`"
+      },
+      "acp-pattern-create": {
+        "description": "Create pattern files with namespace enforcement, draft support, and automatic package updates",
+        "text": "Execute ACP Enhanced command `/acp-pattern-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.pattern-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.pattern-create.md`"
+      },
+      "acp-pattern-sync": {
+        "description": "Manual repair tool \u2014 sync pattern documents from registry. Same engine as `/acp-commit` step 3b, callable without a full commit.",
+        "text": "Execute ACP Enhanced command `/acp-pattern-sync`.\n\n1. Read and follow **every step** in `agent/commands/acp.pattern-sync.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.pattern-sync.md`"
+      },
+      "acp-plan": {
+        "description": "Plan milestones OR tasks for undefined items in progress.yaml or new requirements",
+        "text": "Execute ACP Enhanced command `/acp-plan`.\n\n1. Read and follow **every step** in `agent/commands/acp.plan.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.plan.md`"
+      },
+      "acp-pr": {
+        "description": "Open a feature PR to the default working branch with local CI gates",
+        "text": "Execute ACP Enhanced command `/acp-pr`.\n\n1. Read and follow **every step** in `agent/commands/acp.pr.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.pr.md`"
+      },
+      "acp-preferences-create": {
+        "description": "Create preference files at a specified level (user/workspace/project) with default values from configurables",
+        "text": "Execute ACP Enhanced command `/acp-preferences-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.preferences-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.preferences-create.md`"
+      },
+      "acp-preferences-get": {
+        "description": "Resolve and display preferences for a given namespace",
+        "text": "Execute ACP Enhanced command `/acp-preferences-get`.\n\n1. Read and follow **every step** in `agent/commands/acp.preferences-get.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.preferences-get.md`"
+      },
+      "acp-preferences-set": {
+        "description": "Set a preference value at a specified level (user/workspace/project) with validation",
+        "text": "Execute ACP Enhanced command `/acp-preferences-set`.\n\n1. Read and follow **every step** in `agent/commands/acp.preferences-set.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.preferences-set.md`"
+      },
+      "acp-preferences-show": {
+        "description": "Display the effective preference set for a namespace with source attribution for each value",
+        "text": "Execute ACP Enhanced command `/acp-preferences-show`.\n\n1. Read and follow **every step** in `agent/commands/acp.preferences-show.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.preferences-show.md`"
+      },
+      "acp-preferences-validate": {
+        "description": "Validate all preference files across all levels against their configurables schemas",
+        "text": "Execute ACP Enhanced command `/acp-preferences-validate`.\n\n1. Read and follow **every step** in `agent/commands/acp.preferences-validate.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.preferences-validate.md`"
+      },
+      "acp-proceed": {
+        "description": "Implement tasks \u2014 single-task (default) or autonomous milestone completion (with arguments)",
+        "text": "Execute ACP Enhanced command `/acp-proceed`.\n\n1. Read and follow **every step** in `agent/commands/acp.proceed.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.proceed.md`"
+      },
+      "acp-project-create": {
+        "description": "Create a new generic ACP project (not a package) with full ACP installation and guided setup",
+        "text": "Execute ACP Enhanced command `/acp-project-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-create.md`"
+      },
+      "acp-project-info": {
+        "description": "Display detailed information about a specific project from the global registry",
+        "text": "Execute ACP Enhanced command `/acp-project-info`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-info.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-info.md`"
+      },
+      "acp-project-list": {
+        "description": "List all projects registered in global workspace",
+        "text": "Execute ACP Enhanced command `/acp-project-list`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-list.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-list.md`"
+      },
+      "acp-project-remove": {
+        "description": "Remove a project from the global registry with optional directory deletion",
+        "text": "Execute ACP Enhanced command `/acp-project-remove`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-remove.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-remove.md`"
+      },
+      "acp-project-set": {
+        "description": "Switch to a different project in the global registry",
+        "text": "Execute ACP Enhanced command `/acp-project-set`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-set.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-set.md`"
+      },
+      "acp-project-update": {
+        "description": "Update project metadata in the global registry",
+        "text": "Execute ACP Enhanced command `/acp-project-update`.\n\n1. Read and follow **every step** in `agent/commands/acp.project-update.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.project-update.md`"
+      },
+      "acp-projects-restore": {
+        "description": "Restore/clone missing projects from their registered git origins",
+        "text": "Execute ACP Enhanced command `/acp-projects-restore`.\n\n1. Read and follow **every step** in `agent/commands/acp.projects-restore.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.projects-restore.md`"
+      },
+      "acp-projects-sync": {
+        "description": "Discover unregistered ACP projects in `~/.acp/projects/` and add them to the registry",
+        "text": "Execute ACP Enhanced command `/acp-projects-sync`.\n\n1. Read and follow **every step** in `agent/commands/acp.projects-sync.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.projects-sync.md`"
+      },
+      "acp-receive": {
+        "description": "Load an incoming handoff, verify git and session alignment, and print the assignment checklist before work begins",
+        "text": "Execute ACP Enhanced command `/acp-receive`.\n\n1. Read and follow **every step** in `agent/commands/acp.receive.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.receive.md`"
+      },
+      "acp-report": {
+        "description": "Generate a comprehensive project status report including progress, accomplishments, and next steps",
+        "text": "Execute ACP Enhanced command `/acp-report`.\n\n1. Read and follow **every step** in `agent/commands/acp.report.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.report.md`"
+      },
+      "acp-resume": {
+        "description": "Resume work on a project by initializing context, reviewing recent progress, and continuing with the next task",
+        "text": "Execute ACP Enhanced command `/acp-resume`.\n\n1. Read and follow **every step** in `agent/commands/acp.resume.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.resume.md`"
+      },
+      "acp-review": {
+        "description": "Enforce code quality, security, and consistency standards across a project's codebase using a structured **64-rule** ruleset (54 core + 10 Appendix A) aligned to OWASP Top 10:2025, OWASP MASVS v2.0, TypeScript strict mode, and industry best practices. Optional `--pr-diff` is an agent pass on `git diff <base>...HEAD`, not Phase 1 `--diff`.",
+        "text": "Execute ACP Enhanced command `/acp-review`.\n\n1. Read and follow **every step** in `agent/commands/acp.review.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.review.md`"
+      },
+      "acp-route": {
+        "description": "Classify a task, select the cheapest capable executor, and create a route file in `agent/routing/tasks/`",
+        "text": "Execute ACP Enhanced command `/acp-route`.\n\n1. Read and follow **every step** in `agent/commands/acp.route.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.route.md`"
+      },
+      "acp-rule-file-audit": {
+        "description": "Fast scan of ACP rule files for Unicode injection and hidden instructions (alias for `/acp-integrity --self --fast`)",
+        "text": "Execute ACP Enhanced command `/acp-rule-file-audit`.\n\n1. Read and follow **every step** in `agent/commands/acp.rule-file-audit.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.rule-file-audit.md`"
+      },
+      "acp-session-sync": {
+        "description": "Manual repair tool \u2014 sync session documents from registry. Same engine as `/acp-commit` step 2b, callable without a full commit.",
+        "text": "Execute ACP Enhanced command `/acp-session-sync`.\n\n1. Read and follow **every step** in `agent/commands/acp.session-sync.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.session-sync.md`"
+      },
+      "acp-sessions": {
+        "description": "Manage and view active agent sessions across projects",
+        "text": "Execute ACP Enhanced command `/acp-sessions`.\n\n1. Read and follow **every step** in `agent/commands/acp.sessions.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.sessions.md`"
+      },
+      "acp-smoke": {
+        "description": "Optional device preflight via a project-configured runner. Unconfigured \u2192 exit 2 (never PASS). Not a CI step.",
+        "text": "Execute ACP Enhanced command `/acp-smoke`.\n\n1. Read and follow **every step** in `agent/commands/acp.smoke.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.smoke.md`"
+      },
+      "acp-spec": {
+        "description": "Generate a specification document from a clarification, design, draft, requirements doc, or interactive input",
+        "text": "Execute ACP Enhanced command `/acp-spec`.\n\n1. Read and follow **every step** in `agent/commands/acp.spec.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.spec.md`"
+      },
+      "acp-stakeholder-report": {
+        "description": "Generate a concise weekly or monthly stakeholder progress summary (RAG health, outcomes, decisions needed)",
+        "text": "Execute ACP Enhanced command `/acp-stakeholder-report`.\n\n1. Read and follow **every step** in `agent/commands/acp.stakeholder-report.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.stakeholder-report.md`"
+      },
+      "acp-status": {
+        "description": "Display current project status including milestone progress, current task, recent work, and next steps. With `--health`: run YAML validation and git drift checks.",
+        "text": "Execute ACP Enhanced command `/acp-status`.\n\n1. Read and follow **every step** in `agent/commands/acp.status.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.status.md`"
+      },
+      "acp-sync": {
+        "description": "Synchronize documentation with source code by identifying and updating stale documentation",
+        "text": "Execute ACP Enhanced command `/acp-sync`.\n\n1. Read and follow **every step** in `agent/commands/acp.sync.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.sync.md`"
+      },
+      "acp-task-create": {
+        "description": "Create task files with proper structure, milestone linking, and automatic progress.yaml updates",
+        "text": "Execute ACP Enhanced command `/acp-task-create`.\n\n1. Read and follow **every step** in `agent/commands/acp.task-create.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.task-create.md`"
+      },
+      "acp-task": {
+        "description": "Create, read, list, and stamp routing task files in `agent/routing/tasks/`",
+        "text": "Execute ACP Enhanced command `/acp-task`.\n\n1. Read and follow **every step** in `agent/commands/acp.task.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.task.md`"
+      },
+      "acp-update": {
+        "description": "Update progress.yaml with latest project status, task completion, and recent work",
+        "text": "Execute ACP Enhanced command `/acp-update`.\n\n1. Read and follow **every step** in `agent/commands/acp.update.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.update.md`"
+      },
+      "acp-validate": {
+        "description": "Validate all ACP documents for structure, consistency, correctness, and namespace conventions",
+        "text": "Execute ACP Enhanced command `/acp-validate`.\n\n1. Read and follow **every step** in `agent/commands/acp.validate.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.validate.md`"
+      },
+      "acp-version-check-for-updates": {
+        "description": "Check if newer version of ACP is available without applying updates",
+        "text": "Execute ACP Enhanced command `/acp-version-check-for-updates`.\n\n1. Read and follow **every step** in `agent/commands/acp.version-check-for-updates.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.version-check-for-updates.md`"
+      },
+      "acp-version-check": {
+        "description": "Display current ACP version and compatibility information",
+        "text": "Execute ACP Enhanced command `/acp-version-check`.\n\n1. Read and follow **every step** in `agent/commands/acp.version-check.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.version-check.md`"
+      },
+      "acp-version-update": {
+        "description": "Update ACP files (AGENT.md, templates, scripts) to the latest version",
+        "text": "Execute ACP Enhanced command `/acp-version-update`.\n\n1. Read and follow **every step** in `agent/commands/acp.version-update.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.version-update.md`"
+      },
+      "acp-visualize": {
+        "description": "Launch the ACP Progress Visualizer dashboard for the current project",
+        "text": "Execute ACP Enhanced command `/acp-visualize`.\n\n1. Read and follow **every step** in `agent/commands/acp.visualize.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.visualize.md`"
+      },
+      "acp-wiki-update": {
+        "description": "Update a section of `agent/wiki/architecture.md` or `agent/wiki/domain.yml` after architectural or domain changes",
+        "text": "Execute ACP Enhanced command `/acp-wiki-update`.\n\n1. Read and follow **every step** in `agent/commands/acp.wiki-update.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/acp.wiki-update.md`"
+      },
+      "git-commit": {
+        "description": "Automate version detection, changelog updates, and git commits with proper semantic versioning",
+        "text": "Execute ACP Enhanced command `/git-commit`.\n\n1. Read and follow **every step** in `agent/commands/git.commit.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/git.commit.md`"
+      },
+      "git-init": {
+        "description": "Initialize a git repository with intelligent .gitignore based on project type",
+        "text": "Execute ACP Enhanced command `/git-init`.\n\n1. Read and follow **every step** in `agent/commands/git.init.md`.\n2. Treat text after the command in the user's message as command arguments.\n3. Run the command header from the source file, then continue unless the source explicitly waits for input.\n\n**Canonical source**: `agent/commands/git.init.md`"
+      }
+    }
+  }
+}

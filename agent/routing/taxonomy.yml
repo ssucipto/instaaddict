@@ -1,0 +1,395 @@
+# ACP Protocol Task Taxonomy
+# Maps task types to executor + context required
+# Generated 2026-05-01 — update weekly via /acp-cost-report suggestions
+# Updated 2026-06-03: added skills_catalog + mention fields (audit-022 R6, route-053)
+last_updated: 2026-06-07
+
+task_types:
+
+  # ── COMMAND DOCS ────────────────────────────────────────────
+  command-doc-write:
+    executor: deepseek-v4-pro
+    complexity: medium
+    context_required: [wiki/domain.yml#commands, memory/patterns.md]
+    tokens_est: 8000
+    skill: commands
+
+  command-doc-update:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/sessions.md]
+    tokens_est: 3000
+    skill: commands
+
+  # ── BASH SCRIPTS ─────────────────────────────────────────────
+  bash-script-create:
+    executor: deepseek-v4-pro
+    complexity: medium
+    context_required: [wiki/architecture.md#command-script-binding, memory/patterns.md]
+    tokens_est: 10000
+    skill: scripts
+
+  bash-script-fix:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/sessions.md]
+    tokens_est: 3500
+    skill: scripts
+
+  bash-script-refactor:
+    executor: deepseek-v4-pro
+    complexity: medium
+    context_required: [wiki/architecture.md, memory/decisions.md]
+    tokens_est: 12000
+    skill: scripts
+
+  shell-scripting:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/sessions.md]
+    tokens_est: 4000
+    skill: scripts
+    description: >
+      Legacy alias for bash-script-fix. Used in early routes (route-005, route-011).
+      New routes should use bash-script-fix, bash-script-create, or bash-script-refactor.
+
+  # ── YAML SCHEMAS ─────────────────────────────────────────────
+  yaml-schema:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [wiki/domain.yml#schemas]
+    tokens_est: 4000
+    skill: schemas
+
+  # ── TESTING ──────────────────────────────────────────────────
+  e2e-test-write:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/patterns.md, wiki/domain.yml#test_suites]
+    tokens_est: 5000
+    skill: testing
+
+  test-run:
+    executor: local-script
+    complexity: low
+    context_required: [active-task-only]
+    tokens_est: 0
+    skill: testing
+
+  # ── TYPESCRIPT ───────────────────────────────────────────────
+  typescript-feature:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [wiki/architecture.md#dispatch-script-flow]
+    tokens_est: 5000
+    skill: typescript
+
+  # ── DESIGN & ARCHITECTURE ────────────────────────────────────
+  design-document:
+    executor: claude-sonnet
+    complexity: high
+    context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md]
+    tokens_est: 18000
+    skill: crosscut
+
+  design-spec:
+    executor: copilot
+    complexity: medium
+    context_required: [commands/acp.design-spec.md, wiki/domain.yml, memory/decisions.md]
+    tokens_est: 15000
+    skill: crosscut
+    description: >
+      Generating Application Interface & Data-Flow Design Specifications
+      using /acp-design-spec. Scans codebase for routes, stores, APIs,
+      persistence; produces 19-section spec with Mermaid diagrams.
+
+  stakeholder-report:
+    executor: copilot
+    complexity: low
+    context_required: [commands/acp.stakeholder-report.md, progress.yaml]
+    tokens_est: 5000
+    skill: crosscut
+    description: >
+      Generating weekly/monthly stakeholder progress summaries with RAG
+      health indicators. Reads progress.yaml, filters to business outcomes
+      (no task IDs), produces 1-2 page executive summary.
+
+  architecture-plan:
+    executor: claude-sonnet
+    complexity: high
+    context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md, memory/sessions.md]
+    tokens_est: 20000
+    skill: crosscut
+
+  # ── DOCUMENTATION & CROSS-CUTTING ────────────────────────────
+  documentation-sync:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/sessions.md]
+    tokens_est: 3000
+    skill: crosscut
+
+  preference-system:
+    executor: deepseek-v4-pro
+    complexity: high
+    context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md]
+    tokens_est: 15000
+    skill: scripts
+
+  # ── BUG FIXES ─────────────────────────────────────────────────
+  bug-fix-simple:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [memory/sessions.md]
+    tokens_est: 3000
+    skill: scripts
+
+  bug-fix-complex:
+    executor: deepseek-v4-pro
+    complexity: medium
+    context_required: [wiki/architecture.md, memory/sessions.md, memory/decisions.md]
+    tokens_est: 12000
+    skill: scripts
+
+  # ── UPSTREAM SYNC ─────────────────────────────────────────────
+  upstream-sync:
+    executor: claude-sonnet
+    complexity: high
+    context_required: [memory/decisions.md, wiki/architecture.md]
+    tokens_est: 22000
+    skill: upstream-sync
+    notes: >
+      High token estimate: must read upstream AGENT.md (76 KB), all upstream command
+      files, all upstream script files, and upstream milestones before making any
+      HAVE/PARTIAL/PORT/DEFER decision. CHANGELOG is cross-reference only (loaded last).
+      See agent/skills/upstream-sync.md for mandatory source priority order.
+
+  # ── CROSS-CUTTING / MEMORY / PROCESS ─────────────────────────
+  wiki-update:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [wiki/domain.yml, wiki/architecture.md]
+    tokens_est: 4000
+    skill: crosscut
+    description: Updates to agent/wiki/ files (domain.yml, architecture.md, glossary)
+
+  memory-write:
+    executor: copilot
+    complexity: low
+    context_required: [memory/sessions.md, memory/lessons.md]
+    tokens_est: 2000
+    skill: crosscut
+    description: Writing or updating memory layer files (sessions.md, lessons.md, patterns.md)
+
+  changelog-update:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [CHANGELOG.md]
+    tokens_est: 2000
+    skill: crosscut
+    description: Writing version entries to CHANGELOG.md
+
+  progress-update:
+    executor: deepseek-v4-flash
+    complexity: low
+    context_required: [progress.yaml]
+    tokens_est: 3000
+    skill: crosscut
+    description: Updating agent/progress.yaml milestone and task status
+
+  ci-cd-setup:
+    executor: copilot
+    complexity: medium
+    context_required: [.github/workflows/, agent/core/identity.yml]
+    tokens_est: 6000
+    skill: crosscut
+    description: >
+      Setting up or modifying CI/CD pipelines, branch protection rules,
+      GitHub Actions workflows, and git branch strategies.
+
+  adr-write:
+    executor: copilot
+    complexity: low
+    context_required: [memory/decisions.md]
+    tokens_est: 3000
+    skill: crosscut
+    description: Writing architectural decision records to agent/memory/decisions.md
+
+  audit-run:
+    executor: copilot
+    complexity: high
+    context_required: [commands/acp.audit.md, memory/audit-carryovers.md]
+    tokens_est: 8000
+    skill: crosscut
+    description: Running /acp-audit against a milestone or codebase
+
+  milestone-create:
+    executor: copilot
+    complexity: medium
+    context_required: ['milestones/milestone-1-{title}.template.md', progress.yaml]
+    tokens_est: 5000
+    skill: crosscut
+    description: Creating milestone planning documents in agent/milestones/
+
+  route-create:
+    executor: copilot
+    complexity: low
+    context_required: [routing/taxonomy.yml, routing/rules.md]
+    tokens_est: 3000
+    skill: crosscut
+    description: Creating routing task files in agent/routing/tasks/
+
+  upstream-parity-check:
+    executor: deepseek-v4-flash
+    complexity: medium
+    context_required: [wiki/architecture.md, patterns/local.upstream-integration-runbook.md]
+    tokens_est: 6000
+    skill: crosscut
+    description: Checking fork divergence against upstream prmichaelsen/agent-context-protocol
+
+  # ── CODE REVIEW ──────────────────────────────────────────────
+  # Added v6.11.0 (M55 — /acp-review command). Four variants by scope.
+  code-review-full:
+    executor: copilot
+    complexity: high
+    context_required: [commands/acp.review.md, skills/code-review.md]
+    tokens_est: 14000
+    skill: code-review
+    description: >
+      Full-project code review with all 54 rules across 7 categories.
+      Includes OWASP Top 10:2025, TypeScript strictness, and optional
+      MASVS v2.0 mobile rules. Produces agent/reports/review-NNN.md.
+
+  code-review-targeted:
+    executor: deepseek-v4-pro
+    complexity: medium
+    context_required: [commands/acp.review.md, skills/code-review.md]
+    tokens_est: 7000
+    skill: code-review
+    description: >
+      Targeted review with --rules flag limiting to 1-2 categories.
+      Cost-efficient for incremental PR reviews and mid-sprint checks.
+
+  code-review-security:
+    executor: copilot
+    complexity: high
+    context_required: [commands/acp.review.md, skills/code-review.md]
+    tokens_est: 9000
+    skill: code-review
+    description: >
+      Security-only review (--rules security). Enforces OWASP Top 10:2025
+      and MASVS v2.0 rules. CRITICAL findings bypass --severity filter.
+
+  code-review-ci:
+    executor: qwen3-235b
+    complexity: low
+    context_required: [commands/acp.review.md, skills/code-review.md]
+    tokens_est: 3000
+    skill: code-review
+    description: >
+      CI pipeline review with --ci flag. Compact output, exit 1 on
+      CRITICAL/HIGH findings. Safe for pre-commit hooks and GitHub Actions.
+
+  # ── CODE INTEGRITY ────────────────────────────────────────────
+  # Added v6.12.0 (M56 — /acp-integrity command). Phase 1 pattern matching.
+  code-integrity-scan:
+    executor: copilot
+    complexity: high
+    context_required: [commands/acp.integrity.md, skills/code-integrity.md, wiki/integrity-rules.md]
+    tokens_est: 8000
+    skill: code-integrity
+    description: >
+      AI code integrity & trustworthiness verification. 55 rules across
+      11 categories. Phase 1 pattern matching with 6 bash scripts.
+      Detects hidden Unicode, exfiltration, supply chain risks, CI injection.
+      Deferred to v2.0 (M58): taint flow, semantic injection, memory poisoning.
+
+  # ── PARALLEL TASKS ───────────────────────────────────────────
+  # Added v6.8.2 (audit-022 R9, route-056). Completes ACP against
+  # Anthropic's 6 agent workflows (parallelization + orchestrator-workers).
+  parallel:
+    executor: deepseek-v4-pro     # Orchestrator — decomposes + aggregates
+    complexity: high
+    context_required: [agent/routing/taxonomy.yml]
+    tokens_est: 12000
+    skill: crosscut
+    mention: "@{crosscut}"
+    sub_task_default_executor: deepseek-v4-flash
+    description: >
+      Tasks with independent sub-tasks that can run concurrently.
+      Sub-tasks form a DAG via depends_on fields. Orchestrator (pro model)
+      decomposes, spawns workers (flash model), and aggregates results.
+
+  orchestrator-workers:
+    executor: deepseek-v4-pro     # Orchestrator
+    complexity: high
+    context_required: [agent/routing/taxonomy.yml]
+    tokens_est: 20000
+    skill: crosscut
+    mention: "@{crosscut}"
+    description: >
+      Large refactors spanning multiple domains. Orchestrator decomposes
+      the task, dispatches to specialized worker agents, and aggregates outputs.
+      Higher token budget for cross-domain reasoning.
+
+# ── Skills Catalog ──────────────────────────────────────────────
+# Added v6.8.2 (audit-022 R6, route-053). Skills are invoked via @-mention
+# (e.g., @{testing}) rather than auto-loaded. This catalog maps skill names
+# to their @-mention triggers, file paths, and applicable task types.
+#
+# Usage: User types @{skill-name} → Agent reads skill file → Applies conventions.
+
+skills_catalog:
+  - name: commands
+    mention: "@{commands}"
+    file: agent/skills/commands.md
+    description: Command doc writing conventions — structure, naming, directive patterns
+    triggers: [command-doc-write, command-doc-update]
+
+  - name: scripts
+    mention: "@{scripts}"
+    file: agent/skills/scripts.md
+    description: Bash shell scripting — POSIX compat, error trapping, macOS portability
+    triggers: [bash-script-create, bash-script-fix, bash-script-refactor, shell-scripting]
+
+  - name: schemas
+    mention: "@{schemas}"
+    file: agent/skills/schemas.md
+    description: YAML schema design — structure, validation rules, naming conventions
+    triggers: [yaml-schema]
+
+  - name: testing
+    mention: "@{testing}"
+    file: agent/skills/testing.md
+    description: E2E and unit testing — test structure, assertions, common patterns
+    triggers: [e2e-test-write, test-run]
+
+  - name: typescript
+    mention: "@{typescript}"
+    file: agent/skills/typescript.md
+    description: TypeScript tooling — dispatch, validation, project structure
+    triggers: [typescript-feature]
+
+  - name: crosscut
+    mention: "@{crosscut}"
+    file: agent/skills/crosscut.md
+    description: Cross-cutting concerns — docs, README, AGENT.md, wiki, memory
+    triggers: [design-document, architecture-plan, architecture-design, documentation-sync, wiki-update, memory-write, changelog-update, progress-update, adr-write, audit-run, milestone-create, route-create, upstream-parity-check]
+
+  - name: upstream-sync
+    mention: "@{upstream}"
+    file: agent/skills/upstream-sync.md
+    description: Upstream parity checking — divergence analysis, port safety gates
+    triggers: [upstream-sync]
+
+  - name: code-review
+    mention: "@{code-review}"
+    file: agent/skills/code-review.md
+    description: Code quality & security review — OWASP Top 10:2025, TypeScript strictness, API conventions, mobile MASVS v2.0
+    triggers: [code-review-full, code-review-targeted, code-review-security, code-review-ci]
+
+  - name: code-integrity
+    mention: "@{code-integrity}"
+    file: agent/skills/code-integrity.md
+    description: AI code integrity & trustworthiness — hidden Unicode, exfiltration, supply chain, CI injection, Phase 1 pattern matching
+    triggers: [code-integrity-scan]
