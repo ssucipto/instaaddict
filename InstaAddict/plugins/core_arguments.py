@@ -18,6 +18,14 @@ class CoreArguments(Plugin):
                 "default": None,
             },
             {
+                "arg": "--reels-topic",
+                "help": "Target topic for the Vision algorithm to classify and filter Reels (e.g. 'dogs or animals')",
+                "nargs": "?",
+                "const": "dogs or animals",
+                "default": "dogs or animals",
+                "metavar": "topic string",
+            },
+            {
                 "arg": "--ai-persona",
                 "help": "System persona identity for Gemini Vision AI comments and captions",
                 "nargs": "?",

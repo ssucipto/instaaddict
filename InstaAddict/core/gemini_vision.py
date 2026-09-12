@@ -236,14 +236,30 @@ logger = logging.getLogger(__name__)
 
 def evaluate_reel_content(img_bytes, topic="dogs or animals"):
     """Validates if a reel matches the target taxonomy to train the algorithm."""
-    global VISION_API_DEAD
+    global VISION_API_DEAD, SESSION_API_CALLS
     if VISION_API_DEAD:
         return True # Fallback
 
+    if SESSION_API_CALLS >= MAX_API_CALLS_PER_SESSION:
+        logger.warning("Gemini AI reached local safety limit of 50 calls. Severing VLM.")
+        VISION_API_DEAD = True
+        return True
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key or api_key == "INSERT_YOUR_KEY_HERE":
+        logger.warning("No Gemini API key found in .env. Skipping Vision AI Filter.")
+        VISION_API_DEAD = True
+        return True
+
+    SESSION_API_CALLS += 1
+    
     try:
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
         
+        # Local import to avoid top level issues if any
+        import io
+        from PIL import Image
         img = Image.open(io.BytesIO(img_bytes))
         
         prompt = f"Look at this screenshot of an Instagram Reel. Does this image predominantly feature {topic}? Reply strictly with a single word: YES or NO."
@@ -262,4 +278,4 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
         return False
     except Exception as e:
         logger.error(f"Reel Vision Evaluation Failed: {e}")
-        return True # Default to open on failure
+        return True
