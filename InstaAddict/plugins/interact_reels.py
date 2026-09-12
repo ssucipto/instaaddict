@@ -50,7 +50,7 @@ class InteractReelsPlugin(Plugin):
             
             # 1. SCREENSHOT & FILTER
             raw_png = d.screenshot(format='raw')
-            is_valid_topic = evaluate_reel_content(raw_png, topic="dogs, puppies, or animals")
+            is_valid_topic = evaluate_reel_content(raw_png, topic=configs.args.reels_topic or "dogs or animals")
             
             w, h = d.info['displayWidth'], d.info['displayHeight']
             
