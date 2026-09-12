@@ -1,0 +1,24 @@
+project: InstaAddict
+type: cli-tool
+description: 'Human-like Instagram automation bot powered by ADB and UIAutomator2,
+  automating interactions (following, liking, commenting, watching stories) directly
+  on Android devices without private API calls.
+
+  '
+stack:
+- primary: Python
+- runtime: Python 3.11+ / 3.13
+- automation: uiautomator2
+- bridge: adb (Android Debug Bridge)
+- configuration: YAML / ConfigArgParse
+- data: SQLite / JSON / text lists
+team: open-source
+priorities:
+- anti-detection
+- reliability
+- safety-limits
+- clean-code
+repo: github.com/joeahkim/InstaAddict
+capabilities:
+- IG v446+ Compatibility (Action Bar & Media group resolution)
+- Local JSON/Media queue processing (UploadPostsPlugin)

@@ -1221,6 +1221,22 @@ class PostsViewList:
     def _get_media_container(self):
         media = self.device.find(resourceIdMatches=ResourceID.CAROUSEL_AND_MEDIA_GROUP)
         content_desc = media.get_desc() if media.exists() else None
+        
+        # Fallback for IG >= v446 where contentDesc comes from its child
+        if content_desc is None and media.exists():
+            try:
+                # Iterate actual device UI children of the media frame
+                # A common hack: if the media group has no desc, one of its photo/video children does
+                info = media.ui_info()
+                # Find desc across immediate children via uiautomator lookup
+                child = media.child(className="android.widget.FrameLayout")
+                if child.exists():
+                    child_desc = child.get_desc()
+                    if child_desc:
+                        content_desc = child_desc
+            except Exception as e:
+                logger.debug(f"Media child description fallback failed: {str(e)}")
+        
         return media, content_desc
 
     @staticmethod
@@ -1280,9 +1296,14 @@ class PostsViewList:
         opened_post_view = OpenedPostView(self.device)
         if skip_media_check:
             return
+            
         media, content_desc = self._get_media_container()
+        
+        # Avoid silent aborts if content_desc is completely unbound from IG UI v446+
         if content_desc is None:
-            return
+            logger.info("Content description is fully missing. Falling back to simple click mode.")
+            mode = LikeMode.SINGLE_CLICK
+            already_watched = True
         if not already_watched:
             media_type, _ = post_view_list.detect_media_type(content_desc)
             opened_post_view.watch_media(media_type)
@@ -1441,27 +1462,49 @@ class AccountView:
 
     def changeToUsername(self, username: str):
         action_bar = ProfileView._getActionBarTitleBtn(self)
+        
+        # If action_bar exists, we compare it
         if action_bar is not None:
             current_profile_name = action_bar.get_text()
-            # in private accounts there is little lock which is codec as two spaces (should be \u1F512)
-            if current_profile_name.strip().upper() == username.upper():
+            if current_profile_name and current_profile_name.strip().upper() == username.upper():
                 logger.info(
                     f"You are already logged as {username}!",
                     extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
                 )
                 return True
-            logger.debug(f"You're logged as {current_profile_name.strip()}")
-            selector = self.device.find(resourceId=ResourceID.ACTION_BAR_TITLE_CHEVRON)
+            if current_profile_name:
+                logger.debug(f"You're logged as {current_profile_name.strip()}")
+                
+        # If no action bar was found OR names didn't match, look for dropdown selector
+        selector = self.device.find(resourceId=ResourceID.ACTION_BAR_TITLE_CHEVRON)
+        if not selector.exists(Timeout.SHORT):
+            # Try tapping the action_bar directly as the account switcher dropdown triggers there
+            if action_bar:
+                selector = action_bar
+        
+        if selector and selector.exists():
             selector.click()
             if self._find_username(username):
+                # Verify change without hard sleep - let the _getActionBarTitleBtn UIAutomator internal wait handle it
+                action_bar = ProfileView._getActionBarTitleBtn(self)
                 if action_bar is not None:
                     current_profile_name = action_bar.get_text()
-                    if current_profile_name.strip().upper() == username.upper():
+                    if current_profile_name and current_profile_name.strip().upper() == username.upper():
                         return True
-                else:
-                    logger.error(
-                        "Cannot find action bar (where you select your account)!"
-                    )
+                
+                # Fallback verify: search exact username on screen if action bar still failing
+                direct_name = self.device.find(textMatches=f"(?i)^{username}$")
+                if direct_name.exists(Timeout.SHORT):
+                    return True
+        else:
+            # Maybe already single account and it matches? 
+            # We must be on the profile already if we couldn't click a dropdown.
+            direct_name = self.device.find(textMatches=f"(?i)^{username}$")
+            if direct_name.exists(Timeout.SHORT):
+                logger.info(f"Confirmed already logged as {username} via screen text fallback.")
+                return True
+                
+        logger.error("Failed to switch to or verify account {username}.")
         return False
 
     def _find_username(self, username, has_scrolled=False):
@@ -1934,6 +1977,14 @@ class ProfileView(ActionBarView):
         )
         if not watching_stories and action_bar.exists(Timeout.LONG) or watching_stories:
             return action_bar
+            
+        # IG v446 fallback: The dedicated action bar resource IDs were removed. 
+        # The title is now simply a TextView at the top of the screen containing the username.
+        logger.debug("Action bar IDs not found. Falling back to layout inspection.")
+        top_text = self.device.find(classNameMatches="(?i)TextView|Button", textMatches="(?i)^[-a-z0-9_.]+$")
+        if top_text.exists(Timeout.SHORT):
+            return top_text
+
         logger.error(
             "Unable to find action bar! (The element with the username at top)"
         )
