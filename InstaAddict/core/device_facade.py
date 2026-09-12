@@ -318,7 +318,7 @@ class DeviceFacade:
         sy = int(sy)
         try:
             logger.debug(f"Swipe from: ({sx},{sy}) to ({ex},{ey}).")
-            self.deviceV2.swipe_points([[sx, sy], [ex, ey]], uniform(0.2, 0.5))
+            self.deviceV2.swipe_points([[sx, sy], [ex, ey]], uniform(0.05, 0.15))
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e)
