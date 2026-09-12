@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 VISION_API_DEAD = False
 SESSION_API_CALLS = 0
-MAX_API_CALLS_PER_SESSION = 50
+MAX_API_CALLS_PER_SESSION = 400
 
 import json
 import sys
@@ -62,7 +62,7 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         return ""
         
     if SESSION_API_CALLS >= MAX_API_CALLS_PER_SESSION:
-        logger.warning("Gemini AI reached local safety limit of 50 calls. Severing VLM.")
+        logger.warning("Gemini AI reached local safety limit of 400 calls. Severing VLM.")
         VISION_API_DEAD = True
         return ""
 
@@ -151,7 +151,7 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
         return ""
         
     if SESSION_API_CALLS >= MAX_API_CALLS_PER_SESSION:
-        logger.warning("Gemini AI reached local safety limit of 50 calls. Severing VLM.")
+        logger.warning("Gemini AI reached local safety limit of 400 calls. Severing VLM.")
         VISION_API_DEAD = True
         return ""
 
@@ -241,7 +241,7 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
         return True # Fallback
 
     if SESSION_API_CALLS >= MAX_API_CALLS_PER_SESSION:
-        logger.warning("Gemini AI reached local safety limit of 50 calls. Severing VLM.")
+        logger.warning("Gemini AI reached local safety limit of 400 calls. Severing VLM.")
         VISION_API_DEAD = True
         return True
 
