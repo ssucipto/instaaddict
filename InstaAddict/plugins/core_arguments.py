@@ -18,6 +18,14 @@ class CoreArguments(Plugin):
                 "default": None,
             },
             {
+                "arg": "--ai-persona",
+                "help": "System persona identity for Gemini Vision AI comments and captions",
+                "nargs": "?",
+                "const": "casual Instagram user",
+                "default": "casual Instagram user",
+                "metavar": "persona string",
+            },
+            {
                 "arg": "--username",
                 "nargs": None,
                 "help": "username of the instagram account being used",

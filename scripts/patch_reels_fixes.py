@@ -1,0 +1,11 @@
+import re
+with open('InstaAddict/plugins/interact_reels.py', 'r', encoding='utf-8') as f:
+    code = f.read()
+
+code = code.replace(
+    'from InstaAddict.core.models import MediaType',
+    'from InstaAddict.core.views import MediaType'
+)
+
+with open('InstaAddict/plugins/interact_reels.py', 'w', encoding='utf-8') as f:
+    f.write(code)
