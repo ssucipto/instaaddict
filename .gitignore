@@ -22,6 +22,7 @@ Pipfile.lock
 /crashes/
 /logs/
 __pycache__/
+window.xml
 
 # ADR-28 — field-feedback file local
 docs/acp-enhanced-dev-team-feedback-consolidated.md

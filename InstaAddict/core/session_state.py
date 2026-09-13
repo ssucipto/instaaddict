@@ -48,6 +48,9 @@ class SessionState:
         self.removedMassFollowers = []
         self.totalScraped = {}
         self.totalCrashes = 0
+        self.totalUploadsSuccess = 0
+        self.totalUploadsFailed = 0
+        self.uploadHistory = []
         self.startTime = datetime.now()
         self.finishTime = None
 
@@ -312,6 +315,10 @@ class SessionStateEncoder(JSONEncoder):
             "total_watched": session_state.totalWatched,
             "total_unfollowed": session_state.totalUnfollowed,
             "total_scraped": session_state.totalScraped,
+            "total_crashes": getattr(session_state, "totalCrashes", 0),
+            "total_uploads_success": getattr(session_state, "totalUploadsSuccess", 0),
+            "total_uploads_failed": getattr(session_state, "totalUploadsFailed", 0),
+            "upload_history": getattr(session_state, "uploadHistory", []),
             "start_time": str(session_state.startTime),
             "finish_time": str(session_state.finishTime),
             "args": session_state.args.__dict__,

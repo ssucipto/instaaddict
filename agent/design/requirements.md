@@ -20,5 +20,6 @@ InstaAddict is a robust Instagram automation bot written in Python that interact
 3. **Multi-Account & Cloned App Support**: Enable seamless operation across multiple Instagram profiles and cloned apps (Dual Messenger / Parallel Space).
 
 ### Secondary Goals
-1. **Real-time Reporting & Analytics**: Telegram notifications, session metrics, and SQLite history logging.
+1. **Real-time Reporting & Analytics**: Telegram notifications, session metrics, continuous Markdown run history, and SQLite logging.
 2. **Modular Plugin Architecture**: Allow community contributors to add custom engagement strategies easily.
+3. **Production Telemetry & Self-Learning**: Isolated error trace logging, unhandled crash interception, full state persistence (crashes and content queue uploads), and automated dog-feeding parameter optimization.

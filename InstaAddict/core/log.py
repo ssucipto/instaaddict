@@ -55,11 +55,33 @@ def create_log_file_handler(filename):
     return file_handler
 
 
+def create_error_log_file_handler(filename):
+    file_handler = RotatingFileHandler(
+        filename,
+        mode="a",
+        backupCount=10,
+        maxBytes=15 * 1000000,
+        encoding="utf-8",
+    )
+
+    file_handler.setLevel(logging.WARNING)
+    file_handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s %(levelname)8s | %(message)s (%(filename)s:%(lineno)d)",
+            datefmt=r"[%m/%d %H:%M:%S]",
+        )
+    )
+    # Do NOT add LoggerFilterInstaAddictOnly to error handler so that
+    # external crashes (uiautomator2, adbutils, system) are captured
+    return file_handler
+
+
 def configure_logger(debug, username):
     global g_session_id
     global g_log_file_name
     global g_logs_dir
     global g_file_handler
+    global g_error_file_handler
     global g_log_file_updated
 
     console_level = logging.DEBUG if debug else logging.INFO
@@ -96,8 +118,29 @@ def configure_logger(debug, username):
     g_file_handler = create_log_file_handler(f"{g_logs_dir}/{g_log_file_name}")
     root_logger.addHandler(g_file_handler)
 
+    error_log_name = g_log_file_name.replace(".log", "_error_trace.log")
+    g_error_file_handler = create_error_log_file_handler(
+        f"{g_logs_dir}/{error_log_name}"
+    )
+    root_logger.addHandler(g_error_file_handler)
+
+    def handle_uncaught_exception(exc_type, exc_value, exc_traceback):
+        import sys
+
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        root_logger.critical(
+            "Uncaught fatal exception:", exc_info=(exc_type, exc_value, exc_traceback)
+        )
+
+    import sys
+
+    sys.excepthook = handle_uncaught_exception
+
     init_logger = logging.getLogger(__name__)
     init_logger.debug(f"Initial log file: {g_logs_dir}/{g_log_file_name}")
+    init_logger.debug(f"Initial error log file: {g_logs_dir}/{error_log_name}")
 
 
 def get_log_file_config():
@@ -112,36 +155,85 @@ def update_log_file_name(username: str):
     old_log_file_name, logs_dir, file_handler, _ = get_log_file_config()
     old_full_filename = f"{logs_dir}/{old_log_file_name}"
 
+    old_error_log_file_name = old_log_file_name.replace(".log", "_error_trace.log")
+    old_error_full_filename = f"{logs_dir}/{old_error_log_file_name}"
+
     current_logger = logging.getLogger(__name__)
     if not username:
         current_logger.error(f"No username found, using log file {old_full_filename}")
         return
     named_log_file_name = f"{username}.log"
     named_full_filename = f"{logs_dir}/{named_log_file_name}"
+
+    named_error_log_file_name = f"{username}_error_trace.log"
+    named_error_full_filename = f"{logs_dir}/{named_error_log_file_name}"
+
     rollover = bool(os.path.isfile(named_full_filename))
     named_file_handler = create_log_file_handler(named_full_filename)
     if rollover:
         named_file_handler.doRollover()
 
+    error_rollover = bool(os.path.isfile(named_error_full_filename))
+    named_error_file_handler = create_error_log_file_handler(named_error_full_filename)
+    if error_rollover:
+        named_error_file_handler.doRollover()
+
     # copy existing runtime logs (uidd4.log) to named log file (username.log)
-    with open(old_full_filename, "r", encoding="utf-8") as unnamed_file, open(
-        named_full_filename, "a", encoding="utf-8"
-    ) as named_file:
-        for line in unnamed_file:
-            named_file.write(line)
+    if os.path.exists(old_full_filename):
+        with open(old_full_filename, "r", encoding="utf-8") as unnamed_file, open(
+            named_full_filename, "a", encoding="utf-8"
+        ) as named_file:
+            for line in unnamed_file:
+                named_file.write(line)
+
+    if os.path.exists(old_error_full_filename):
+        with open(
+            old_error_full_filename, "r", encoding="utf-8"
+        ) as unnamed_error_file, open(
+            named_error_full_filename, "a", encoding="utf-8"
+        ) as named_error_file:
+            for line in unnamed_error_file:
+                named_error_file.write(line)
 
     root_logger = logging.getLogger()
     root_logger.removeHandler(file_handler)
     root_logger.addHandler(named_file_handler)
 
+    global g_error_file_handler
+    if g_error_file_handler:
+        root_logger.removeHandler(g_error_file_handler)
+    root_logger.addHandler(named_error_file_handler)
+
     current_logger = logging.getLogger(__name__)
     current_logger.debug(f"Updated log file: {named_full_filename}")
+    current_logger.debug(f"Updated error log file: {named_error_full_filename}")
+
+    # Explicitly close old handlers before unlinking files to prevent Windows PermissionError
+    try:
+        file_handler.close()
+    except Exception as e:
+        current_logger.debug(f"Error closing old file handler: {e}")
 
     try:
-        os.remove(old_full_filename)
+        if g_error_file_handler:
+            g_error_file_handler.close()
+    except Exception as e:
+        current_logger.debug(f"Error closing old error file handler: {e}")
+
+    try:
+        if os.path.exists(old_full_filename):
+            os.remove(old_full_filename)
     except Exception as e:
         current_logger.debug(
             f"Failed to remove old file: {old_full_filename}. Exception: {e}"
+        )
+
+    try:
+        if os.path.exists(old_error_full_filename):
+            os.remove(old_error_full_filename)
+    except Exception as e:
+        current_logger.debug(
+            f"Failed to remove old error file: {old_error_full_filename}. Exception: {e}"
         )
 
     global g_log_file_name
@@ -149,4 +241,5 @@ def update_log_file_name(username: str):
     global g_log_file_updated
     g_log_file_name = named_log_file_name
     g_file_handler = named_file_handler
+    g_error_file_handler = named_error_file_handler
     g_log_file_updated = True
