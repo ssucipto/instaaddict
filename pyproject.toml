@@ -4,7 +4,10 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "InstaAddict"
-authors = [{ name = "Joeahkim", email = "joeahkim@gmail.com" }]
+authors = [
+    { name = "ssucipto" },
+    { name = "Joeahkim", email = "joeahkim@gmail.com" }
+]
 readme = "README.md"
 classifiers = [
     "License :: Free for non-commercial use",
@@ -33,7 +36,7 @@ analytics = ["matplotlib==3.4.2"]
 dev = ["flit", "pre-commit", "black", "flake8", "isort", "ruff"]
 
 [project.urls]
-Source = "https://github.com/joeahkim/InstaAddict"
+Source = "https://github.com/ssucipto/instaaddict"
 
 [project.scripts]
 instaaddict = "InstaAddict.__main__:main"
