@@ -105,3 +105,17 @@ carryovers:
     affected_files:
       - InstaAddict/core/gemini_vision.py
       - InstaAddict/plugins/interact_reels.py
+
+  - id: CO-009
+    audit_report: agent/reports/audit-019-upstream-commits.md
+    date_raised: 2026-09-13
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-13'
+    verified_in_audit: 'audit-020'
+    summary: Upstream repository has 5 relevant UI bugfix commits. Need to safely cherry-pick them to avoid "merge conflicts" and preserve custom Vision AI/Uploader logic.
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/handle_sources.py

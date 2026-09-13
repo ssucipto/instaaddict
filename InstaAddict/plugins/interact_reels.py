@@ -30,6 +30,7 @@ class InteractReelsPlugin(Plugin):
             },
             {
                 "arg": "--evaluate-percentage",
+                "nargs": None,
                 "help": "Percentage of Reels to evaluate with Vision AI",
                 "metavar": "25",
                 "default": 25,

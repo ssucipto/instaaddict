@@ -299,7 +299,11 @@ def interact_with_user(
                         like_succeed = opened_post_view.like_video()
                         logger.debug("Closing video...")
                         device.back()
-                elif media_type in (MediaType.CAROUSEL, MediaType.PHOTO, MediaType.UNKNOWN):
+                elif media_type in (
+                    MediaType.CAROUSEL,
+                    MediaType.PHOTO,
+                    MediaType.UNKNOWN,
+                ):
                     if media_type == MediaType.CAROUSEL:
                         _browse_carousel(device, obj_count)
                     opened_post_view.watch_media(media_type)
@@ -618,7 +622,9 @@ def _comment(
 
         if explicit_comment:
             smart_ai_comment = explicit_comment
-            logger.info("Using pre-generated explicit comment. Skipping duplicate Vision-AI check.")
+            logger.info(
+                "Using pre-generated explicit comment. Skipping duplicate Vision-AI check."
+            )
         else:
             # VISION AI: Take snapshot of view BEFORE opening comment box (obfuscation guard)
             logger.info("Executing Vision-AI Context Assessment...")
@@ -636,7 +642,10 @@ def _comment(
             resourceIdMatches=ResourceID.MEDIA_CONTAINER,
         )
         if tab_bar.exists() and media.exists():
-            if int(tab_bar.get_bounds()["top"]) - int(media.get_bounds()["bottom"]) < 150:
+            if (
+                int(tab_bar.get_bounds()["top"]) - int(media.get_bounds()["bottom"])
+                < 150
+            ):
                 universal_actions._swipe_points(
                     direction=Direction.DOWN, delta_y=randint(150, 250)
                 )
@@ -662,7 +671,9 @@ def _comment(
                         enabled="true",
                     )
                 if not comment_box.exists():
-                    any_edittext = device.find(classNameMatches=".*EditText.*|.*AutoCompleteTextView.*")
+                    any_edittext = device.find(
+                        classNameMatches=".*EditText.*|.*AutoCompleteTextView.*"
+                    )
                     if any_edittext.exists():
                         logger.debug(
                             f"[DEBUG comment box] found an EditText-like widget but the selector missed it. Bounds: {any_edittext.get_bounds()}"
@@ -672,19 +683,25 @@ def _comment(
                             "[DEBUG comment box] no EditText-like widget found on screen at all."
                         )
                 if comment_box.exists():
-                    comment = smart_ai_comment if smart_ai_comment else load_random_comment(my_username, media_type)
+                    comment = (
+                        smart_ai_comment
+                        if smart_ai_comment
+                        else load_random_comment(my_username, media_type)
+                    )
                     if not comment:
                         UniversalActions.close_keyboard(device)
                         device.back()
                         return False
-                    
+
                     import time
+
                     # Biometric Telemetry Typing Delay Guard (150ms per character)
                     sleep_duration = len(comment) * 0.15
                     logger.info(
-                        f"Write comment: {comment} (Simulating native typing delay for {sleep_duration:.2f}s)", extra={"color": f"{Fore.CYAN}"}
+                        f"Write comment: {comment} (Simulating native typing delay for {sleep_duration:.2f}s)",
+                        extra={"color": f"{Fore.CYAN}"},
                     )
-                    
+
                     comment_box.set_text(
                         comment, Mode.PASTE if args.dont_type else Mode.TYPE
                     )
@@ -694,10 +711,21 @@ def _comment(
                     # Fire physical spacebar to wake React Native event listener natively
                     try:
                         import subprocess
-                        subprocess.run(["adb", "-s", str(device.deviceV2.serial), "shell", "input", "keyevent", "62"], shell=False)
+
+                        subprocess.run(
+                            [
+                                "adb",
+                                "-s",
+                                str(device.deviceV2.serial),
+                                "shell",
+                                "input",
+                                "keyevent",
+                                "62",
+                            ],
+                            shell=False,
+                        )
                     except:
                         pass
-
 
                     # Wait for post button to appear (it only shows after typing)
                     random_sleep(0.5, 1, modulable=False)
@@ -711,23 +739,36 @@ def _comment(
                         )
                     if not post_button.exists():
                         # Fallback: try to find button by content-desc "Post" or "Send"
-                        post_button = device.find(descriptionMatches="(?i)^(Post|Send)$")
+                        post_button = device.find(
+                            descriptionMatches="(?i)^(Post|Send)$"
+                        )
                     if post_button.exists():
                         post_button.click()
                         time.sleep(2)
-                        
+
                         # Graceful Degradation: Soft-Ban Action Blocked Sniffer
-                        blocked = device.find(textMatches="(?i)Blocked|(?i)Restricted|(?i)Try Again Later")
+                        blocked = device.find(
+                            textMatches="(?i)Blocked|(?i)Restricted|(?i)Try Again Later"
+                        )
                         if blocked.exists(timeout=2):
-                            logger.error("Ig Action Blocked overlay detected! Aborting to prevent ban cascade.")
+                            logger.error(
+                                "Ig Action Blocked overlay detected! Aborting to prevent ban cascade."
+                            )
                             # session_state natively records blocks and we should raise it
                             ok_btn = device.find(textMatches="(?i)Tell us|(?i)OK")
-                            if ok_btn.exists(): ok_btn.click()
+                            if ok_btn.exists():
+                                ok_btn.click()
                             from InstaAddict.core.exceptions import ActionBlockedError
-                            raise ActionBlockedError("Action Blocked during comment injection.")
-                            if ok_btn.exists(): ok_btn.click()
+
+                            raise ActionBlockedError(
+                                "Action Blocked during comment injection."
+                            )
+                            if ok_btn.exists():
+                                ok_btn.click()
                     else:
-                        logger.warning("Post button not found, skipping comment submission")
+                        logger.warning(
+                            "Post button not found, skipping comment submission"
+                        )
                         universal_actions.close_keyboard(device)
                         device.back()
                         return False
@@ -741,9 +782,7 @@ def _comment(
                 universal_actions.close_keyboard(device)
                 # Verify comment was posted by checking for "{username} said {comment}" pattern in content-desc
                 # This is the reliable signal based on UI hierarchy analysis
-                posted_text = device.find(
-                    description=f"{my_username} said {comment}"
-                )
+                posted_text = device.find(description=f"{my_username} said {comment}")
                 if posted_text.exists(Timeout.MEDIUM):
                     logger.info("Comment succeed.", extra={"color": f"{Fore.GREEN}"})
                     session_state.totalComments += 1
@@ -766,6 +805,7 @@ def _comment(
                     direction=Direction.DOWN, delta_y=randint(150, 250)
                 )
     return False
+
 
 def _send_PM(
     device,
@@ -1062,7 +1102,9 @@ def _watch_stories(
                 resourceId=ResourceID.TOUCH_INTERCEPTOR_EXPANDED_PROFILE_PIC
             )
             if expanded_profile_pic.exists():
-                logger.debug("Profile picture preview opened instead of story. Dismissing.")
+                logger.debug(
+                    "Profile picture preview opened instead of story. Dismissing."
+                )
                 device.back()
                 return 0
             story_view = CurrentStoryView(device)

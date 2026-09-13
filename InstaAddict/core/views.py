@@ -543,7 +543,10 @@ class PostsViewList:
                         break
                 else:
                     media_bounds = self._get_current_media_bounds(containers_content)
-                    if media_bounds and gap_view_obj.get_bounds()["bottom"] < media_bounds["bottom"]:
+                    if (
+                        media_bounds
+                        and gap_view_obj.get_bounds()["bottom"] < media_bounds["bottom"]
+                    ):
                         PostsViewList(self.device).swipe_to_fit_posts(
                             SwipeTo.HALF_PHOTO
                         )
@@ -586,14 +589,18 @@ class PostsViewList:
                     "bottom": displayHeight * 0.75,
                 }
 
-            ac_exists, _, ac_bottom = PostsViewList(self.device)._get_action_bar_position()
+            ac_exists, _, ac_bottom = PostsViewList(
+                self.device
+            )._get_action_bar_position()
             if ac_exists:
                 obj2 = ac_bottom + 20
             else:
                 obj2 = media_bounds["top"] if media_bounds else displayHeight * 0.25
 
             if (obj1 - obj2) < (displayHeight * 0.4):
-                logger.debug(f"Calculated swipe distance {obj1 - obj2} is too small. Overriding to prevent snap-back.")
+                logger.debug(
+                    f"Calculated swipe distance {obj1 - obj2} is too small. Overriding to prevent snap-back."
+                )
                 obj1 = displayHeight * 0.8
                 obj2 = displayHeight * 0.2
 
@@ -699,7 +706,9 @@ class PostsViewList:
         visible_candidates = [
             item
             for item in media_candidates
-            if 0 <= (item["bounds"]["top"] + item["bounds"]["bottom"]) / 2 <= display_height
+            if 0
+            <= (item["bounds"]["top"] + item["bounds"]["bottom"]) / 2
+            <= display_height
         ]
         if not visible_candidates:
             visible_candidates = media_candidates
@@ -744,8 +753,12 @@ class PostsViewList:
                 if media_bounds is not None:
                     logger.debug("Using compatibility media bounds.")
 
-            if media_count > 1 and media_bounds and (
-                media_bounds["bottom"] < self.device.get_info()["displayHeight"] / 3
+            if (
+                media_count > 1
+                and media_bounds
+                and (
+                    media_bounds["bottom"] < self.device.get_info()["displayHeight"] / 3
+                )
             ):
                 universal_actions._swipe_points(Direction.DOWN, delta_y=100)
                 continue
@@ -761,7 +774,10 @@ class PostsViewList:
                 else:
                     universal_actions._swipe_points(Direction.DOWN, delta_y=100)
                     continue
-            elif media_bounds and media_bounds["bottom"] > likes_view.get_bounds()["bottom"]:
+            elif (
+                media_bounds
+                and media_bounds["bottom"] > likes_view.get_bounds()["bottom"]
+            ):
                 universal_actions._swipe_points(Direction.DOWN, delta_y=100)
                 continue
             logger.debug("Likers container exists!")
@@ -954,7 +970,10 @@ class PostsViewList:
         for child in node.iter("node"):
             if child is node:
                 continue
-            if PostsViewList._normalize_ig_text(child.attrib.get("content-desc")) == username:
+            if (
+                PostsViewList._normalize_ig_text(child.attrib.get("content-desc"))
+                == username
+            ):
                 return True
         return False
 
@@ -1062,7 +1081,11 @@ class PostsViewList:
             if not has_media:
                 continue
             for caption in captions:
-                if header["bounds"]["top"] <= caption["bounds"]["top"] < next_header_top:
+                if (
+                    header["bounds"]["top"]
+                    <= caption["bounds"]["top"]
+                    < next_header_top
+                ):
                     logger.debug("Description found in current post hierarchy.")
                     return caption["text"]
         return None
@@ -1262,7 +1285,7 @@ class PostsViewList:
     def _get_media_container(self):
         media = self.device.find(resourceIdMatches=ResourceID.CAROUSEL_AND_MEDIA_GROUP)
         content_desc = media.get_desc() if media.exists() else None
-        
+
         # Fallback for IG >= v446 where contentDesc comes from its child
         if content_desc is None and media.exists():
             try:
@@ -1277,7 +1300,7 @@ class PostsViewList:
                         content_desc = child_desc
             except Exception as e:
                 logger.debug(f"Media child description fallback failed: {str(e)}")
-        
+
         return media, content_desc
 
     @staticmethod
@@ -1337,12 +1360,14 @@ class PostsViewList:
         opened_post_view = OpenedPostView(self.device)
         if skip_media_check:
             return
-            
+
         media, content_desc = self._get_media_container()
-        
+
         # Avoid silent aborts if content_desc is completely unbound from IG UI v446+
         if content_desc is None:
-            logger.info("Content description is fully missing. Falling back to simple click mode.")
+            logger.info(
+                "Content description is fully missing. Falling back to simple click mode."
+            )
             mode = LikeMode.SINGLE_CLICK
             already_watched = True
         if not already_watched:
@@ -1390,12 +1415,14 @@ class PostsViewList:
                 return False
         else:
             if retries <= 0:
-                logger.debug("Could not verify like via standard button ID. Assuming already handled.")
+                logger.debug(
+                    "Could not verify like via standard button ID. Assuming already handled."
+                )
                 return True
             UniversalActions(self.device)._swipe_points(
                 direction=Direction.DOWN, delta_y=100
             )
-            return PostsViewList(self.device)._check_if_liked(retries=retries-1)
+            return PostsViewList(self.device)._check_if_liked(retries=retries - 1)
 
     def _check_if_ad_or_hashtag(
         self, post_owner_obj
@@ -1506,11 +1533,14 @@ class AccountView:
 
     def changeToUsername(self, username: str):
         action_bar = ProfileView._getActionBarTitleBtn(self)
-        
+
         # If action_bar exists, we compare it
         if action_bar is not None:
             current_profile_name = action_bar.get_text()
-            if current_profile_name and current_profile_name.strip().upper() == username.upper():
+            if (
+                current_profile_name
+                and current_profile_name.strip().upper() == username.upper()
+            ):
                 logger.info(
                     f"You are already logged as {username}!",
                     extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
@@ -1518,14 +1548,14 @@ class AccountView:
                 return True
             if current_profile_name:
                 logger.debug(f"You're logged as {current_profile_name.strip()}")
-                
+
         # If no action bar was found OR names didn't match, look for dropdown selector
         selector = self.device.find(resourceId=ResourceID.ACTION_BAR_TITLE_CHEVRON)
         if not selector.exists(Timeout.SHORT):
             # Try tapping the action_bar directly as the account switcher dropdown triggers there
             if action_bar:
                 selector = action_bar
-        
+
         if selector and selector.exists():
             selector.click()
             if self._find_username(username):
@@ -1533,21 +1563,26 @@ class AccountView:
                 action_bar = ProfileView._getActionBarTitleBtn(self)
                 if action_bar is not None:
                     current_profile_name = action_bar.get_text()
-                    if current_profile_name and current_profile_name.strip().upper() == username.upper():
+                    if (
+                        current_profile_name
+                        and current_profile_name.strip().upper() == username.upper()
+                    ):
                         return True
-                
+
                 # Fallback verify: search exact username on screen if action bar still failing
                 direct_name = self.device.find(textMatches=f"(?i)^{username}$")
                 if direct_name.exists(Timeout.SHORT):
                     return True
         else:
-            # Maybe already single account and it matches? 
+            # Maybe already single account and it matches?
             # We must be on the profile already if we couldn't click a dropdown.
             direct_name = self.device.find(textMatches=f"(?i)^{username}$")
             if direct_name.exists(Timeout.SHORT):
-                logger.info(f"Confirmed already logged as {username} via screen text fallback.")
+                logger.info(
+                    f"Confirmed already logged as {username} via screen text fallback."
+                )
                 return True
-                
+
         logger.error("Failed to switch to or verify account {username}.")
         return False
 
@@ -2025,11 +2060,13 @@ class ProfileView(ActionBarView):
         )
         if not watching_stories and action_bar.exists(Timeout.LONG) or watching_stories:
             return action_bar
-            
-        # IG v446 fallback: The dedicated action bar resource IDs were removed. 
+
+        # IG v446 fallback: The dedicated action bar resource IDs were removed.
         # The title is now simply a TextView at the top of the screen containing the username.
         logger.debug("Action bar IDs not found. Falling back to layout inspection.")
-        top_text = self.device.find(classNameMatches="(?i)TextView|Button", textMatches="(?i)^[-a-z0-9_.]+$")
+        top_text = self.device.find(
+            classNameMatches="(?i)TextView|Button", textMatches="(?i)^[-a-z0-9_.]+$"
+        )
         if top_text.exists(Timeout.SHORT):
             return top_text
 
@@ -2563,6 +2600,7 @@ class FollowingView:
         logger.error(f"Cannot confirm unfollow for {username}.")
         save_crash(self.device)
         return False
+
 
 class FollowersView:
     def __init__(self, device: DeviceFacade):

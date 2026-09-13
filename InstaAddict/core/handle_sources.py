@@ -691,6 +691,7 @@ def handle_followers(
         username,
     )
 
+
 def check_and_report_restricted_list(device, session_state, target_username):
     no_results_heading = device.find(
         className=ClassName.TEXT_VIEW,
@@ -731,6 +732,7 @@ def check_and_report_restricted_list(device, session_state, target_username):
         logger.error(f"Failed to send Telegram restriction alert: {e}")
 
     return True
+
 
 def iterate_over_followers(
     self,
@@ -907,7 +909,9 @@ def iterate_over_followers(
                     resourceId=self.ResourceID.ACTION_BAR_SEARCH_EDIT_TEXT
                 )
                 if search_input.exists():
-                    logger.debug("On active search-input screen, pressing back to dismiss")
+                    logger.debug(
+                        "On active search-input screen, pressing back to dismiss"
+                    )
                     device.back()
                 return
 
