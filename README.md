@@ -1,27 +1,27 @@
 <p align="center">
-  <img src="https://github.com/joeahkim/InstaAddict/raw/master/res/logo.png" alt="logo">
+  <img src="https://github.com/ssucipto/instaaddict/raw/master/res/logo.png" alt="logo">
   <br />
-  <h1 align="center">InstaAddict</h1>
+  <h1 align="center">InstaAddict AI — Enhanced Edition</h1>
   <br />
-  <p align="center">Looking for production-grade Instagram automation? I'm proud to present <b>InstaAddict</b>: a <b>100% free, open-source, human-like Instagram bot</b>. Grow your audience and engagement with automated liking, following, commenting, story watching, and autonomous posting on real Android devices or emulators. <b>No root required. No private APIs.</b></p>
+  <p align="center">Looking for production-grade Instagram automation? I'm proud to present <b>InstaAddict AI (Enhanced Edition)</b>: a <b>100% free, open-source, human-like Instagram bot</b>. Grow your audience and engagement with automated liking, following, commenting, story watching, and autonomous posting on real Android devices or emulators. <b>No root required. No private APIs.</b></p>
   <p align="center">
-    <a href="https://github.com/joeahkim/InstaAddict/blob/develop/LICENSE">
-      <img src="https://img.shields.io/github/license/joeahkim/InstaAddict?style=flat" alt="license"/>
+    <a href="https://github.com/ssucipto/instaaddict/blob/master/LICENSE">
+      <img src="https://img.shields.io/github/license/ssucipto/instaaddict?style=flat" alt="license"/>
     </a>
-    <a href="https://pypi.org/project/instaaddict/">
-      <img src="https://img.shields.io/badge/pypi-v1.1.0-blue?style=flat" alt="pypi"/>
+    <a href="https://github.com/ssucipto/instaaddict/releases">
+      <img src="https://img.shields.io/badge/release-v1.1.0-blue?style=flat" alt="release"/>
     </a>
     <a href="https://www.python.org/">
       <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-red.svg?style=flat" alt="Python"/>
     </a>
-    <a href="https://github.com/joeahkim/InstaAddict/pulls">
+    <a href="https://github.com/ssucipto/instaaddict/pulls">
       <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs Welcome"/>
     </a>
-    <a href="https://github.com/joeahkim/InstaAddict/issues">
-      <img src="https://img.shields.io/github/issues/joeahkim/InstaAddict?style=flat" alt="Issues"/>
+    <a href="https://github.com/ssucipto/instaaddict/issues">
+      <img src="https://img.shields.io/github/issues/ssucipto/instaaddict?style=flat" alt="Issues"/>
     </a>
-    <a href="https://github.com/joeahkim/InstaAddict/stargazers">
-      <img src="https://img.shields.io/github/stars/joeahkim/InstaAddict?style=flat" alt="Stars"/>
+    <a href="https://github.com/ssucipto/instaaddict/stargazers">
+      <img src="https://img.shields.io/github/stars/ssucipto/instaaddict?style=flat" alt="Stars"/>
     </a>
     <a href="https://discord.gg/PvxsP8HFa">
       <img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"/>
@@ -58,27 +58,25 @@
 
 <br />
 
-# About This Project & Our Fork
+# About This Project & Lineage
 
-**InstaAddict** is an advanced fork, active continuation, and comprehensive architectural modernization of [GramAddict](https://github.com/GramAddict/bot), originally created and maintained by [mastrolube](https://github.com/mastrolube) and the GramAddict community. 
+**InstaAddict AI (Enhanced Edition)** is an advanced fork and comprehensive architectural modernization maintained by [@ssucipto](https://github.com/ssucipto).
 
-Upstream GramAddict has ceased active maintenance. Instagram continuously updates its Android application's UI hierarchy, resource locators, and view structures (such as switching from traditional feed containers to full-screen Reels viewer pagers, changing account switcher selectors, introducing modern web view ad overlays, and altering IME keyboard behaviors on Android 14+). Without ongoing patches, these shifts silently break automation scripts and freeze execution.
+### Project Lineage & Credits
+1. **InstaAddict AI (Enhanced Edition)** — Maintained by [@ssucipto](https://github.com/ssucipto). Introduces modern IG v446+ Reels compatibility, multimodal Gemini Vision AI, tiered dynamic hashtag discovery, persistent non-bot caching, fluid 200ms ADB gestures, and in-app browser escape watchdogs.
+2. **InstaAddict (Upstream Fork)** — Maintained by [@joeahkim](https://github.com/joeahkim), which first rebranded from GramAddict and introduced initial UI locator updates for IG 438+.
+3. **GramAddict (Original Foundation)** — Originally created and architected by [mastrolube](https://github.com/mastrolube) and the open-source GramAddict community.
 
-InstaAddict actively tracks Instagram updates, hardening automation against UI shifts, eliminating ad trapping, integrating multimodal Vision AI, implementing deterministic hashtag rotation engines, and maintaining maximum reliability.
+> This project is 100% free and open-source under the MIT License. All original architectural foundation credits go to the GramAddict and InstaAddict open-source contributors.
 
-> This project is 100% free and open source under the MIT License. All original architectural foundation credits go to the GramAddict contributors.
-
-### Maintained by
+### Enhanced Edition Maintainer
 
 <p>
-  <a href="https://github.com/joeahkim">
-    <img src="https://img.shields.io/badge/GitHub-joeahkim-181717?style=flat&logo=github" alt="GitHub"/>
+  <a href="https://github.com/ssucipto">
+    <img src="https://img.shields.io/badge/GitHub-ssucipto-181717?style=flat&logo=github" alt="GitHub"/>
   </a>
-  <a href="https://x.com/_joeahkim">
-    <img src="https://img.shields.io/badge/X-@__joeahkim-000000?style=flat&logo=x" alt="X"/>
-  </a>
-  <a href="https://www.instagram.com/_joeahkim/">
-    <img src="https://img.shields.io/badge/Instagram-@__joeahkim-E4405F?style=flat&logo=instagram&logoColor=white" alt="Instagram"/>
+  <a href="https://github.com/ssucipto/instaaddict">
+    <img src="https://img.shields.io/badge/Repository-ssucipto%2Finstaaddict-blue?style=flat&logo=git" alt="Repository"/>
   </a>
 </p>
 
@@ -264,8 +262,8 @@ Your device physically renders the UI, scrolls feeds, inspects elements, and tap
 
 ```bash
 # Clone the repository
-git clone https://github.com/joeahkim/InstaAddict.git
-cd InstaAddict
+git clone https://github.com/ssucipto/instaaddict.git
+cd instaaddict
 
 # Create a virtual environment
 python -m venv .venv
@@ -388,21 +386,15 @@ Ensure platform-tools is added to your Environment `PATH` variable, and restart 
 
 # Support This Project
 
-InstaAddict is 100% free and open source. Maintaining compatibility against Instagram's rapid UI shifts requires dedicated research and testing. If InstaAddict has helped you grow your accounts, consider supporting development:
-
-<p align="center">
-  <a href="https://paystack.shop/pay/joeahkim">
-    <img src="https://img.shields.io/badge/Donate-Paystack-00C3F7?style=for-the-badge&logo=stripe&logoColor=white" alt="Donate via Paystack"/>
-  </a>
-</p>
+InstaAddict AI (Enhanced Edition) is 100% free and open-source. Maintaining compatibility against Instagram's rapid UI shifts requires continuous research and testing. If this bot has helped your workflow or account growth, please consider giving it a ⭐ on GitHub and sharing it with the community!
 
 <br />
 
 # Community
 
-* 💬 **Discord**: [Join our Discord community](https://discord.gg/PvxsP8HFa) for support, setup assistance, and growth discussions.
-* 🐛 **Issue Tracker**: Found a bug or broken locator on a new Instagram release? [Submit an Issue](https://github.com/joeahkim/InstaAddict/issues).
-* 🛠️ **Contributing**: Pull requests and locator updates are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+* 💬 **Discord**: [Join the Discord community](https://discord.gg/PvxsP8HFa) for community support, setup assistance, and growth discussions.
+* 🐛 **Issue Tracker**: Found a bug or broken locator on a new Instagram release? [Submit an Issue](https://github.com/ssucipto/instaaddict/issues).
+* 🛠️ **Contributing**: Pull requests, bug reports, and locator updates are welcome!
 
 ---
 

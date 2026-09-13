@@ -19,7 +19,7 @@ priorities:
 - reliability
 - safety-limits
 - clean-code
-repo: github.com/joeahkim/InstaAddict
+repo: github.com/ssucipto/instaaddict
 capabilities:
 - IG v446+ Full-Screen Reels & Modern Action Bar / Media group resolution
 - Multi-Tier Hashtag Discovery, Rotation & Pruning Engine (HashtagManager)
