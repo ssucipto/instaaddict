@@ -94,6 +94,21 @@ class DeviceFacade:
         except ImportError:
             raise ImportError("Please install uiautomator2: pip3 install uiautomator2")
 
+        # Patch uiautomator2 current_ime regex for Android 14+ / modern IME compatibility
+        if not hasattr(uiautomator2.Device, "_acp_patched_ime"):
+            uiautomator2.Device._acp_patched_ime = True
+            def patched_current_ime(dev_self):
+                _INPUT_METHOD_RE = re.compile(
+                    r"(?:mCurMethodId|mCurImeId|mSelectedImeId)=([-_./\w]+)"
+                )
+                dim, _ = dev_self.shell(["dumpsys", "input_method"])
+                m = _INPUT_METHOD_RE.search(dim)
+                method_id = None if not m else m.group(1)
+                shown = "mInputShown=true" in dim
+                return (method_id, shown)
+
+            uiautomator2.Device.current_ime = patched_current_ime
+
     def _get_current_app(self):
         try:
             return self.deviceV2.app_current()["package"]
@@ -291,20 +306,29 @@ class DeviceFacade:
         """Swipe finger in the `direction`.
         Scale is the sliding distance. Default to 50% of the screen width
         """
-        swipe_dir = ""
-        if direction == Direction.UP:
-            swipe_dir = "up"
-        elif direction == Direction.RIGHT:
-            swipe_dir = "right"
-        elif direction == Direction.LEFT:
-            swipe_dir = "left"
-        elif direction == Direction.DOWN:
-            swipe_dir = "down"
-
-        logger.debug(f"Swipe {swipe_dir}, scale={scale}")
+        logger.debug(f"Swipe {direction.name}, scale={scale}")
 
         try:
-            self.deviceV2.swipe_ext(swipe_dir, scale=scale)
+            info = self.get_info()
+            w, h = info["displayWidth"], info["displayHeight"]
+            cx, cy = w / 2, h / 2
+            
+            sx, sy, ex, ey = cx, cy, cx, cy
+            if direction == Direction.UP:
+                sy = min(h * 0.9, cy + (h * scale / 2))
+                ey = max(h * 0.1, cy - (h * scale / 2))
+            elif direction == Direction.DOWN:
+                sy = max(h * 0.1, cy - (h * scale / 2))
+                ey = min(h * 0.9, cy + (h * scale / 2))
+            elif direction == Direction.LEFT:
+                sx = min(w * 0.9, cx + (w * scale / 2))
+                ex = max(w * 0.1, cx - (w * scale / 2))
+            elif direction == Direction.RIGHT:
+                sx = max(w * 0.1, cx - (w * scale / 2))
+                ex = min(w * 0.9, cx + (w * scale / 2))
+
+            logger.debug(f"Fast Drag from ({sx},{sy}) to ({ex},{ey}).")
+            self.deviceV2.drag(sx, sy, ex, ey, duration=0.03)
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e)
@@ -318,7 +342,7 @@ class DeviceFacade:
         sy = int(sy)
         try:
             logger.debug(f"Drag (No-Fling) from ({sx},{sy}) to ({ex},{ey}).")
-            self.deviceV2.drag(sx, sy, ex, ey, duration=0.25)
+            self.deviceV2.drag(sx, sy, ex, ey, duration=0.03)
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e)
@@ -712,48 +736,50 @@ class DeviceFacade:
                 if mode == Mode.PASTE:
                     self.viewV2.set_text(text)
                 else:
-                    self.click(sleep=SleepTime.SHORT)
-                    self.deviceV2.clear_text()
-                    random_sleep(0.3, 1, modulable=False)
-                    start = datetime.now()
-                    sentences = text.splitlines()
-                    for j, sentence in enumerate(sentences, start=1):
-                        word_list = sentence.split()
-                        n_words = len(word_list)
-                        for n, word in enumerate(word_list, start=1):
-                            i = 0
-                            n_single_letters = randint(1, 3)
-                            for char in word:
-                                if i < n_single_letters:
-                                    self.deviceV2.send_keys(char, clear=False)
-                                    # random_sleep(0.01, 0.1, modulable=False, logging=False)
-                                    i += 1
-                                else:
-                                    if word[-1] in punct_list:
-                                        self.deviceV2.send_keys(word[i:-1], clear=False)
-                                        # random_sleep(0.01, 0.1, modulable=False, logging=False)
-                                        self.deviceV2.send_keys(word[-1], clear=False)
+                    try:
+                        self.click(sleep=SleepTime.SHORT)
+                        self.deviceV2.clear_text()
+                        random_sleep(0.3, 1, modulable=False)
+                        start = datetime.now()
+                        sentences = text.splitlines()
+                        for j, sentence in enumerate(sentences, start=1):
+                            word_list = sentence.split()
+                            n_words = len(word_list)
+                            for n, word in enumerate(word_list, start=1):
+                                i = 0
+                                n_single_letters = randint(1, 3)
+                                for char in word:
+                                    if i < n_single_letters:
+                                        self.deviceV2.send_keys(char, clear=False)
+                                        i += 1
                                     else:
-                                        self.deviceV2.send_keys(word[i:], clear=False)
-                                    # random_sleep(0.01, 0.1, modulable=False, logging=False)
-                                    break
-                            if n < n_words:
-                                self.deviceV2.send_keys(" ", clear=False)
-                                # random_sleep(0.01, 0.1, modulable=False, logging=False)
-                        if j < len(sentences):
-                            self.deviceV2.send_keys("\n")
+                                        if word[-1] in punct_list:
+                                            self.deviceV2.send_keys(word[i:-1], clear=False)
+                                            self.deviceV2.send_keys(word[-1], clear=False)
+                                        else:
+                                            self.deviceV2.send_keys(word[i:], clear=False)
+                                        break
+                                if n < n_words:
+                                    self.deviceV2.send_keys(" ", clear=False)
+                            if j < len(sentences):
+                                self.deviceV2.send_keys("\n")
 
-                    typed_text = self.viewV2.get_text()
-                    # Instagram strips spaces out of hashtag searches, so we don't need to throw an error if the stripped version matches
-                    if typed_text.replace(" ", "") != text.replace(" ", ""):
+                        typed_text = self.viewV2.get_text(error=False)
+                        # Instagram strips spaces out of hashtag searches, so we don't need to throw an error if the stripped version matches
+                        if typed_text.replace(" ", "") != text.replace(" ", ""):
+                            logger.warning(
+                                f"Typed text '{typed_text}' does not match expected '{text}', falling back to direct set_text."
+                            )
+                            self.viewV2.set_text(text)
+                        else:
+                            logger.debug(
+                                f"Text typed in: {(datetime.now()-start).total_seconds():.2f}s"
+                            )
+                    except Exception as e:
                         logger.warning(
-                            "Failed to write in text field, let's try in the old way.."
+                            f"Typing simulation failed ({e}), falling back to direct set_text."
                         )
                         self.viewV2.set_text(text)
-                    else:
-                        logger.debug(
-                            f"Text typed in: {(datetime.now()-start).total_seconds():.2f}s"
-                        )
                 DeviceFacade.sleep_mode(SleepTime.SHORT)
             except Exception as e:
                 raise DeviceFacade.JsonRpcError(e)
