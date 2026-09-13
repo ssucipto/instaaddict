@@ -1,4 +1,5 @@
 import logging
+import re
 from random import seed
 from time import sleep
 
@@ -50,7 +51,6 @@ class InteractReelsPlugin(Plugin):
             
 
             # Anti-Ad Trapping Mechanism
-            from InstaAddict.core.utils import case_insensitive_re
             
             # 1. First, check if we accidentally clicked INTO the ad (webview mode)
             webview = device.find(className="android.webkit.WebView")
@@ -59,16 +59,16 @@ class InteractReelsPlugin(Plugin):
                 device.back()
                 sleep(3)
                 logger.info("Flinging away from the Ad Reel...")
-                device.swipe(Direction.UP, 0.7)
+                device.swipe(Direction.UP, 0.85)
                 random_sleep(2, 4)
                 continue
                 
             # 2. Check if the current reel itself IS an ad (has a 'Learn More', 'Install', or 'Shop Now' button)
-            ad_button = device.find(textMatches=re.compile(r"(Learn More|Install|Shop Now|Download)", re.IGNORECASE))
-            sponsored = device.find(textMatches=re.compile(r"Sponsored", re.IGNORECASE))
+            ad_button = device.find(textMatches="(?i)(Learn More|Install|Shop Now|Download)")
+            sponsored = device.find(textMatches="(?i)Sponsored")
             if ad_button.exists(ui_timeout=1) or sponsored.exists(ui_timeout=1):
                 logger.warning("Sponsored Advertisement detected. Flinging away to avoid trap...")
-                device.swipe(Direction.UP, 0.7)
+                device.swipe(Direction.UP, 0.85)
                 random_sleep(2, 4)
                 continue
                 
@@ -109,7 +109,7 @@ class InteractReelsPlugin(Plugin):
             # 2. FIXED ADVANCED SWIPE (Avoid rubber-banding)
             logger.info("Swiping to next Reel...")
             # Use native structural swipe to ensure adequate momentum physics.
-            device.swipe(Direction.UP, 0.7)
+            device.swipe(Direction.UP, 0.85)
             
             # Anti-rubber-band grace period
             random_sleep(2, 4)
