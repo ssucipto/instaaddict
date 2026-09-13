@@ -1095,11 +1095,17 @@ class PostsViewList:
     ) -> Tuple[bool, str, str, bool, bool, bool]:
         """check if that post has been just interacted"""
         universal_actions = UniversalActions(self.device)
-        username, is_ad, is_hashtag = PostsViewList(self.device)._post_owner(
+        username, is_ad, is_hashtag = self._post_owner(
             current_job, Owner.GET_NAME
         )
         username = PostsViewList._normalize_ig_text(username)
         has_tags = self._has_tags()
+        if is_ad:
+            logger.info("Advertisement detected in current post.")
+            return False, "", "", True, is_hashtag, has_tags
+        if not username or username == "False" or len(username.strip()) == 0:
+            logger.info("No valid post author found. Skipping as ad/unsupported.")
+            return False, "", "", True, is_hashtag, has_tags
         for _ in range(8):
             post_description = self.device.find(
                 index=-1,
@@ -1226,6 +1232,15 @@ class PostsViewList:
         for _ in range(3):
             if not post_owner_obj.exists():
                 if mode == Owner.OPEN:
+                    if (
+                        not username
+                        or username == "False"
+                        or len(username.strip()) == 0
+                    ):
+                        logger.info(
+                            "Cannot open post owner: invalid or empty username."
+                        )
+                        return False, True, is_hashtag
                     comment_description = self.device.find(
                         resourceIdMatches=ResourceID.ROW_FEED_COMMENT_TEXTVIEW_LAYOUT,
                         textStartsWith=username,
@@ -1253,23 +1268,26 @@ class PostsViewList:
 
         if not post_owner_clickable:
             logger.info("Can't find the owner name, skip.")
-            return False, is_ad, is_hashtag
+            return False, True, is_hashtag
         if mode == Owner.OPEN:
+            is_ad, is_hashtag, _ = self._check_if_ad_or_hashtag(post_owner_obj)
+            if is_ad:
+                logger.info("Post owner is an ad; refusing to click open post owner.")
+                return False, True, is_hashtag
             logger.info("Open post owner.")
-            PostsViewList(self.device)._if_action_bar_is_over_obj_swipe(post_owner_obj)
+            self._if_action_bar_is_over_obj_swipe(post_owner_obj)
             post_owner_obj.click()
             return True, is_ad, is_hashtag
         elif mode == Owner.GET_NAME:
-            if current_job == "feed":
-                is_ad, is_hashtag, username = PostsViewList(
-                    self.device
-                )._check_if_ad_or_hashtag(post_owner_obj)
-            if username is None:
+            is_ad, is_hashtag, username = self._check_if_ad_or_hashtag(post_owner_obj)
+            if username is None or username == "":
                 raw_text = post_owner_obj.get_text()
                 logger.debug(f"[DEBUG owner name] raw_text='{raw_text}'")
                 username = (
                     post_owner_obj.get_text().replace("•", "").strip().split(" ", 1)[0]
                 )
+            if not username or username == "False" or len(username.strip()) == 0:
+                is_ad = True
             return username, is_ad, is_hashtag
 
         elif mode == Owner.GET_POSITION:
@@ -1435,12 +1453,17 @@ class PostsViewList:
         )
 
         owner_name = post_owner_obj.get_text() or post_owner_obj.get_desc() or ""
+        if not isinstance(owner_name, str):
+            owner_name = str(owner_name) if owner_name else ""
+
         if not owner_name:
             logger.info("Can't find the owner name, need to use OCR.")
             try:
                 import pytesseract as pt
 
                 owner_name = self.get_text_from_screen(pt, post_owner_obj)
+                if not isinstance(owner_name, str):
+                    owner_name = str(owner_name) if owner_name else ""
             except ImportError:
                 logger.error(
                     "You need to install pytesseract (the wrapper: pip install pytesseract) in order to use OCR feature."
@@ -1449,17 +1472,86 @@ class PostsViewList:
                 logger.error(
                     "You need to install Tesseract (the engine: it depends on your system) in order to use OCR feature."
                 )
-        if owner_name.startswith("#"):
+        if owner_name and owner_name.startswith("#"):
             is_hashtag = True
             logger.debug("Looks like an hashtag, skip.")
+
+        # Check secondary label / subtitle for sponsored indicators
+        ad_regex = r"\b(sponsored|ad|promoted|advertisement|paid partnership)\b"
         if ad_like_obj.exists():
-            ad_labels = {"sponsored", "ad"}
             ad_like_txt = ad_like_obj.get_text() or ad_like_obj.get_desc() or ""
-            if ad_like_txt.casefold() in ad_labels:
+            if not isinstance(ad_like_txt, str):
+                ad_like_txt = str(ad_like_txt) if ad_like_txt else ""
+            if re.search(ad_regex, ad_like_txt, re.IGNORECASE):
                 logger.debug(f"Looks like an AD (label: '{ad_like_txt}'), skip.")
                 is_ad = True
-            elif is_hashtag:
+            elif is_hashtag and owner_name:
                 owner_name = owner_name.split("•")[0].strip()
+
+        # Check if owner name itself indicates sponsored content
+        if owner_name and re.search(ad_regex, owner_name, re.IGNORECASE):
+            logger.debug(
+                f"Looks like an AD (owner contains sponsored: '{owner_name}'), skip."
+            )
+            is_ad = True
+
+        # Check Call-To-Action (CTA) ad buttons in visible post area
+        if not is_ad:
+            owner_bounds = None
+            if post_owner_obj.exists():
+                try:
+                    b = post_owner_obj.get_bounds()
+                    if isinstance(b, dict) and isinstance(
+                        b.get("top"), (int, float)
+                    ):
+                        owner_bounds = b
+                except Exception:
+                    pass
+            post_owner_top = owner_bounds["top"] if owner_bounds else 0
+
+            cta_ad_button = self.device.find(
+                resourceIdMatches=f"{ResourceID.AD_ACTION_BUTTON}|{ResourceID.AD_CALL_TO_ACTION}|{ResourceID.POST_AD_CTA_BUTTON}"
+            )
+            if cta_ad_button.exists():
+                cta_bounds = None
+                try:
+                    cb = cta_ad_button.get_bounds()
+                    if isinstance(cb, dict) and isinstance(
+                        cb.get("bottom"), (int, float)
+                    ):
+                        cta_bounds = cb
+                except Exception:
+                    pass
+                if (
+                    cta_bounds is None
+                    or cta_bounds.get("bottom", 0) >= post_owner_top
+                ):
+                    logger.debug(
+                        "Looks like an AD (CTA button resource detected), skip."
+                    )
+                    is_ad = True
+            if not is_ad:
+                ad_button_text = self.device.find(
+                    textMatches="(?i)^(Learn More|Install Now|Install|Shop Now|Download|Sign Up|Watch More|Apply Now|Get Offer|Book Now|Contact Us|Play Game|Subscribe|Open app)$"
+                )
+                if ad_button_text.exists():
+                    cta_text_bounds = None
+                    try:
+                        tb = ad_button_text.get_bounds()
+                        if isinstance(tb, dict) and isinstance(
+                            tb.get("bottom"), (int, float)
+                        ):
+                            cta_text_bounds = tb
+                    except Exception:
+                        pass
+                    if (
+                        cta_text_bounds is None
+                        or cta_text_bounds.get("bottom", 0) >= post_owner_top
+                    ):
+                        logger.debug(
+                            f"Looks like an AD (CTA button text '{ad_button_text.get_text()}'), skip."
+                        )
+                        is_ad = True
 
         return is_ad, is_hashtag, owner_name
 
@@ -2747,7 +2839,118 @@ class UniversalActions:
         random_sleep(inf=5, sup=8, modulable=False)
 
     @staticmethod
+    def escape_in_app_browser(device) -> bool:
+        """
+        Detects if the bot has accidentally navigated into an in-app browser
+        (such as BrowserLiteInMainProcessIGActivity) or an external browser/app,
+        and safely dismisses it to restore the main Instagram UI.
+        """
+        escaped = False
+        try:
+            current_app = {}
+            if hasattr(device, "deviceV2") and hasattr(device.deviceV2, "app_current"):
+                raw_app = device.deviceV2.app_current()
+                if isinstance(raw_app, dict):
+                    current_app = raw_app
+
+            pkg = current_app.get("package", "")
+            act = current_app.get("activity", "")
+            app_id = getattr(device, "app_id", "com.instagram.android")
+
+            is_browser_activity = bool(
+                act
+                and any(
+                    b in act.lower()
+                    for b in ["browserlite", "inappbrowser", "browseractivity"]
+                )
+            )
+            system_packages = {
+                "com.android.systemui",
+                "android",
+                "com.google.android.inputmethod.latin",
+            }
+            is_foreign_package = bool(
+                pkg and pkg != app_id and pkg not in system_packages
+            )
+
+            close_btn = device.find(
+                resourceIdMatches=ResourceID.IG_BROWSER_CLOSE_BUTTON
+            )
+            browser_root = device.find(
+                resourceIdMatches=ResourceID.BROWSER_LITE_ROOT_CONTAINER
+            )
+            browser_chrome = device.find(
+                resourceIdMatches=ResourceID.BROWSER_CHROME_CONTAINER
+            )
+            webview_cont = device.find(resourceIdMatches=ResourceID.WEBVIEW_CONTAINER)
+            webview_cls = device.find(className="android.webkit.WebView")
+            close_desc = device.find(
+                descriptionMatches=case_insensitive_re(
+                    ["Close browser", "Close", "Done"]
+                )
+            )
+
+            is_browser_ui = (
+                close_btn.exists()
+                or browser_root.exists()
+                or browser_chrome.exists()
+                or webview_cont.exists()
+                or webview_cls.exists()
+                or close_desc.exists()
+            )
+
+            if is_browser_activity or is_foreign_package or is_browser_ui:
+                logger.warning(
+                    f"In-app browser or advertisement overlay detected! (activity={act}, package={pkg}) Escaping..."
+                )
+                escaped = True
+
+                if close_btn.exists():
+                    logger.info(
+                        "Clicking in-app browser close button (ig_browser_close_button)..."
+                    )
+                    close_btn.click()
+                    random_sleep(inf=1, sup=2)
+                elif close_desc.exists():
+                    logger.info("Clicking browser close action by description...")
+                    close_desc.click()
+                    random_sleep(inf=1, sup=2)
+                else:
+                    logger.info("Pressing back to escape browser/external ad...")
+                    device.back()
+                    random_sleep(inf=1, sup=2)
+
+                if hasattr(device, "deviceV2") and hasattr(
+                    device.deviceV2, "app_current"
+                ):
+                    raw_new_app = device.deviceV2.app_current()
+                    new_app = raw_new_app if isinstance(raw_new_app, dict) else {}
+                    new_pkg = new_app.get("package", "")
+                    new_act = new_app.get("activity", "")
+                    if new_pkg != app_id or any(
+                        b in new_act.lower() for b in ["browserlite", "inappbrowser"]
+                    ):
+                        logger.warning(
+                            "Still inside browser after first dismissal attempt. Pressing back again..."
+                        )
+                        device.back()
+                        random_sleep(inf=1, sup=2)
+
+                    if new_pkg and new_pkg != app_id and new_pkg not in system_packages:
+                        logger.warning(
+                            f"Still in external app {new_pkg}. Relaunching {app_id}..."
+                        )
+                        device.deviceV2.app_start(app_id)
+                        random_sleep(inf=2, sup=3)
+
+        except Exception as e:
+            logger.debug(f"escape_in_app_browser check encountered error: {e}")
+
+        return escaped
+
+    @staticmethod
     def detect_block(device) -> bool:
+        UniversalActions.escape_in_app_browser(device)
         if not args.disable_block_detection:
             return False
         logger.debug("Checking for block...")
