@@ -327,8 +327,8 @@ class DeviceFacade:
                 sx = max(w * 0.1, cx - (w * scale / 2))
                 ex = min(w * 0.9, cx + (w * scale / 2))
 
-            logger.debug(f"ADB Shell Swipe from ({sx},{sy}) to ({ex},{ey}) over 150ms.")
-            self.deviceV2.shell(f"input swipe {int(sx)} {int(sy)} {int(ex)} {int(ey)} 150")
+            logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 250ms.")
+            self.deviceV2.swipe(sx, sy, ex, ey, 0.25)
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e) from e
@@ -341,8 +341,8 @@ class DeviceFacade:
             ey = int(ey * uniform(0.98, 1.02))
         sy = int(sy)
         try:
-            logger.debug(f"ADB Shell Swipe from ({sx},{sy}) to ({ex},{ey}) over 150ms.")
-            self.deviceV2.shell(f"input swipe {int(sx)} {int(sy)} {int(ex)} {int(ey)} 150")
+            logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 250ms.")
+            self.deviceV2.swipe(sx, sy, ex, ey, 0.25)
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e) from e
