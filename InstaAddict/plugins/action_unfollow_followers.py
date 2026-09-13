@@ -96,6 +96,16 @@ class ActionUnfollowFollowers(Plugin):
                 "metavar": "3",
                 "default": "0",
             },
+            {
+                "arg": "--clear-non-bot-cache",
+                "help": "clear the persistent cache of non-bot followings before starting",
+                "action": "store_true",
+            },
+            {
+                "arg": "--ignore-non-bot-cache",
+                "help": "ignore the persistent non-bot followings cache during this session",
+                "action": "store_true",
+            },
         ]
 
     def run(self, device, configs, storage, sessions, profile_filter, plugin):
@@ -293,7 +303,30 @@ class ActionUnfollowFollowers(Plugin):
                     device, self.args.sort_followers_newest_to_oldest
                 )
                 sorted = True
+        clear_cache = getattr(self.args, "clear_non_bot_cache", False)
+        ignore_cache = getattr(self.args, "ignore_non_bot_cache", False)
+
+        if clear_cache and hasattr(storage, "clear_non_bot_followings"):
+            logger.info("Clearing non-bot followings cache as requested.")
+            storage.clear_non_bot_followings()
+
         checked = {}
+        if (
+            not ignore_cache
+            and unfollow_restriction
+            in [
+                UnfollowRestriction.FOLLOWED_BY_SCRIPT,
+                UnfollowRestriction.FOLLOWED_BY_SCRIPT_NON_FOLLOWERS,
+            ]
+            and hasattr(storage, "non_bot_followings")
+        ):
+            for cached_user in storage.non_bot_followings:
+                checked[cached_user.casefold()] = None
+            if storage.non_bot_followings:
+                logger.info(
+                    f"Loaded {len(storage.non_bot_followings)} known non-bot followings from cache."
+                )
+
         unfollowed_count = 0
         total_unfollows_limit_reached = False
         posts_end_detector.notify_new_page()
@@ -320,8 +353,9 @@ class ActionUnfollowFollowers(Plugin):
 
                 username = user_name_view.get_text()
                 screen_iterated_followings.append(username)
-                if username not in checked:
-                    checked[username] = None
+                username_key = username.casefold() if username else ""
+                if username_key not in checked:
+                    checked[username_key] = None
 
                     if storage.is_user_in_whitelist(username):
                         logger.info(f"@{username} is in whitelist. Skip.")
@@ -331,14 +365,26 @@ class ActionUnfollowFollowers(Plugin):
                         UnfollowRestriction.FOLLOWED_BY_SCRIPT,
                         UnfollowRestriction.FOLLOWED_BY_SCRIPT_NON_FOLLOWERS,
                     ]:
+                        if (
+                            not ignore_cache
+                            and hasattr(storage, "is_non_bot_following")
+                            and storage.is_non_bot_following(username)
+                        ):
+                            logger.debug(
+                                f"@{username} already recorded as not followed by this bot (cached). Skip."
+                            )
+                            continue
+
                         following_status = storage.get_following_status(username)
                         _, last_interaction = storage.check_user_was_interacted(
                             username
                         )
                         if following_status == FollowingStatus.NOT_IN_LIST:
                             logger.info(
-                                f"@{username} has not been followed by this bot. Skip."
+                                f"@{username} has not been followed by this bot. Recorded to cache. Skip."
                             )
+                            if hasattr(storage, "add_non_bot_following"):
+                                storage.add_non_bot_following(username, save=False)
                             continue
                         elif not storage.can_be_unfollowed(
                             last_interaction,
@@ -409,9 +455,14 @@ class ActionUnfollowFollowers(Plugin):
                             output=True,
                         )
                     if unfollowed_count >= count or total_unfollows_limit_reached:
+                        if hasattr(storage, "save_non_bot_followings"):
+                            storage.save_non_bot_followings()
                         return
                 else:
-                    logger.debug(f"Already checked {username}.")
+                    logger.debug(f"Already checked {username} (or in non-bot cache).")
+
+            if hasattr(storage, "save_non_bot_followings"):
+                storage.save_non_bot_followings()
 
             if screen_iterated_followings != prev_screen_iterated_followings:
                 prev_screen_iterated_followings = screen_iterated_followings
@@ -431,6 +482,8 @@ class ActionUnfollowFollowers(Plugin):
                         logger.warning(
                             "Can't iterate over the list anymore, you may be soft-banned and cannot perform this action (refreshing follower list)."
                         )
+                        if hasattr(storage, "save_non_bot_followings"):
+                            storage.save_non_bot_followings()
                         return
                     list_view.scroll(Direction.DOWN)
                 else:
@@ -438,6 +491,8 @@ class ActionUnfollowFollowers(Plugin):
                         "Reached the following list end, finish.",
                         extra={"color": f"{Fore.GREEN}"},
                     )
+                    if hasattr(storage, "save_non_bot_followings"):
+                        storage.save_non_bot_followings()
                     return
 
     def do_unfollow(
