@@ -49,7 +49,12 @@ from InstaAddict.core.utils import (
     stop_bot,
     wait_for_next_session,
 )
-from InstaAddict.core.views import AccountView, ProfileView, TabBarView, UniversalActions
+from InstaAddict.core.views import (
+    AccountView,
+    ProfileView,
+    TabBarView,
+    UniversalActions,
+)
 from InstaAddict.core.views import load_config as load_views
 
 

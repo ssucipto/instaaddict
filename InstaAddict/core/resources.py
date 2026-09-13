@@ -148,18 +148,10 @@ class ResourceID:
         self.ROW_PROFILE_HEADER_FOLLOWERS_CONTAINER = f"{APP_ID}:id/row_profile_header_followers_container|{APP_ID}:id/row_profile_header_container_followers|{APP_ID}:id/profile_header_followers_stacked_familiar"
         self.ROW_PROFILE_HEADER_FOLLOWING_CONTAINER = f"{APP_ID}:id/row_profile_header_following_container|{APP_ID}:id/row_profile_header_container_following|{APP_ID}:id/profile_header_following_stacked_familiar"
         self.ROW_PROFILE_HEADER_IMAGEVIEW = f"{APP_ID}:id/row_profile_header_imageview"
-        self.ROW_PROFILE_HEADER_TEXTVIEW_FOLLOWERS_COUNT = (
-            f"{APP_ID}:id/row_profile_header_textview_followers_count|{APP_ID}:id/profile_header_familiar_followers_value"
-        )
-        self.ROW_PROFILE_HEADER_TEXTVIEW_POST_CONTAINER = (
-            f"{APP_ID}:id/row_profile_header_post_count_container|{APP_ID}:id/profile_header_post_count_front_familiar"
-        )
-        self.ROW_PROFILE_HEADER_TEXTVIEW_FOLLOWING_COUNT = (
-            f"{APP_ID}:id/row_profile_header_textview_following_count|{APP_ID}:id/profile_header_familiar_following_value"
-        )
-        self.ROW_PROFILE_HEADER_TEXTVIEW_POST_COUNT = (
-            f"{APP_ID}:id/row_profile_header_textview_post_count|{APP_ID}:id/profile_header_familiar_post_count_value"
-        )
+        self.ROW_PROFILE_HEADER_TEXTVIEW_FOLLOWERS_COUNT = f"{APP_ID}:id/row_profile_header_textview_followers_count|{APP_ID}:id/profile_header_familiar_followers_value"
+        self.ROW_PROFILE_HEADER_TEXTVIEW_POST_CONTAINER = f"{APP_ID}:id/row_profile_header_post_count_container|{APP_ID}:id/profile_header_post_count_front_familiar"
+        self.ROW_PROFILE_HEADER_TEXTVIEW_FOLLOWING_COUNT = f"{APP_ID}:id/row_profile_header_textview_following_count|{APP_ID}:id/profile_header_familiar_following_value"
+        self.ROW_PROFILE_HEADER_TEXTVIEW_POST_COUNT = f"{APP_ID}:id/row_profile_header_textview_post_count|{APP_ID}:id/profile_header_familiar_post_count_value"
         self.ROW_SEARCH_EDIT_TEXT = f"{APP_ID}:id/row_search_edit_text"
         self.ROW_SEARCH_USER_USERNAME = f"{APP_ID}:id/row_search_user_username"
         self.ROW_SIMPLE_TEXT_TEXTVIEW = f"{APP_ID}:id/row_simple_text_textview"
