@@ -75,21 +75,33 @@ carryovers:
     audit_report: agent/reports/audit-015-swipe-distance-snapback.md
     date_raised: 2026-09-13
     severity: high
-    status: pending
+    status: fixed
+    fix_applied_date: '2026-09-13'
+    verified_in_audit: 'self-verification'
     summary: Hardcoded pixel defaults in UniversalActions._swipe_points and scattered micro-scrolls cause snap-backs on modern IG layouts
     affected_files:
       - InstaAddict/core/views.py
       - InstaAddict/core/interaction.py
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-007
     audit_report: agent/reports/audit-015-swipe-distance-snapback.md
     date_raised: 2026-09-13
     severity: medium
-    status: pending
+    status: fixed
+    fix_applied_date: '2026-09-13'
+    verified_in_audit: 'self-verification'
     summary: swipe_points uses drag instead of swipe, lacking fling momentum necessary for Reels-like feed navigation
     affected_files:
       - InstaAddict/core/device_facade.py
-    fix_applied_date: null
-    verified_in_audit: null
+
+  - id: CO-008
+    audit_report: agent/reports/audit-018-vision-ai-quota.md
+    date_raised: 2026-09-13
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-13'
+    verified_in_audit: 'self-verification'
+    summary: Vision AI calls use raw 1080p images on every reel without resizing, duplicate screenshots for commenting, and flawed Optical Hashing resulting in severe quota burn.
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/plugins/interact_reels.py

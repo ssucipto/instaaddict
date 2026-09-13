@@ -7,7 +7,8 @@ from InstaAddict.core.plugin_loader import Plugin
 from InstaAddict.core.views import TabBarView, UniversalActions, Direction
 from InstaAddict.core.interaction import _comment
 from InstaAddict.core.utils import random_sleep
-from InstaAddict.core.gemini_vision import evaluate_reel_content
+from InstaAddict.core.gemini_vision import evaluate_and_comment_reel
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,13 @@ class InteractReelsPlugin(Plugin):
                 "metavar": "10-20",
                 "default": None,
                 "operation": True,
+            },
+            {
+                "arg": "--evaluate-percentage",
+                "help": "Percentage of Reels to evaluate with Vision AI",
+                "metavar": "25",
+                "default": 25,
+                "type": int,
             }
         ]
 
@@ -75,11 +83,18 @@ class InteractReelsPlugin(Plugin):
             # Brief pause to let video render for classification
             sleep(2)
             
-            # 1. SCREENSHOT & FILTER
+            # 1. THROTTLE & FILTER
+            eval_pct = getattr(configs.args, 'evaluate_percentage', 25)
+            if random.randint(1, 100) > eval_pct:
+                logger.info("Skipping reel evaluation to preserve quota.")
+                device.swipe(Direction.UP, 0.85)
+                random_sleep(2, 4)
+                continue
+
             raw_png = d.screenshot(format='raw')
-            is_valid_topic = evaluate_reel_content(raw_png, topic=configs.args.reels_topic or "dogs or animals")
+            comment_text = evaluate_and_comment_reel(raw_png, topic=configs.args.reels_topic or "dogs or animals")
             
-            if is_valid_topic:
+            if comment_text:
                 logger.info("?? Vision AI Detected Animal! Engaging with targeting algorithm...")
                 random_sleep(10, 25)
 
@@ -97,7 +112,8 @@ class InteractReelsPlugin(Plugin):
                         comment_percentage=100,
                         args=configs.args,
                         session_state=sessions[-1],
-                        media_type=MediaType.REEL
+                        media_type=MediaType.REEL,
+                        explicit_comment=comment_text
                     )
                 except Exception as e:
                     import traceback

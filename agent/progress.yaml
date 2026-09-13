@@ -225,12 +225,15 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-13
-  description: 'Fixed uiautomator2 swipe jitter by moving to adb shell input swipe. Hardened Gemini Vision API with 429 quota retry loops and FinishReason:2 safety catchers.'
+  description: 'Fixed uiautomator2 swipe jitter by moving to adb shell input swipe. Hardened Gemini Vision API with 429 quota retry loops and FinishReason:2 safety catchers. Optimized Vision AI pipeline for quota preservation.'
   items:
   - "✓ Migrated swipe_points to adb shell input swipe"
   - "✓ Built robust backoff mechanisms for 429 Quota Exceeded exceptions"
   - "✓ Addressed FinishReason:2 safety crashes via payload sanitization"
   - "✓ Replaced generic except blocks with proper raise from Exception chaining"
+  - "✓ Implemented 1-shot evaluate_and_comment_reel to halve API requests"
+  - "✓ Added 512x512 LANCZOS compression for Vision AI payloads"
+  - "✓ Added --evaluate-percentage to throttle Reel evaluations and preserve quota"
 - date: 2026-09-12
   description: 'Connected emulator and generated starter bot profile for feed interaction.'
   items:
