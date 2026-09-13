@@ -94,64 +94,72 @@ def get_vision_comment(device, _reserved: str = '') -> str:
     
     genai.configure(api_key=api_key)
     
-    try:
-        # Compress with Pillow (Ram-Only BytesIO)
-        img = Image.open(io.BytesIO(raw_screenshot))
-        img = img.convert("RGB")
-        img.thumbnail((512, 512), Image.Resampling.LANCZOS)
-        
-        system_prompt = (
-            f"Your Persona: '{UNIVERSAL_PERSONA}'. "
-            "You are leaving a comment on someone's Instagram post as this persona. "
-            "Look at this screenshot, identify ONE highly specific, narrow detail in the frame. "
-            "Write a natural, slang-friendly comment about it in exactly 3 to 6 words. "
-            "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'. "
-            "Always reply in English regardless of localized text."
-        )
-
-        model = genai.GenerativeModel(
-            model_name='gemini-3.7-flash',
-            system_instruction=system_prompt,
-            generation_config=genai.GenerationConfig(
-                max_output_tokens=150,
-                temperature=0.9
+    for attempt in range(3):
+        try:
+            # Compress with Pillow (Ram-Only BytesIO)
+            img = Image.open(io.BytesIO(raw_screenshot))
+            img = img.convert("RGB")
+            img.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            
+            system_prompt = (
+                f"Your Persona: '{UNIVERSAL_PERSONA}'. "
+                "You are leaving a comment on someone's Instagram post as this persona. "
+                "Look at this screenshot, identify ONE highly specific, narrow detail in the frame. "
+                "Write a natural, slang-friendly comment about it in exactly 3 to 6 words. "
+                "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'. "
+                "Always reply in English regardless of localized text."
             )
-        )
-        
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-        ]
-        
-        response = model.generate_content(
-            img,
-            safety_settings=safety_settings,
-            request_options={"timeout": 30.0}
-        )
-        
-        comment = response.text
-        return _sanitize_response(comment)
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Gemini Vision API Exception: {error_msg}")
-        if "401" in error_msg:
-            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-            VISION_API_DEAD = True
-        elif "429" in error_msg or "Quota exceeded" in error_msg:
-            wait_time = 60
-            import re
-            m = re.search(r"retry in ([\d\.]+)s", error_msg)
-            if not m:
-                m = re.search(r"seconds:\s*(\d+)", error_msg)
-            if m:
-                wait_time = int(float(m.group(1))) + 5
-            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
-            import time
-            time.sleep(wait_time)
-        return ""
+
+            model = genai.GenerativeModel(
+                model_name='gemini-3.7-flash',
+                system_instruction=system_prompt,
+                generation_config=genai.GenerationConfig(
+                    max_output_tokens=150,
+                    temperature=0.9
+                )
+            )
+            
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+            ]
+            
+            response = model.generate_content(
+                img,
+                safety_settings=safety_settings,
+                request_options={"timeout": 30.0}
+            )
+            
+            try:
+                comment = response.text
+                return _sanitize_response(comment)
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+                return ""
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Gemini Vision API Exception: {error_msg}")
+            if "401" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
+            elif "429" in error_msg or "Quota exceeded" in error_msg:
+                wait_time = 60
+                import re
+                m = re.search(r"retry in ([\d\.]+)s", error_msg)
+                if not m:
+                    m = re.search(r"seconds:\s*(\d+)", error_msg)
+                if m:
+                    wait_time = int(float(m.group(1))) + 5
+                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
+                import time
+                time.sleep(wait_time)
+                continue
+            break
+    return ""
 
 
 def get_vision_caption(media_path: str, persona: str = "casual Instagram user") -> str:
@@ -174,76 +182,84 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
     SESSION_API_CALLS += 1
     genai.configure(api_key=api_key)
     
-    try:
-        mime = "video/mp4" if media_path.lower().endswith(('.mp4', '.mov')) else "image/jpeg"
-        
-        if "video" in mime:
-            logger.info("Uploading video chunk to Gemini natively for captioning...")
-            media_item = genai.upload_file(media_path, mime_type=mime)
-        else:
-            # Compress with Pillow (Ram-Only BytesIO) for fast upload
-            img = Image.open(media_path)
-            img = img.convert("RGB")
-            img.thumbnail((512, 512), Image.Resampling.LANCZOS)
-            media_item = img
-        
-        
-        # Override local argument with global if available
-        active_persona = UNIVERSAL_PERSONA if UNIVERSAL_PERSONA else persona
-        system_prompt = (
-            f"You are managing an Instagram account. Your Persona: '{active_persona}'. "
-            "Look at this media payload. Write a concise, highly organic caption (1-2 short sentences). "
-            "Then, add exactly 3-5 highly relevant hashtags. "
-            "UNDER ABSOLUTELY NO CIRCUMSTANCES CAN YOU USE THE '@' SYMBOL OR TAG ANY USERS! "
-            "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text)."
-        )
-
-        model = genai.GenerativeModel(
-            model_name='gemini-3.7-flash',
-            system_instruction=system_prompt,
-            generation_config=genai.GenerationConfig(
-                temperature=0.9
+    for attempt in range(3):
+        try:
+            mime = "video/mp4" if media_path.lower().endswith(('.mp4', '.mov')) else "image/jpeg"
+            
+            if "video" in mime:
+                logger.info("Uploading video chunk to Gemini natively for captioning...")
+                media_item = genai.upload_file(media_path, mime_type=mime)
+            else:
+                # Compress with Pillow (Ram-Only BytesIO) for fast upload
+                img = Image.open(media_path)
+                img = img.convert("RGB")
+                img.thumbnail((512, 512), Image.Resampling.LANCZOS)
+                media_item = img
+            
+            
+            # Override local argument with global if available
+            active_persona = UNIVERSAL_PERSONA if UNIVERSAL_PERSONA else persona
+            system_prompt = (
+                f"You are managing an Instagram account. Your Persona: '{active_persona}'. "
+                "Look at this media payload. Write a concise, highly organic caption (1-2 short sentences). "
+                "Then, add exactly 3-5 highly relevant hashtags. "
+                "UNDER ABSOLUTELY NO CIRCUMSTANCES CAN YOU USE THE '@' SYMBOL OR TAG ANY USERS! "
+                "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text)."
             )
-        )
-        
-        safety_settings = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-        ]
-        
-        logger.info("Executing Vision-AI Caption Generation...")
-        response = model.generate_content(
-            media_item,
-            safety_settings=safety_settings,
-            request_options={"timeout": 60.0} # Sufficient timeout for video chunking
-        )
-        
-        caption = response.text
-        # Markdown & Spam Sanitizer
-        caption = caption.replace("*", "").replace("@", "").strip()
-        logger.info(f"AI Caption generated: {caption}")
-        return caption
-        
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Gemini Vision Caption API Exception: {error_msg}")
-        if "401" in error_msg:
-            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-            VISION_API_DEAD = True
-        elif "429" in error_msg or "Quota exceeded" in error_msg:
-            wait_time = 60
-            import re
-            m = re.search(r"retry in ([\d\.]+)s", error_msg)
-            if not m:
-                m = re.search(r"seconds:\s*(\d+)", error_msg)
-            if m:
-                wait_time = int(float(m.group(1))) + 5
-            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
-            import time
-            time.sleep(wait_time)
-        return ""
+
+            model = genai.GenerativeModel(
+                model_name='gemini-3.7-flash',
+                system_instruction=system_prompt,
+                generation_config=genai.GenerationConfig(
+                    temperature=0.9
+                )
+            )
+            
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+            ]
+            
+            logger.info("Executing Vision-AI Caption Generation...")
+            response = model.generate_content(
+                media_item,
+                safety_settings=safety_settings,
+                request_options={"timeout": 60.0} # Sufficient timeout for video chunking
+            )
+            
+            try:
+                caption = response.text
+                # Markdown & Spam Sanitizer
+                caption = caption.replace("*", "").replace("@", "").strip()
+                logger.info(f"AI Caption generated: {caption}")
+                return caption
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+                return ""
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Gemini Vision Caption API Exception: {error_msg}")
+            if "401" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
+            elif "429" in error_msg or "Quota exceeded" in error_msg:
+                wait_time = 60
+                import re
+                m = re.search(r"retry in ([\d\.]+)s", error_msg)
+                if not m:
+                    m = re.search(r"seconds:\s*(\d+)", error_msg)
+                if m:
+                    wait_time = int(float(m.group(1))) + 5
+                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
+                import time
+                time.sleep(wait_time)
+                continue
+            break
+    return ""
 import os
 import re
 import io
@@ -273,44 +289,53 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
 
     SESSION_API_CALLS += 1
     
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-3.7-flash')
-        
-        # Local import to avoid top level issues if any
-        import io
-        from PIL import Image
-        img = Image.open(io.BytesIO(img_bytes))
-        
-        prompt = f"Look at this screenshot of an Instagram Reel. Does this image predominantly feature {topic}? Reply strictly with a single word: YES or NO."
-        
-        response = model.generate_content(
-            [prompt, img],
-            generation_config=genai.GenerationConfig(
-                temperature=0.0,
-                max_output_tokens=150,
+    for attempt in range(3):
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-3.7-flash')
+            
+            # Local import to avoid top level issues if any
+            import io
+            from PIL import Image
+            img = Image.open(io.BytesIO(img_bytes))
+            
+            prompt = f"Look at this screenshot of an Instagram Reel. Does this image predominantly feature {topic}? Reply strictly with a single word: YES or NO."
+            
+            response = model.generate_content(
+                [prompt, img],
+                generation_config=genai.GenerationConfig(
+                    temperature=0.0,
+                    max_output_tokens=150,
+                )
             )
-        )
-        
-        answer = response.text.strip().upper()
-        if "YES" in answer:
-            return True
-        return False
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Reel Vision Evaluation Failed: {error_msg}")
-        if "401" in error_msg:
-            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-            VISION_API_DEAD = True
-        elif "429" in error_msg or "Quota exceeded" in error_msg:
-            wait_time = 60
-            import re
-            m = re.search(r"retry in ([\d\.]+)s", error_msg)
-            if not m:
-                m = re.search(r"seconds:\s*(\d+)", error_msg)
-            if m:
-                wait_time = int(float(m.group(1))) + 5
-            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
-            import time
-            time.sleep(wait_time)
-        return True
+            
+            try:
+                answer = response.text.strip().upper()
+                if "YES" in answer:
+                    return True
+                return False
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+                return True
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Reel Vision Evaluation Failed: {error_msg}")
+            if "401" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
+            elif "429" in error_msg or "Quota exceeded" in error_msg:
+                wait_time = 60
+                import re
+                m = re.search(r"retry in ([\d\.]+)s", error_msg)
+                if not m:
+                    m = re.search(r"seconds:\s*(\d+)", error_msg)
+                if m:
+                    wait_time = int(float(m.group(1))) + 5
+                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
+                import time
+                time.sleep(wait_time)
+                continue
+            break
+    return True

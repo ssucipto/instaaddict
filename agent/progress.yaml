@@ -224,19 +224,22 @@ progress:
   documentation: 85
   overall: 100
 recent_work:
-- date: 2026-09-12
-  description: 'Connected emulator and generated starter bot profile for feed interaction.
-
-    '
+- date: 2026-09-13
+  description: 'Fixed uiautomator2 swipe jitter by moving to adb shell input swipe. Hardened Gemini Vision API with 429 quota retry loops and FinishReason:2 safety catchers.'
   items:
-  - "\xE2\u0153\u2026 Verified emulator-5554 connected via ADB"
-  - "\xE2\u0153\u2026 Created accounts/my_bot_account/config.yml configured for feed interaction"
-  - "\xE2\u0153\u2026 Created accounts/my_bot_account/filters.yml, whitelist.txt, and blacklist.txt"
-  - "\xF0\u0178\u201C\u2039 Ensure Instagram APK is installed and logged in on emulator"
+  - "✓ Migrated swipe_points to adb shell input swipe"
+  - "✓ Built robust backoff mechanisms for 429 Quota Exceeded exceptions"
+  - "✓ Addressed FinishReason:2 safety crashes via payload sanitization"
+  - "✓ Replaced generic except blocks with proper raise from Exception chaining"
+- date: 2026-09-12
+  description: 'Connected emulator and generated starter bot profile for feed interaction.'
+  items:
+  - "✓ Verified emulator-5554 connected via ADB"
+  - "✓ Created accounts/my_bot_account/config.yml configured for feed interaction"
+  - "✓ Created accounts/my_bot_account/filters.yml, whitelist.txt, and blacklist.txt"
+  - "✓ Ensure Instagram APK is installed and logged in on emulator"
 next_steps:
-- Install Instagram on the emulator (if not already installed) and log into the target account
-- Update `username` in accounts/my_bot_account/config.yml to match your IG handle
-- Launch InstaAddict with: python -m InstaAddict --config accounts/my_bot_account/config.yml
+- Resume Instagram bot interactions with more stable scrolling and VLM quota resilience.
 notes:
 - Emulator: emulator-5554 (Android 17 / x86_64)
 - Profile directory: accounts/my_bot_account/
