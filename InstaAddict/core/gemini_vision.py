@@ -4,7 +4,6 @@ import io
 import logging
 from PIL import Image
 import warnings
-warnings.simplefilter("ignore")
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -111,10 +110,10 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         )
 
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-3.7-flash',
             system_instruction=system_prompt,
             generation_config=genai.GenerationConfig(
-                max_output_tokens=15,
+                max_output_tokens=150,
                 temperature=0.9
             )
         )
@@ -129,7 +128,7 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         response = model.generate_content(
             img,
             safety_settings=safety_settings,
-            request_options={"timeout": 5.0}
+            request_options={"timeout": 30.0}
         )
         
         comment = response.text
@@ -138,9 +137,20 @@ def get_vision_comment(device, _reserved: str = '') -> str:
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Gemini Vision API Exception: {error_msg}")
-        if "429" in error_msg or "401" in error_msg:
-            logger.error("Circuit Breaker Activated. Disabling Vision AI for session.")
+        if "401" in error_msg:
+            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
             VISION_API_DEAD = True
+        elif "429" in error_msg or "Quota exceeded" in error_msg:
+            wait_time = 60
+            import re
+            m = re.search(r"retry in ([\d\.]+)s", error_msg)
+            if not m:
+                m = re.search(r"seconds:\s*(\d+)", error_msg)
+            if m:
+                wait_time = int(float(m.group(1))) + 5
+            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
+            import time
+            time.sleep(wait_time)
         return ""
 
 
@@ -189,7 +199,7 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
         )
 
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-3.7-flash',
             system_instruction=system_prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.9
@@ -207,7 +217,7 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
         response = model.generate_content(
             media_item,
             safety_settings=safety_settings,
-            request_options={"timeout": 15.0} # Slightly longer timeout for video chunking
+            request_options={"timeout": 60.0} # Sufficient timeout for video chunking
         )
         
         caption = response.text
@@ -219,9 +229,20 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Gemini Vision Caption API Exception: {error_msg}")
-        if "429" in error_msg or "401" in error_msg:
-            logger.error("Circuit Breaker Activated. Disabling Vision AI for session.")
+        if "401" in error_msg:
+            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
             VISION_API_DEAD = True
+        elif "429" in error_msg or "Quota exceeded" in error_msg:
+            wait_time = 60
+            import re
+            m = re.search(r"retry in ([\d\.]+)s", error_msg)
+            if not m:
+                m = re.search(r"seconds:\s*(\d+)", error_msg)
+            if m:
+                wait_time = int(float(m.group(1))) + 5
+            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
+            import time
+            time.sleep(wait_time)
         return ""
 import os
 import re
@@ -229,7 +250,6 @@ import io
 import logging
 from PIL import Image
 import warnings
-warnings.simplefilter("ignore")
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
@@ -255,7 +275,7 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
     
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3.7-flash')
         
         # Local import to avoid top level issues if any
         import io
@@ -268,7 +288,7 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
             [prompt, img],
             generation_config=genai.GenerationConfig(
                 temperature=0.0,
-                max_output_tokens=10,
+                max_output_tokens=150,
             )
         )
         
@@ -277,5 +297,20 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
             return True
         return False
     except Exception as e:
-        logger.error(f"Reel Vision Evaluation Failed: {e}")
+        error_msg = str(e)
+        logger.error(f"Reel Vision Evaluation Failed: {error_msg}")
+        if "401" in error_msg:
+            logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+            VISION_API_DEAD = True
+        elif "429" in error_msg or "Quota exceeded" in error_msg:
+            wait_time = 60
+            import re
+            m = re.search(r"retry in ([\d\.]+)s", error_msg)
+            if not m:
+                m = re.search(r"seconds:\s*(\d+)", error_msg)
+            if m:
+                wait_time = int(float(m.group(1))) + 5
+            logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming...")
+            import time
+            time.sleep(wait_time)
         return True
