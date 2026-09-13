@@ -173,6 +173,152 @@ def print_full_report(sessions, scrape_mode):
             extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
         )
 
+    save_markdown_history(sessions, scrape_mode)
+
+
+def save_markdown_history(sessions, scrape_mode):
+    """Automatically writes a persistent session summary and appends to history.md (never overwritten)."""
+    import os
+
+    if not sessions:
+        return
+
+    latest_session = sessions[-1]
+    username = latest_session.my_username
+    if not username and hasattr(latest_session, "args"):
+        username = getattr(latest_session.args, "username", None)
+    if not username:
+        username = "default"
+
+    account_dir = os.path.join("accounts", username)
+    reports_dir = os.path.join(account_dir, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    history_path = os.path.join(account_dir, "history.md")
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    file_timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    session_report_path = os.path.join(reports_dir, f"session_{file_timestamp}.md")
+
+    finish_time = latest_session.finishTime or datetime.now()
+    duration_str = str(finish_time - latest_session.startTime).split(".")[0]
+
+    succ_interactions = (
+        sum(latest_session.successfulInteractions.values())
+        if hasattr(latest_session, "successfulInteractions")
+        else 0
+    )
+    total_followed = (
+        sum(latest_session.totalFollowed.values())
+        if hasattr(latest_session, "totalFollowed")
+        else 0
+    )
+    total_likes = getattr(latest_session, "totalLikes", 0)
+    total_unfollowed = getattr(latest_session, "totalUnfollowed", 0)
+    total_comments = getattr(latest_session, "totalComments", 0)
+    total_pm = getattr(latest_session, "totalPm", 0)
+    total_watched = getattr(latest_session, "totalWatched", 0)
+    total_crashes = getattr(latest_session, "totalCrashes", 0)
+    uploads_ok = getattr(latest_session, "totalUploadsSuccess", 0)
+    uploads_fail = getattr(latest_session, "totalUploadsFailed", 0)
+    upload_str = f"{uploads_ok} ok / {uploads_fail} fail"
+
+    # 1. Append to cumulative history.md
+    write_header = (
+        not os.path.exists(history_path) or os.path.getsize(history_path) == 0
+    )
+    try:
+        with open(history_path, "a", encoding="utf-8") as f:
+            if write_header:
+                f.write(f"# @{username} - Session Execution History\n\n")
+                f.write(
+                    "This file is automatically appended at the end of every bot session to maintain non-overwritten history.\n\n"
+                )
+                f.write(
+                    "| Timestamp | Duration | Succ. Interactions | Follows | Unfollows | Likes | Comments | PMs | Watched | Crashes | Uploads |\n"
+                )
+                f.write("|---|---|---|---|---|---|---|---|---|---|---|\n")
+            f.write(
+                f"| {timestamp_str} | {duration_str} | {succ_interactions} | {total_followed} | {total_unfollowed} | {total_likes} | {total_comments} | {total_pm} | {total_watched} | {total_crashes} | {upload_str} |\n"
+            )
+        logger.info(
+            f"Session history appended to {history_path}",
+            extra={"color": f"{Style.BRIGHT}{Fore.GREEN}"},
+        )
+    except Exception as e:
+        logger.error(f"Failed to append session history to {history_path}: {e}")
+
+    # 2. Write individual timestamped session report
+    try:
+        with open(session_report_path, "w", encoding="utf-8") as f:
+            f.write(f"# Session Report: @{username}\n\n")
+            f.write(f"- **Session ID**: `{getattr(latest_session, 'id', 'N/A')}`\n")
+            f.write(
+                f"- **Start Time**: {latest_session.startTime.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            )
+            f.write(f"- **Finish Time**: {finish_time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"- **Duration**: {duration_str}\n")
+            f.write(f"- **Total Crashes**: {total_crashes}\n\n")
+
+            f.write("## Interactions Summary\n")
+            f.write("| Metric | Count |\n|---|---|\n")
+            f.write(f"| Successful Interactions | {succ_interactions} |\n")
+            f.write(f"| Followed | {total_followed} |\n")
+            f.write(f"| Unfollowed | {total_unfollowed} |\n")
+            f.write(f"| Likes | {total_likes} |\n")
+            f.write(f"| Comments | {total_comments} |\n")
+            f.write(f"| PMs Sent | {total_pm} |\n")
+            f.write(f"| Watched Stories/Reels | {total_watched} |\n\n")
+
+            # Per-source breakdown
+            if (
+                hasattr(latest_session, "totalInteractions")
+                and latest_session.totalInteractions
+            ):
+                f.write("## Per-Source Interaction Breakdown\n")
+                f.write(
+                    "| Source | Total Attempts | Successful | Followed |\n|---|---|---|---|\n"
+                )
+                for src, attempts in latest_session.totalInteractions.items():
+                    succ = latest_session.successfulInteractions.get(src, 0)
+                    foll = latest_session.totalFollowed.get(src, 0)
+                    f.write(f"| {src} | {attempts} | {succ} | {foll} |\n")
+                f.write("\n")
+
+            # Upload activity
+            upload_hist = getattr(latest_session, "uploadHistory", [])
+            if upload_hist:
+                f.write("## Upload Activity\n")
+                f.write(
+                    "| Timestamp | File | Status | Caption Preview |\n|---|---|---|---|\n"
+                )
+                for up in upload_hist:
+                    f.write(
+                        f"| {up.get('timestamp', '')} | {up.get('file', '')} | {up.get('status', '')} | {up.get('caption', '')[:40]} |\n"
+                    )
+                f.write("\n")
+
+        logger.info(
+            f"Detailed session report saved: {session_report_path}",
+            extra={"color": f"{Style.BRIGHT}{Fore.GREEN}"},
+        )
+    except Exception as e:
+        logger.error(f"Failed to write session report {session_report_path}: {e}")
+
+    # 3. Trigger Dogfooding Optimizer for automated parameter tuning
+    try:
+        from InstaAddict.core.dogfood import run_dogfood_optimization
+
+        tuning_results = run_dogfood_optimization(username)
+        if tuning_results and tuning_results.get("recommendations"):
+            recs = tuning_results["recommendations"]
+            if any(r["severity"] in ["HIGH", "CRITICAL"] for r in recs):
+                logger.info(
+                    f"Dogfood Optimizer identified tuning recommendations in accounts/{username}/tuning_suggestions.md",
+                    extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
+                )
+    except Exception as e:
+        logger.debug(f"Dogfood optimization skipped or encountered error: {e}")
+
 
 def print_short_report(source, session_state):
     total_likes = session_state.totalLikes

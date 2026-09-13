@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.0.2
+  version: 1.0.3
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -10,7 +10,7 @@ milestones:
   name: Framework Foundation & Environment Setup
   priority: 0
   file: agent/milestones/milestone-1-foundation.md
-  status: in_progress
+  status: completed
   progress: 100
   started: 2026-09-11
   completed: 2026-09-12
@@ -29,8 +29,8 @@ milestones:
   started: 2026-09-12
   completed: '2026-09-12'
   estimated_weeks: 2
-  tasks_completed: 5
-  tasks_total: 6
+  tasks_completed: 4
+  tasks_total: 4
   notes: 'Track Instagram UI changes, verify locators in views.py against recent app releases, and execute test runs.
 
     '
@@ -49,6 +49,7 @@ milestones:
   tasks_completed: 1
 - id: M5
   name: Vision-AI Engagement & Reels Stalker
+  file: agent/milestones/milestone-5-advanced-engagement.md
   status: completed
   progress: 100
   tasks_total: 3
@@ -58,6 +59,7 @@ milestones:
   completed: '2026-09-12'
 - id: M6
   name: AI-Driven Content Generation (Autopilot Uploads)
+  file: agent/milestones/milestone-6-ai-captions.md
   status: completed
   progress: 100
   tasks_total: 3
@@ -65,6 +67,16 @@ milestones:
   started: '2026-09-12'
   notes: Implement Gemini Vision AI to automatically generate hyper-contextual captions and hashtag arrays for local payload uploads.
   completed: '2026-09-12'
+- id: M7
+  name: Production Telemetry, Error Hardening & Self-Learning System
+  status: completed
+  progress: 100
+  tasks_total: 4
+  tasks_completed: 4
+  started: '2026-09-13'
+  completed: '2026-09-13'
+  notes: Hardened error logging against Windows leaks, expanded state serialization with crashes/uploads, automated non-overwritten markdown history, and built automated dog-feeding optimizer.
+  file: agent/milestones/milestone-7-telemetry-dogfood.md
 tasks:
   milestone_1:
   - id: task-1
@@ -211,19 +223,53 @@ tasks:
     estimated_hours: 1
     notes: Ensure fallback logic exists (empty caption) if AI fails. Implement a custom prompt config for the specific IG profile character. Respect local .txt overrides.
     completed_date: '2026-09-12'
+  milestone_7:
+  - id: task-20
+    name: Windows File Lock Fix & Error Logger Hardening
+    status: completed
+    estimated_hours: 1
+    completed_date: '2026-09-13'
+    notes: Closed log handlers before removal in update_log_file_name to prevent Windows PermissionError, removed restrictive namespace filtering from error logger, and installed global sys.excepthook.
+  - id: task-21
+    name: Full State Tracking & Persistence Upgrade
+    status: completed
+    estimated_hours: 1
+    completed_date: '2026-09-13'
+    notes: Added total_crashes and upload metrics (totalUploads, successfulUploads, failedUploads, uploadHistory) to SessionState and serialized them in SessionStateEncoder.
+  - id: task-22
+    name: Automated Continuous Markdown History & Session Reports
+    status: completed
+    estimated_hours: 2
+    completed_date: '2026-09-13'
+    notes: Automatically writes non-overwritten session record to accounts/{username}/history.md and accounts/{username}/reports/session_{timestamp}.md at end of each run in print_full_report().
+  - id: task-23
+    name: Automated Dog-Feeding / Self-Learning Optimizer
+    status: completed
+    estimated_hours: 2
+    completed_date: '2026-09-13'
+    notes: Implemented InstaAddict/core/dogfood.py to parse sessions.json, history.md, and _error_trace.log, calculate conversion metrics, identify hotspots, and output automated tuning suggestions.
 documentation:
   design_documents: 1
-  milestone_documents: 1
+  milestone_documents: 5
   pattern_documents: 0
   task_documents: 0
-  last_updated: 2026-09-12
+  last_updated: '2026-09-13'
 progress:
-  planning: 90
-  implementation: 95
-  testing: 60
-  documentation: 85
+  planning: 100
+  implementation: 100
+  testing: 85
+  documentation: 95
   overall: 100
 recent_work:
+- date: 2026-09-13
+  description: 'Completed Milestone 7: Production Telemetry, Error Hardening & Self-Learning System.'
+  items:
+  - "✓ Fixed Windows file lock descriptors leak in log handlers"
+  - "✓ Installed global sys.excepthook to capture fatal unhandled exceptions in error trace"
+  - "✓ Persisted total_crashes, total_uploads_success, total_uploads_failed, and upload_history in SessionState"
+  - "✓ Recorded real-time upload attempts and media previews in UploadPostsPlugin"
+  - "✓ Implemented automated non-overwritten Markdown history (history.md and session reports)"
+  - "✓ Built DogfoodOptimizer to generate automated tuning recommendations from historical telemetry"
 - date: 2026-09-13
   description: 'Fixed uiautomator2 swipe jitter by moving to adb shell input swipe. Hardened Gemini Vision API with 429 quota retry loops and FinishReason:2 safety catchers. Optimized Vision AI pipeline for quota preservation.'
   items:

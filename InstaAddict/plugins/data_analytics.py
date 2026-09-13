@@ -55,6 +55,8 @@ class DataAnalytics(Plugin):
             + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
             + ".pdf"
         )
+        md_filename = filename.replace(".pdf", ".md")
+
         with PdfPages(filename) as pdf:
             sessions_week = self.filter_sessions(sessions, Period.LAST_WEEK)
             sessions_month = self.filter_sessions(sessions, Period.LAST_MONTH)
@@ -75,8 +77,10 @@ class DataAnalytics(Plugin):
             )
             self.plot_duration_statistics(sessions, pdf, self.username, Period.ALL_TIME)
 
+        self.generate_markdown_report(sessions, md_filename)
+
         logger.info(
-            "Report saved as " + filename,
+            f"Reports saved as {filename} and {md_filename}",
             extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
         )
 
@@ -228,6 +232,93 @@ class DataAnalytics(Plugin):
 
         pdf.savefig(fig)
         plt.close()
+
+    def generate_markdown_report(self, sessions, filename):
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"# InstaAddict Comprehensive Report for @{self.username}\n\n")
+            f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+            f.write("## Aggregate Statistics\n")
+            total_sessions = len(sessions)
+            total_duration = timedelta(0)
+            total_crashes_all = 0
+            total_uploads_all = 0
+            total_uploads_failed_all = 0
+            for session in sessions:
+                start = self.get_start_time(session)
+                finish = self.get_finish_time(session)
+                if start and finish:
+                    total_duration += finish - start
+                total_crashes_all += session.get("total_crashes", 0)
+                total_uploads_all += session.get("total_uploads_success", 0)
+                total_uploads_failed_all += session.get("total_uploads_failed", 0)
+
+            total_runtime_str = str(total_duration).split(".")[0]
+            f.write(f"- **Total Sessions**: {total_sessions}\n")
+            f.write(f"- **Total Runtime**: {total_runtime_str}\n")
+            f.write(f"- **Total Crashes Recorded**: {total_crashes_all}\n")
+            f.write(
+                f"- **Total Posts Published**: {total_uploads_all} (Failed attempts: {total_uploads_failed_all})\n\n"
+            )
+
+            f.write("## Session Details\n")
+            f.write(
+                "| Start Time | Duration | Succ. Interactions | Follows | Unfollows | Likes | Comments | PMs | Watched | Crashes | Uploads |\n"
+            )
+            f.write("|---|---|---|---|---|---|---|---|---|---|---|\n")
+
+            all_upload_history = []
+            for session in sessions:
+                start_str = session.get("start_time", "")
+
+                s_time = self.get_start_time(session)
+                f_time = self.get_finish_time(session)
+                duration = (
+                    str(f_time - s_time).split(".")[0] if s_time and f_time else "N/A"
+                )
+
+                interactions = session.get("successful_interactions", 0)
+                follows = session.get("total_followed", 0)
+                unfollows = session.get("total_unfollowed", 0)
+                likes = session.get("total_likes", 0)
+                comments = session.get("total_comments", 0)
+                pms = session.get("total_pm", 0)
+                watched = session.get("total_watched", 0)
+                crashes = session.get("total_crashes", 0)
+                up_ok = session.get("total_uploads_success", 0)
+                up_fail = session.get("total_uploads_failed", 0)
+                upload_summary = f"{up_ok} ok / {up_fail} fail"
+
+                f.write(
+                    f"| {start_str} | {duration} | {interactions} | {follows} | {unfollows} | {likes} | {comments} | {pms} | {watched} | {crashes} | {upload_summary} |\n"
+                )
+
+                hist = session.get("upload_history", [])
+                if hist:
+                    all_upload_history.extend(hist)
+
+            if all_upload_history:
+                f.write("\n## Upload Log History\n")
+                f.write("| Timestamp | File | Status | Caption Preview |\n")
+                f.write("|---|---|---|---|\n")
+                for u in all_upload_history:
+                    f.write(
+                        f"| {u.get('timestamp', '')} | {u.get('file', '')} | {u.get('status', '')} | {u.get('caption', '')[:40]} |\n"
+                    )
+
+            f.write("\n## Parameter Tuning & Analytics\n")
+            f.write(
+                "Use these reports along with `logs/<username>_error_trace.log` to tune your `config.yml`.\n"
+            )
+            f.write(
+                "- **Low Successful Interactions**: Check the error trace log for UI crashes, limits reached, or outdated locators.\n"
+            )
+            f.write(
+                "- **High Crashes**: Indicates device connectivity issues or unstable UI interactions.\n"
+            )
+            f.write(
+                "- **Dog-Feeding**: Run the Dogfood Optimizer to automatically generate tuned parameters from this history.\n"
+            )
 
 
 @unique

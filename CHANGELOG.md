@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.0.3 — Production Telemetry, Error Hardening & Self-Learning System
+
+Production-grade error handling, automated telemetry, continuous non-overwritten reporting, and closed-loop self-learning parameter optimization.
+
+### Added
+- **Error Trace Logging (`_error_trace.log`)**: Dedicated warning and error logger capturing third-party errors (`uiautomator2`, `adbutils`, network stack) alongside InstaAddict events.
+- **Top-Level Crash Interception**: Installed global `sys.excepthook` to guarantee fatal unhandled Python exceptions are written to the error trace log before process exit.
+- **Full State Telemetry**: Expanded `SessionState` and `SessionStateEncoder` to track and persist `totalCrashes`, `totalUploadsSuccess`, `totalUploadsFailed`, and `uploadHistory` into `accounts/{username}/sessions.json`.
+- **Upload Outcome Recording**: Enhanced `UploadPostsPlugin` to log upload executions, file names, captions, and statuses directly into the active session state.
+- **Continuous Markdown History**: Automated `save_markdown_history()` on session completion (`print_full_report()`), appending to `accounts/{username}/history.md` (never overwritten) and generating timestamped session summaries in `accounts/{username}/reports/session_{timestamp}.md`.
+- **Dogfood Self-Learning Optimizer (`DogfoodOptimizer`)**: Implemented `InstaAddict/core/dogfood.py` to analyze run history, error patterns, and source yields, generating automated configuration tuning recommendations in `tuning_suggestions.json` and `tuning_suggestions.md`.
+- **Enhanced Data Analytics Markdown Export**: Upgraded `InstaAddict/plugins/data_analytics.py` to render complete tables of interaction yields, crashes, and content queue uploads.
+
+### Fixed
+- **Windows File Lock Descriptor Leak**: Explicitly closed file handlers before calling `os.remove()` in `update_log_file_name()`, eliminating Windows `PermissionError: [WinError 32]`.
+- **Swipe Jitter & Drag Stalls**: Replaced uiautomator2 dragging with native `adb shell input swipe` for smooth and natural scroll gestures.
+- **Gemini API 429 Quota & Safety Hardening**: Added exponential backoff retry loops, 512x512 LANCZOS payload compression, and safety-block fallback sanitizers.
+
+**Full diff**: `v1.0.2...v1.0.3`
+
 ## v1.0.2 — Instagram compatibility & reliability fixes
 
 Two weeks of accumulated fixes for running InstaAddict against current Instagram versions (tested against 440.0.0.46.86), plus dependency and packaging cleanup.

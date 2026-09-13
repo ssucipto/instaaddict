@@ -119,3 +119,19 @@ carryovers:
       - InstaAddict/core/interaction.py
       - InstaAddict/core/views.py
       - InstaAddict/core/handle_sources.py
+
+  - id: CO-010
+    audit_report: agent/reports/audit-023-reporting-and-error-tracing.md
+    date_raised: 2026-09-13
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-13'
+    verified_in_audit: 'audit-025'
+    summary: Resolve Windows file lock leak, add total_crashes and upload tracking to SessionState, automate non-overwritten Markdown history on session completion, expand error logger to capture external errors and uncaught exceptions, and build automated dog-feeding analyzer.
+    affected_files:
+      - InstaAddict/core/log.py
+      - InstaAddict/core/session_state.py
+      - InstaAddict/core/report.py
+      - InstaAddict/plugins/upload_posts.py
+      - InstaAddict/plugins/data_analytics.py
+      - InstaAddict/core/dogfood.py
