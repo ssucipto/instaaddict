@@ -30,16 +30,7 @@ try:
 except:
     pass
 
-_HISTORY_FILE = "ai_comment_history.json"
 
-_RECENT_INTERACTIONS = set()
-
-if os.path.exists(_HISTORY_FILE):
-    try:
-        with open(_HISTORY_FILE, "r") as f:
-            _RECENT_INTERACTIONS = set(json.load(f))
-    except:
-        pass
 
 def _sanitize_response(text: str) -> str:
     """Regex block to prevent LLM outings like 'I cannot assist'."""
@@ -77,21 +68,8 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         logger.error(f"Failed to capture screen: {e}")
         return ""
         
-    import hashlib
-    screen_hash = hashlib.md5(raw_screenshot[:1024]).hexdigest()
-
-    if screen_hash in _RECENT_INTERACTIONS:
-        logger.warning(f"Idempotency Guard: Already commented on optical hash {screen_hash}. Skipping.")
-        return ""
-
     SESSION_API_CALLS += 1
-    _RECENT_INTERACTIONS.add(screen_hash)
-    try:
-        with open(_HISTORY_FILE, "w") as f:
-            json.dump(list(_RECENT_INTERACTIONS), f)
-    except:
-        pass
-    
+
     genai.configure(api_key=api_key)
     
     for attempt in range(3):
@@ -270,53 +248,71 @@ import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-def evaluate_reel_content(img_bytes, topic="dogs or animals"):
-    """Validates if a reel matches the target taxonomy to train the algorithm."""
+def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
+    """1-Shot VLM: Validates if a reel matches the topic AND generates a comment if true."""
     global VISION_API_DEAD, SESSION_API_CALLS
     if VISION_API_DEAD:
-        return True # Fallback
+        return "" # Fallback
 
     if SESSION_API_CALLS >= MAX_API_CALLS_PER_SESSION:
         logger.warning("Gemini AI reached local safety limit of 400 calls. Severing VLM.")
         VISION_API_DEAD = True
-        return True
+        return ""
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "INSERT_YOUR_KEY_HERE":
         logger.warning("No Gemini API key found in .env. Skipping Vision AI Filter.")
         VISION_API_DEAD = True
-        return True
+        return ""
 
     SESSION_API_CALLS += 1
     
     for attempt in range(3):
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-3.7-flash')
             
-            # Local import to avoid top level issues if any
-            import io
-            from PIL import Image
             img = Image.open(io.BytesIO(img_bytes))
+            img = img.convert("RGB")
+            img.thumbnail((512, 512), Image.Resampling.LANCZOS)
             
-            prompt = f"Look at this screenshot of an Instagram Reel. Does this image predominantly feature {topic}? Reply strictly with a single word: YES or NO."
+            prompt = (
+                f"Your Persona: '{UNIVERSAL_PERSONA}'. "
+                f"Look at this screenshot of an Instagram Reel. Is it predominantly about {topic}? "
+                "If NO, reply strictly with the word: NO. "
+                "If YES, write a natural, slang-friendly comment about a highly specific, narrow detail in exactly 3 to 6 words. "
+                "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'."
+            )
             
-            response = model.generate_content(
-                [prompt, img],
+            model = genai.GenerativeModel(
+                model_name='gemini-3.7-flash',
+                system_instruction=prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.0,
                     max_output_tokens=150,
+                    temperature=0.7
                 )
             )
             
+            safety_settings = [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+            ]
+            
+            response = model.generate_content(
+                img,
+                safety_settings=safety_settings,
+                request_options={"timeout": 30.0}
+            )
+            
             try:
-                answer = response.text.strip().upper()
-                if "YES" in answer:
-                    return True
-                return False
+                answer = response.text.strip()
+                if answer.upper() == "NO":
+                    return ""
+                return _sanitize_response(answer)
             except (ValueError, AttributeError) as e:
                 logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
-                return True
+                return ""
                 
         except Exception as e:
             error_msg = str(e)
@@ -338,4 +334,4 @@ def evaluate_reel_content(img_bytes, topic="dogs or animals"):
                 time.sleep(wait_time)
                 continue
             break
-    return True
+    return ""

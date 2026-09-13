@@ -608,6 +608,7 @@ def _comment(
     args,
     session_state: SessionState,
     media_type: MediaType,
+    explicit_comment: str = None,
 ) -> bool:
     if not session_state.check_limit(
         limit_type=session_state.Limit.COMMENTS, output=False
@@ -615,9 +616,13 @@ def _comment(
         if not random_choice(comment_percentage):
             return False
 
-        # VISION AI: Take snapshot of view BEFORE opening comment box (obfuscation guard)
-        logger.info("Executing Vision-AI Context Assessment...")
-        smart_ai_comment = get_vision_comment(device, "current_post_target")
+        if explicit_comment:
+            smart_ai_comment = explicit_comment
+            logger.info("Using pre-generated explicit comment. Skipping duplicate Vision-AI check.")
+        else:
+            # VISION AI: Take snapshot of view BEFORE opening comment box (obfuscation guard)
+            logger.info("Executing Vision-AI Context Assessment...")
+            smart_ai_comment = get_vision_comment(device, "current_post_target")
 
         universal_actions = UniversalActions(device)
         # we have to do a little swipe for preventing get the previous post comments button (which is covered by top bar, but present in hierarchy!!)
