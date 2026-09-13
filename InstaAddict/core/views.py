@@ -530,57 +530,45 @@ class PostsViewList:
             logger.info(
                 "Scroll down to see next post.", extra={"color": f"{Fore.GREEN}"}
             )
+            # Check if currently inside the Reels / Clips viewer
+            is_clips = False
+            try:
+                clips_viewer = self.device.find(
+                    resourceIdMatches=case_insensitive_re(
+                        f"{ResourceID.ROOT_CLIPS_LAYOUT}|{ResourceID.CLIPS_VIEWER_CONTAINER}|{ResourceID.CLIPS_VIEWER_VIEW_PAGER}|{ResourceID.CLIPS_VIDEO_CONTAINER}"
+                    )
+                )
+                if clips_viewer.exists():
+                    is_clips = True
+            except Exception:
+                is_clips = False
+
+            if is_clips:
+                logger.debug("Reels viewer detected: executing fluid full-page vertical swipe.")
+                start_y = int(displayHeight * 0.80)
+                end_y = int(displayHeight * 0.20)
+                self.device.swipe_points(
+                    displayWidth / 2,
+                    start_y,
+                    displayWidth / 2,
+                    end_y,
+                )
+                return True
+
             gap_view_obj = self.device.find(index=-1, resourceIdMatches=containers_gap)
             obj1 = None
-            for _ in range(3):
-                if not gap_view_obj.exists():
-                    logger.debug("Can't find the gap obj, scroll down a little more.")
-                    PostsViewList(self.device).swipe_to_fit_posts(SwipeTo.HALF_PHOTO)
-                    gap_view_obj = self.device.find(resourceIdMatches=containers_gap)
-                    if not gap_view_obj.exists():
-                        continue
-                    else:
-                        break
-                else:
-                    media_bounds = self._get_current_media_bounds(containers_content)
-                    if (
-                        media_bounds
-                        and gap_view_obj.get_bounds()["bottom"] < media_bounds["bottom"]
-                    ):
-                        PostsViewList(self.device).swipe_to_fit_posts(
-                            SwipeTo.HALF_PHOTO
-                        )
-                        continue
-                    suggested = self.device.find(resourceIdMatches=suggested_users)
-                    if suggested.exists():
-                        for _ in range(2):
-                            PostsViewList(self.device).swipe_to_fit_posts(
-                                SwipeTo.HALF_PHOTO
-                            )
-                            footer_obj = self.device.find(
-                                resourceIdMatches=ResourceID.FOOTER_SPACE
-                            )
-                            if footer_obj.exists():
-                                obj1 = footer_obj.get_bounds()["bottom"]
-                                break
-                    break
-            if obj1 is None:
-                if gap_view_obj.exists():
-                    obj1 = gap_view_obj.get_bounds()["bottom"]
-                else:
-                    logger.debug(
-                        "Gap/footer view not found after retries — likely a "
-                        "sponsored/ad post layout. Falling back to content "
-                        "container bounds."
-                    )
-                    fallback_media_bounds = self._get_current_media_bounds(
-                        containers_content
-                    )
-                    obj1 = (
-                        fallback_media_bounds["bottom"]
-                        if fallback_media_bounds
-                        else displayHeight * 0.75
-                    )
+            if gap_view_obj.exists():
+                obj1 = gap_view_obj.get_bounds()["bottom"]
+            else:
+                fallback_media_bounds = self._get_current_media_bounds(
+                    containers_content
+                )
+                obj1 = (
+                    fallback_media_bounds["bottom"]
+                    if fallback_media_bounds
+                    else displayHeight * 0.75
+                )
+
             media_bounds = self._get_current_media_bounds(containers_content)
             if media_bounds is None:
                 logger.debug("Can't find media bounds, using screen fallback.")
@@ -1104,8 +1092,25 @@ class PostsViewList:
             logger.info("Advertisement detected in current post.")
             return False, "", "", True, is_hashtag, has_tags
         if not username or username == "False" or len(username.strip()) == 0:
-            logger.info("No valid post author found. Skipping as ad/unsupported.")
-            return False, "", "", True, is_hashtag, has_tags
+            logger.info("No valid post author found. Skipping as unsupported.")
+            return False, "", "", False, is_hashtag, has_tags
+
+        # Check Reels caption component if on a Reel
+        clips_caption = self.device.find(
+            resourceIdMatches=ResourceID.CLIPS_CAPTION_COMPONENT
+        )
+        if clips_caption.exists():
+            desc_txt = clips_caption.get_desc() or clips_caption.get_text()
+            if desc_txt:
+                new_description = PostsViewList._normalize_ig_text(desc_txt).upper()
+                if new_description != last_description:
+                    return False, new_description, username, is_ad, is_hashtag, has_tags
+                logger.info(
+                    "This post has the same description and author as the last one."
+                )
+                return True, new_description, username, is_ad, is_hashtag, has_tags
+            logger.info("This Reel post hasn't a caption description...")
+            return False, "", username, is_ad, is_hashtag, has_tags
         for _ in range(8):
             post_description = self.device.find(
                 index=-1,
@@ -1209,20 +1214,57 @@ class PostsViewList:
         """returns a tuple[var, bool, bool]"""
         is_ad = False
         is_hashtag = False
+        owner_locators = (
+            f"{ResourceID.ROW_FEED_PHOTO_PROFILE_NAME}|"
+            f"{ResourceID.CLIPS_AUTHOR_USERNAME}|"
+            f"{ResourceID.CLIPS_AUTHOR_PROFILE_PIC}|"
+            f"{ResourceID.ROW_FEED_PROFILE_HEADER}|"
+            f"{ResourceID.CLIPS_AUTHOR_INFO_COMPONENT}"
+        )
         if username is None:
             post_owner_obj = self.device.find(
                 resourceIdMatches=ResourceID.ROW_FEED_PHOTO_PROFILE_NAME
             )
+            if not post_owner_obj.exists():
+                post_owner_obj = self.device.find(
+                    resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME
+                )
+            if not post_owner_obj.exists():
+                post_owner_obj = self.device.find(
+                    resourceIdMatches=ResourceID.CLIPS_AUTHOR_PROFILE_PIC
+                )
+            if not post_owner_obj.exists():
+                post_owner_obj = self.device.find(
+                    resourceIdMatches=ResourceID.ROW_FEED_PROFILE_HEADER
+                )
+            if not post_owner_obj.exists():
+                post_owner_obj = self.device.find(
+                    resourceIdMatches=owner_locators
+                )
         else:
             for _ in range(2):
                 post_owner_obj = self.device.find(
                     resourceIdMatches=ResourceID.ROW_FEED_PHOTO_PROFILE_NAME,
                     textStartsWith=username,
                 )
+                if not post_owner_obj.exists():
+                    post_owner_obj = self.device.find(
+                        resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME,
+                        textStartsWith=username,
+                    )
+                if not post_owner_obj.exists():
+                    post_owner_obj = self.device.find(
+                        resourceIdMatches=ResourceID.CLIPS_AUTHOR_PROFILE_PIC,
+                        descriptionMatches=f"(?i)Profile picture of {re.escape(username)}",
+                    )
+                if not post_owner_obj.exists():
+                    post_owner_obj = self.device.find(
+                        resourceIdMatches=owner_locators
+                    )
                 notification = self.device.find(
                     resourceIdMatches=ResourceID.NOTIFICATION_MESSAGE
                 )
-                if not post_owner_obj.exists and notification.exists():
+                if not post_owner_obj.exists() and notification.exists():
                     logger.warning(
                         "There is a notification there! Please disable them in settings.. We will wait 10 seconds before continue.."
                     )
@@ -1231,6 +1273,11 @@ class PostsViewList:
 
         for _ in range(3):
             if not post_owner_obj.exists():
+                post_owner_obj = self.device.find(resourceIdMatches=owner_locators)
+                if post_owner_obj.exists():
+                    post_owner_clickable = True
+                    break
+
                 if mode == Owner.OPEN:
                     if (
                         not username
@@ -1240,7 +1287,7 @@ class PostsViewList:
                         logger.info(
                             "Cannot open post owner: invalid or empty username."
                         )
-                        return False, True, is_hashtag
+                        return False, False, is_hashtag
                     comment_description = self.device.find(
                         resourceIdMatches=ResourceID.ROW_FEED_COMMENT_TEXTVIEW_LAYOUT,
                         textStartsWith=username,
@@ -1260,7 +1307,7 @@ class PostsViewList:
                         return True, is_ad, is_hashtag
                 UniversalActions(self.device)._swipe_points(direction=Direction.UP)
                 post_owner_obj = self.device.find(
-                    resourceIdMatches=ResourceID.ROW_FEED_PHOTO_PROFILE_NAME,
+                    resourceIdMatches=owner_locators,
                 )
             else:
                 post_owner_clickable = True
@@ -1268,7 +1315,7 @@ class PostsViewList:
 
         if not post_owner_clickable:
             logger.info("Can't find the owner name, skip.")
-            return False, True, is_hashtag
+            return False, False, is_hashtag
         if mode == Owner.OPEN:
             is_ad, is_hashtag, _ = self._check_if_ad_or_hashtag(post_owner_obj)
             if is_ad:
@@ -1279,15 +1326,25 @@ class PostsViewList:
             post_owner_obj.click()
             return True, is_ad, is_hashtag
         elif mode == Owner.GET_NAME:
-            is_ad, is_hashtag, username = self._check_if_ad_or_hashtag(post_owner_obj)
-            if username is None or username == "":
-                raw_text = post_owner_obj.get_text()
-                logger.debug(f"[DEBUG owner name] raw_text='{raw_text}'")
-                username = (
-                    post_owner_obj.get_text().replace("•", "").strip().split(" ", 1)[0]
-                )
-            if not username or username == "False" or len(username.strip()) == 0:
-                is_ad = True
+            is_ad, is_hashtag, raw_name = self._check_if_ad_or_hashtag(post_owner_obj)
+            if not raw_name:
+                raw_name = post_owner_obj.get_text() or post_owner_obj.get_desc() or ""
+
+            logger.debug(f"[DEBUG owner name] raw_name='{raw_name}'")
+            m_pic = re.search(
+                r"Profile picture of\s+([a-zA-Z0-9._]+)",
+                raw_name,
+                re.IGNORECASE,
+            )
+            if m_pic:
+                username = m_pic.group(1)
+            else:
+                cleaned = raw_name.replace("•", " ").replace("\xa0", " ").strip()
+                m_user = re.match(r"^([a-zA-Z0-9._]+)", cleaned)
+                if m_user:
+                    username = m_user.group(1)
+                else:
+                    username = cleaned.split(" ", 1)[0] if cleaned else ""
             return username, is_ad, is_hashtag
 
         elif mode == Owner.GET_POSITION:
@@ -1835,7 +1892,9 @@ class OpenedPostView:
             attempt = 0
             while True:
                 like_button = post_media_view.down(
-                    resourceIdMatches=ResourceID.ROW_FEED_BUTTON_LIKE
+                    resourceIdMatches=case_insensitive_re(
+                        f"{ResourceID.ROW_FEED_BUTTON_LIKE}|{ResourceID.LIKE_BUTTON}"
+                    )
                 )
                 if like_button.viewV2 is not None or attempt == 3:
                     return like_button if like_button.exists() else None
@@ -1843,6 +1902,13 @@ class OpenedPostView:
                     direction=Direction.DOWN, delta_y=100
                 )
                 attempt += 1
+        like_btn = self.device.find(
+            resourceIdMatches=case_insensitive_re(
+                f"{ResourceID.ROW_FEED_BUTTON_LIKE}|{ResourceID.LIKE_BUTTON}"
+            )
+        )
+        if like_btn.exists(Timeout.SHORT):
+            return like_btn
         return None
 
     def _is_post_liked(self) -> Tuple[Optional[bool], Optional[DeviceFacade.View]]:
@@ -1869,7 +1935,9 @@ class OpenedPostView:
         liked = False
         if not post_media_view.exists():
             like_button = self.device.find(
-                resourceIdMatches=case_insensitive_re(ResourceID.ROW_FEED_BUTTON_LIKE)
+                resourceIdMatches=case_insensitive_re(
+                    f"{ResourceID.ROW_FEED_BUTTON_LIKE}|{ResourceID.LIKE_BUTTON}"
+                )
             )
             if like_button.exists(Timeout.SHORT):
                 logger.info("Liking post via the little heart ❤️.")

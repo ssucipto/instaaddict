@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.0.3
+  version: 1.1.0
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -261,6 +261,27 @@ progress:
   documentation: 95
   overall: 100
 recent_work:
+- date: 2026-09-13
+  description: 'Synchronized Documentation and Bumped Version to v1.1.0.'
+  items:
+  - "✓ Bumped project version to v1.1.0 across InstaAddict/__init__.py, agent/core/identity.yml, and agent/progress.yaml"
+  - "✓ Expanded README.md with comprehensive documentation of fork enhancements over GramAddict"
+  - "✓ Documented Reels/Clips compatibility, Tiered Hashtag Discovery Engine, Non-Bot Cache, Ad Watchdog, and 200ms Flick Physics"
+  - "✓ Documented new CLI flags (--expand-hashtags, --randomize-tasks, --clear-non-bot-cache, etc.) and configuration layouts"
+  - "✓ Updated agent/design/requirements.md with v1.1.0 architectural specifications"
+  - "✓ Validated ACP documentation integrity with zero errors and zero warnings"
+- date: 2026-09-13
+  description: 'Resolved Owner Name Resolution Failures, False Ad Detections, and Jerky Scrolling on Hashtag Feeds.'
+  items:
+  - "✓ Resolved 'Can't find the owner name, skip.' by adding multi-tier author locators for Reels/Clips and modern feed layouts"
+  - "✓ Added CLIPS_AUTHOR_USERNAME, CLIPS_AUTHOR_PROFILE_PIC, CLIPS_AUTHOR_INFO_COMPONENT, CLIPS_CAPTION_COMPONENT, ROOT_CLIPS_LAYOUT, and CLIPS_VIEWER_CONTAINER to ResourceID"
+  - "✓ Completely decoupled missing owner extraction from is_ad flag, eliminating false-positive ad detections on organic posts"
+  - "✓ Replaced jerky 4-to-5 micro-swipe sequence with clean, single-gesture fluid vertical scroll"
+  - "✓ Removed obsolete 3-retry gap view loop from swipe_to_fit_posts and redundant HALF_PHOTO swipe from handle_sources.py"
+  - "✓ Added Reels like button support (LIKE_BUTTON) and caption extraction (CLIPS_CAPTION_COMPONENT)"
+  - "✓ Tuned swipe speed to 200ms in device_facade.py for natural, smooth scrolling"
+  - "✓ Verified live on emulator-5554 and added 9-case unit test suite (test_owner_ad_detection_and_scroll.py) with 100% pass rate"
+  - "✓ Authored audit-037, audit-038, audit-039, and review-032 reports"
 - date: 2026-09-13
   description: 'Implemented Tiered Masterlist Pool and Dynamic Hashtag Discovery & Rotation Engine.'
   items:

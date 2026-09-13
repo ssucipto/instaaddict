@@ -125,3 +125,25 @@
     - authored-audit-036-and-review-031-verification-reports
   deferred: []
   key_fact: "HashtagManager combines a curated 4-tier masterlist (local/breed/lifestyle/reach) with zero-overhead in-app caption harvesting and Gemini AI expansion; deterministic rules (2:2:1:1 tier-balanced sampling, 2-session anti-fatigue cooldown, 7-day saturation benching, and 0-result dead tag pruning) completely prevent bot burnout and maximize niche engagement."
+
+- date: 2026-09-13
+  executor: Antigravity
+  branch: master
+  tasks_completed: [route-040]
+  done:
+    - resolved-hashtag-reels-viewer-author-name-lookup-failure
+    - added-clips-author-username-and-clips-author-profile-pic-resource-ids
+    - decoupled-owner-resolution-failure-from-ad-detection-in-views-py
+    - fixed-reels-caption-extraction-with-fast-exit-to-prevent-redundant-swipes
+    - implemented-reels-like-button-resource-id-support
+    - eliminated-jerky-double-scroll-and-redundant-swipe-to-fit-half-photo
+    - implemented-single-fluid-vertical-swipe-for-reels-view-pager
+    - tuned-adb-swipe-duration-to-200ms-for-smooth-responsive-scrolling
+    - created-comprehensive-unit-test-suite-test-owner-ad-detection-and-scroll
+    - validated-live-reel-post-author-extraction-and-ad-detection-on-emulator
+    - bumped-project-version-to-v1-1-0-consistently-across-all-version-bearing-files
+    - updated-readme-with-comprehensive-fork-differentiation-and-new-subsystem-docs
+    - synchronized-requirements-specification-with-v1-1-0-capabilities
+    - validated-acp-documentation-with-zero-errors-and-zero-warnings
+  deferred: []
+  key_fact: "Hashtag grid taps on video posts open Instagram's full-screen Reels viewer (`clips_author_username`, `clips_author_profile_pic`) rather than standard feed containers. In `views.py:1270`, failing to find `post_owner_clickable` returned `(False, True, is_hashtag)` where the second element falsely flagged the post as an advertisement; decoupling owner discovery failure from ad detection and adding dedicated Reels swipe handling eliminated both the false ad skips and scroll jerkiness. Bumping to v1.1.0 accurately reflects the cumulative addition of 10 major architectural subsystems over GramAddict."

@@ -1,4 +1,5 @@
 project: InstaAddict
+version: 1.1.0
 type: cli-tool
 description: 'Human-like Instagram automation bot powered by ADB and UIAutomator2,
   automating interactions (following, liking, commenting, watching stories) directly
@@ -20,5 +21,12 @@ priorities:
 - clean-code
 repo: github.com/joeahkim/InstaAddict
 capabilities:
-- IG v446+ Compatibility (Action Bar & Media group resolution)
-- Local JSON/Media queue processing (UploadPostsPlugin)
+- IG v446+ Full-Screen Reels & Modern Action Bar / Media group resolution
+- Multi-Tier Hashtag Discovery, Rotation & Pruning Engine (HashtagManager)
+- Persistent Non-Bot Followings Cache with Atomic Disk Writes
+- In-App Browser & Advertisement Trapping Escape Watchdog
+- Multimodal Gemini Vision AI Post Evaluation & Contextual Commenting
+- Autonomous Local Queue Post & Reel Uploader (UploadPostsPlugin)
+- Native 200ms ADB Flick Gestures & Fluid Single-Swipe Feed Navigation
+- Self-Learning Parameter Tuning Engine (DogfoodOptimizer) & Resilient Crash Telemetry
+

@@ -181,7 +181,7 @@ class TestAdDetectionAndEscape(unittest.TestCase):
                 )
             )
 
-        self.assertTrue(is_ad)
+        self.assertFalse(is_ad)
         self.assertEqual(desc, "")
         self.assertEqual(author, "")
 
@@ -273,7 +273,7 @@ class TestAdDetectionAndEscape(unittest.TestCase):
             "hashtag-posts-recent", Owner.OPEN, username=""
         )
         self.assertFalse(opened)
-        self.assertTrue(is_ad)
+        self.assertFalse(is_ad)
 
 
 if __name__ == "__main__":

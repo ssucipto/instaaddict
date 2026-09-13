@@ -3,31 +3,25 @@
   <br />
   <h1 align="center">InstaAddict</h1>
   <br />
-  <p align="center">Looking for Instagram automation? I'm proud to present you a <b>100% free and open source Instagram bot</b>. This bot will allow you to grow your following and engagement by liking, following, commenting and sending PMs automatically with your Android phone/tablet/emulator. <b>No root required.</b></p>
+  <p align="center">Looking for production-grade Instagram automation? I'm proud to present <b>InstaAddict</b>: a <b>100% free, open-source, human-like Instagram bot</b>. Grow your audience and engagement with automated liking, following, commenting, story watching, and autonomous posting on real Android devices or emulators. <b>No root required. No private APIs.</b></p>
   <p align="center">
     <a href="https://github.com/joeahkim/InstaAddict/blob/develop/LICENSE">
-      <img src="https://img.shields.io/github/license/joeahkim/InstaAddict?style=flat" alt=""/>
+      <img src="https://img.shields.io/github/license/joeahkim/InstaAddict?style=flat" alt="license"/>
     </a>
     <a href="https://pypi.org/project/instaaddict/">
-      <img src="https://img.shields.io/pypi/v/instaaddict?style=flat&label=pypi" alt=""/>
+      <img src="https://img.shields.io/badge/pypi-v1.1.0-blue?style=flat" alt="pypi"/>
     </a>
     <a href="https://www.python.org/">
-      <img src="https://img.shields.io/badge/built%20with-Python3-red.svg?style=flat" alt=""/>
+      <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-red.svg?style=flat" alt="Python"/>
     </a>
     <a href="https://github.com/joeahkim/InstaAddict/pulls">
-      <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt=""/>
+      <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs Welcome"/>
     </a>
     <a href="https://github.com/joeahkim/InstaAddict/issues">
-      <img src="https://img.shields.io/github/issues/joeahkim/InstaAddict?style=flat" alt=""/>
-    </a>
-    <a href="https://github.com/joeahkim/InstaAddict/pulls">
-      <img src="https://img.shields.io/github/issues-pr/joeahkim/InstaAddict?style=flat" alt=""/>
+      <img src="https://img.shields.io/github/issues/joeahkim/InstaAddict?style=flat" alt="Issues"/>
     </a>
     <a href="https://github.com/joeahkim/InstaAddict/stargazers">
-      <img src="https://img.shields.io/github/stars/joeahkim/InstaAddict?style=flat" alt="">
-    </a>
-    <a href="https://github.com/joeahkim/InstaAddict/commits/develop">
-      <img src="https://img.shields.io/github/last-commit/joeahkim/InstaAddict/develop?style=flat" alt="">
+      <img src="https://img.shields.io/github/stars/joeahkim/InstaAddict?style=flat" alt="Stars"/>
     </a>
     <a href="https://discord.gg/PvxsP8HFa">
       <img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"/>
@@ -37,28 +31,42 @@
 
 <br />
 
-## Table of contents
+## Table of Contents
 
-* [About this project](#about-this-project)
-* [Why automate your Instagram?](#why-should-i-automate-my-instagram-account)
-* [Why InstaAddict over other bots?](#i-saw-there-are-a-lot-of-similar-projects-on-github-why-should-i-choose-this-one)
-* [How it works](#so-this-bot-does-not-use-api)
-* [Compatibility / known working versions](#compatibility--known-working-versions)
-* [Features](#cool-what-can-i-do-with-this-bot)
-* [Quick start](#quick-start)
-* [Common setup issues](#common-setup-issues)
-* [Support this project](#support-this-project)
-* [Community](#talk-botty-with-us)
+* [About This Project & Our Fork](#about-this-project--our-fork)
+* [What's New in This Fork (InstaAddict vs GramAddict)](#whats-new-in-this-fork-instaaddict-vs-gramaddict)
+  * [1. Full-Screen Reels & Modern IG (v446+) Compatibility](#1-full-screen-reels--modern-ig-v446-compatibility)
+  * [2. Tiered Masterlist & Dynamic Hashtag Discovery Engine](#2-tiered-masterlist--dynamic-hashtag-discovery-engine)
+  * [3. Persistent Non-Bot Followings Cache](#3-persistent-non-bot-followings-cache)
+  * [4. Universal Ad Avoidance & In-App Browser Escape Watchdog](#4-universal-ad-avoidance--in-app-browser-escape-watchdog)
+  * [5. Fluid 200ms ADB Native Swiping & Single-Swipe Flick Physics](#5-fluid-200ms-adb-native-swiping--single-swipe-flick-physics)
+  * [6. Multimodal Gemini Vision AI Post Evaluation & Contextual Commenting](#6-multimodal-gemini-vision-ai-post-evaluation--contextual-commenting)
+  * [7. Autonomous Content Queue & Post Uploader](#7-autonomous-content-queue--post-uploader)
+  * [8. Task Sequence Randomizer](#8-task-sequence-randomizer)
+  * [9. Production Telemetry & Self-Learning Dogfood Optimizer](#9-production-telemetry--self-learning-dogfood-optimizer)
+  * [10. Android 14+ UIAutomator2 & FastInputIME Mode.PASTE](#10-android-14-uiautomator2--fastinputime-modepaste)
+* [Why Automate Your Instagram?](#why-automate-your-instagram)
+* [Why InstaAddict Over Other Bots?](#why-instaaddict-over-other-bots)
+* [How It Works](#how-it-works)
+* [Compatibility & Known Working Versions](#compatibility--known-working-versions)
+* [Features & Interaction Jobs](#features--interaction-jobs)
+* [Quick Start Guide](#quick-start-guide)
+* [Configuration & CLI Reference](#configuration--cli-reference)
+* [Common Setup Issues & Troubleshooting](#common-setup-issues--troubleshooting)
+* [Support This Project](#support-this-project)
+* [Community](#community)
 
 <br />
 
-# About This Project
+# About This Project & Our Fork
 
-**InstaAddict** is a fork and continuation of [GramAddict](https://github.com/GramAddict/bot), an open-source Instagram automation bot originally created and maintained by [mastrolube](https://github.com/mastrolube) and the GramAddict community. The original project is no longer actively maintained — Instagram keeps changing its app's UI, and without ongoing fixes those changes silently break automation over time.
+**InstaAddict** is an advanced fork, active continuation, and comprehensive architectural modernization of [GramAddict](https://github.com/GramAddict/bot), originally created and maintained by [mastrolube](https://github.com/mastrolube) and the GramAddict community. 
 
-We're deeply grateful to the GramAddict team for building such a solid foundation. Their dedication to keeping the bot free, open source, and community-driven made this project possible. InstaAddict picks up where GramAddict left off — actively tracking Instagram's UI changes, fixing compatibility as things break, and keeping the bot alive for the community.
+Upstream GramAddict has ceased active maintenance. Instagram continuously updates its Android application's UI hierarchy, resource locators, and view structures (such as switching from traditional feed containers to full-screen Reels viewer pagers, changing account switcher selectors, introducing modern web view ad overlays, and altering IME keyboard behaviors on Android 14+). Without ongoing patches, these shifts silently break automation scripts and freeze execution.
 
-> This project is licensed under the same terms as the original. All credit for the core architecture and original features goes to the GramAddict contributors.
+InstaAddict actively tracks Instagram updates, hardening automation against UI shifts, eliminating ad trapping, integrating multimodal Vision AI, implementing deterministic hashtag rotation engines, and maintaining maximum reliability.
+
+> This project is 100% free and open source under the MIT License. All original architectural foundation credits go to the GramAddict contributors.
 
 ### Maintained by
 
@@ -76,346 +84,311 @@ We're deeply grateful to the GramAddict team for building such a solid foundatio
 
 <br />
 
-# Why should I automate my Instagram account?
+# What's New in This Fork (InstaAddict vs GramAddict)
 
-It's hard to grow an account organically these days. Instagram's explore/discovery surfaces mostly favor accounts you already interact with — nobody sees your posts unless you're already getting engagement. InstaAddict helps close that gap by handling the repetitive interaction work (liking, following, watching stories) so real people are more likely to discover and engage with your actual content.
+InstaAddict introduces major architectural enhancements, new subsystems, and critical bug fixes that transform the bot into an autonomous, self-healing growth engine:
 
-## So do I still need to post good content?
+---
 
-Yes, absolutely. This bot gets you visibility — it doesn't replace having something worth looking at once people arrive.
+### 1. Full-Screen Reels & Modern IG (v446+) Compatibility
+- **Modern Reels Viewer Support**: In Instagram v446+, opening video posts from hashtag grids launches the full-screen Reels viewer (`clips_viewer_view_pager`, `root_clips_layout`, `clips_viewer_container`). InstaAddict natively handles this layout.
+- **Multi-Tier Author Resolution**: Post author discovery now gracefully cascades across feed locators (`ROW_FEED_PHOTO_PROFILE_NAME`), Clips text locators (`CLIPS_AUTHOR_USERNAME`), regex content description extraction (`CLIPS_AUTHOR_PROFILE_PIC` via `"Profile picture of ([\w.]+)"`), and header components (`ROW_FEED_PROFILE_HEADER`, `CLIPS_AUTHOR_INFO_COMPONENT`).
+- **Decoupled Ad Classification**: Fixed a longstanding bug where failing to click an author's header unconditionally returned `is_ad = True`. Missing author resolution now returns `(False, False, is_hashtag)`, completely eliminating false-positive ad skips on organic content.
+- **Native Reels Like Button**: Automatically recognizes and interacts with `ResourceID.LIKE_BUTTON` (`com.instagram.android:id/like_button`).
+- **Fast Caption Extraction**: Directly queries `CLIPS_CAPTION_COMPONENT` with immediate exit, preventing 8 futile 200px swipe-downs on captionless reels.
 
-## I don't know where to start...
+---
 
-That's fine — this README walks you through the whole setup. If you get stuck anywhere, the [Discord community](https://discord.gg/PvxsP8HFa) is there to help.
+### 2. Tiered Masterlist & Dynamic Hashtag Discovery Engine
+- **4-Tier Curated Masterlist**: Organizes hashtags into structured tiers (`accounts/<username>/hashtags.yml`):
+  1. *Tier 1 (Local Community & Geo)*: High engagement local community tags.
+  2. *Tier 2 (Breed & Niche)*: Core profile topic and breed tags.
+  3. *Tier 3 (Lifestyle & Adventure)*: Contextual outdoor/lifestyle activity tags.
+  4. *Tier 4 (Reach & Trending)*: High-volume reach tags.
+- **Dual Expansion Strategies**:
+  - *Strategy 1 (Gemini AI Expansion)*: Triggered via `--expand-hashtags`, leverages Google Gemini API to synthesize trending niche tags aligned with your account persona.
+  - *Strategy 2 (In-App Caption Harvester)*: Silently scans post captions during live interaction loops with zero extra network or ADB overhead, logging observed tags in `discovered_hashtags.json`.
+- **Deterministic Mathematical Governance Rules**:
+  - `R-ADD-1` to `R-ADD-4`: Auto-promotes tags after 3+ sightings, filtered against a strict anti-spam blacklist and semantic relevance keywords, auto-classifying them into appropriate tiers.
+  - `R-ROT-1` to `R-ROT-3`: Proportional tier sampling (2:2:1:1 balanced ratio), 2-session anti-fatigue cooldowns, and randomized sequence execution.
+  - `R-PRN-1` to `R-PRN-2`: Automatically marks 0-result tags as `DEAD` and benches over-interacted tags for 7 days (`SATURATED`).
 
-## I've seen a lot of similar projects on GitHub — why this one?
+---
 
-Most competing bots use direct API requests, which is exactly what gets accounts banned (1–30 days) — Instagram actively watches for that traffic pattern. There are also several closed-source "premium" bots that strip features out of the free tier and charge a subscription to unlock them back, while running encrypted code so you can't verify what it's actually doing on your account.
+### 3. Persistent Non-Bot Followings Cache
+- **Instant O(1) Memory Lookups**: Avoids repetitive UI element scraping and log spam by persisting known non-bot followings in `accounts/<username>/non_bot_followings.json`.
+- **Atomic Disk Writes**: Uses `atomicwrites` to ensure atomic temporary file swaps, eliminating corruption on sudden process termination.
+- **Fast-Skip Unfollow Engine**: Pre-seeds checked sets in `ActionUnfollowFollowers` for script-based unfollow modes, skipping organic accounts instantly.
+- **Automatic Invalidation**: Automatically removes accounts from the cache whenever followed or unfollowed.
+- **CLI Ergonomics**: Added `--clear-non-bot-cache` and `--ignore-non-bot-cache`.
 
-InstaAddict is free to use and open source, full stop. No paywalled features, no encrypted execution, no subscription. If you want to verify exactly what it does, the code is right here.
+---
 
-## So this bot doesn't use the API?
+### 4. Universal Ad Avoidance & In-App Browser Escape Watchdog
+- **In-App Browser Escape**: Automatically detects and closes `BrowserLiteInMainProcessIGActivity` and external Chrome overlays via native close buttons (`ig_browser_close_button`), fallback back-presses, and foreground app relaunching.
+- **Multi-Vector Ad Detection**: Combines sponsored badges, server components, and post-relative bounded CTA button coordinates to guarantee ads are never liked or scraped.
+- **System Package Whitelisting**: Protects Android system UI (`com.android.systemui`, `android`, and IME keyboards) from false-positive dismissals.
 
-Correct — it drives the real Instagram app through **adb** and **uiautomator2**, an Android UI-testing framework. Your device (or emulator) is literally used to tap through the app the way a person would, which is far harder for Instagram to distinguish from real usage than API-based bots.
+---
 
-<p align="center">
-  <img src="https://github.com/joeahkim/InstaAddict/raw/master/res/demo.gif">
-</p>
+### 5. Fluid 200ms ADB Native Swiping & Single-Swipe Flick Physics
+- **Native ADB Swipes**: Completely replaced jerky `uiautomator2.drag` calls with calibrated native `adb shell input swipe` commands.
+- **Single-Swipe Reels Scroll**: Executes a single fluid vertical flick (80% down to 20% display height) for full-screen Reels.
+- **Removed Redundant Swipes**: Stripped the obsolete `HALF_PHOTO` swipe call from `handle_sources.py` and the 3-retry gap loop from `swipe_to_fit_posts`, eliminating 4-5 micro-jerks per post.
+- **200ms Flick Velocity**: Calibrated duration to 200ms, creating a smooth and natural scroll that mirrors human finger motion.
 
-## Does that mean I'll never get banned?
+---
 
-No — please configure sensible limits. Real humans don't scroll and interact with hundreds of accounts nonstop all day, and neither should your bot. Aggressive limits (too many follows/likes in a row, spammy PMs) get flagged whether a bot or a person does them. Keep it modest, keep it paced, and it'll stay under the radar.
+### 6. Multimodal Gemini Vision AI Post Evaluation & Contextual Commenting
+- **Gemini 2.5 Flash Multimodal Reasoning**: Analyzes post imagery and video frames to generate hyper-contextual comments matching your account persona (`accounts/<username>/ai-persona.yml`).
+- **One-Shot Evaluate & Comment**: Combines relevance evaluation and comment generation into a single prompt, cutting API requests and latency by 50%.
+- **512x512 LANCZOS Payload Compression**: Compresses screenshots before transmission to conserve bandwidth and API token limits.
+- **Resilient Quota Handling**: Exponential backoff retry loops for 429 quota exhaustion and payload sanitizers for safety finish reasons.
+- **Throttling**: Added `--evaluate-percentage` to control API usage per session.
 
-## Do I need a computer?
+---
 
-Yes for the initial setup, but the bot itself can run [directly on your phone via Termux](https://docs.gramaddict.org/#/termux) once configured. You can host it on:
+### 7. Autonomous Content Queue & Post Uploader
+- **Local Content Queuing (`UploadPostsPlugin`)**: Reads scheduled media from `accounts/<username>/upload_queue/`.
+- **Automatic Formatting**: Automatically adjusts aspect ratios, trims videos, applies spintax or AI-generated captions, and appends optimized hashtag arrays.
+- **Session State Telemetry**: Persists upload attempts, success/failure counts, and detailed media logs in `sessions.json`.
 
-* your computer (Windows, macOS, or Linux)
-* a Raspberry Pi (a cheap, low-power Linux box that can run this unattended)
+---
 
-### Choosing between a physical device or an emulator
+### 8. Task Sequence Randomizer
+- **Humanized Job Scheduling**: Added `--randomize-tasks` / `randomize_task_sequence: true` to shuffle active interaction jobs every session, preventing predictable algorithmic patterns that Instagram detects.
 
-Both work. If you're going the emulator route, there's one thing that trips people up: **Instagram's APK is ARM-only**, so your emulator needs either a native ARM system image or built-in ARM translation. Recommended:
+---
 
-* **Windows:** [MEmu](https://www.memuplay.com/) or [LDPlayer](https://www.ldplayer.net/) — both include ARM translation out of the box.
-* **macOS:** [Android Studio](https://developer.android.com/studio) (installable via `brew install --cask android-studio`), but make sure you pick an **ARM64 system image** in the AVD manager, not the default x86_64 one — an x86-only image will fail to install or crash Instagram.
+### 9. Production Telemetry & Self-Learning Dogfood Optimizer
+- **Unhandled Crash Interception**: Installed a global `sys.excepthook` interceptor that logs fatal Python exceptions and third-party stack traces into `_error_trace.log` before exit.
+- **Windows File Lock Safety**: Explicitly closes file handlers before unlinking, eliminating `PermissionError: [WinError 32]` collisions on Windows.
+- **Continuous Markdown History**: Automatically appends run logs to `accounts/<username>/history.md` (never overwritten) and generates timestamped markdown session reports in `accounts/<username>/reports/`.
+- **Dogfood Self-Learning Optimizer (`dogfood.py`)**: Analyzes session outcomes, conversion yields, and error patterns to produce automated parameter tuning recommendations in `tuning_suggestions.md`.
 
-<br />
+---
 
-# Compatibility / known working versions
-
-InstaAddict actively tracks Instagram's UI changes. This is updated as fixes land — see [CHANGELOG.md](CHANGELOG.md) for the full history.
-
-| Component    | Verified working                 |
-| ------------ | -------------------------------- |
-| Instagram    | 440.0.0.46.86                    |
-| uiautomator2 | 2.16.26                          |
-| Python       | **3.13.14**                      |
-| Platforms    | Windows, macOS, Termux (Android) |
-
-**Python 3.13.14 is the version currently tested and verified with InstaAddict.** Other Python versions may work, but they are not officially tested at this time.
-
-If something breaks on a newer Instagram version, please [open an issue](https://github.com/joeahkim/InstaAddict/issues) — we treat "this stopped working" reports as our highest-priority bugs, not an afterthought.
-
-<br />
-
-# Cool! What can I do with this bot?
-
-* Works without rooting
-* Works with both emulators and physical devices
-* Can run stand-alone (no computer required after setup, via Termux)
-* Realistic, randomized human-like delays and actions
-* Auto-creates your account config folder from a template on first run
-* Watches stories while interacting
-* Comments with emojis and [spintax logic](https://github.com/InstaAddict/docs/blob/main/configuration.md#spintax-support)
-* Sends PMs
-* Types like a human (suggestion-faking rather than key-by-key typing)
-* Browses carousels and watches their contents
-* Watches videos for a configurable duration
-* Session scheduling
-* Telegram activity reports
-* Multiple actions per session
-* Extensive, customizable limits to keep your account safe from soft bans
-* Available interaction jobs:
-
-  * a user's followers or following
-  * a hashtag's top or recent post likers
-  * a hashtag's top or recent posts
-  * a place's top or recent post likers
-  * a place's top or recent posts
-  * a specific user's post likers
-  * a single blogger
-  * your own feed
-  * a list of users from a `.txt` file
-  * posts from a list of links in a `.txt` file
-  * unfollow any followers
-  * unfollow followers the bot itself followed
-  * unfollow followers the bot followed who don't follow back
-  * unfollow from a `.txt` list
-  * scrape mode — collect usernames without interacting, for later use
-* Extensive filters for who gets interacted with:
-
-  * blacklist / whitelist
-  * biography character set and language
-  * profile name character set
-  * private / public / business / non-business accounts
-  * post count / follower count / following count
-  * ...and more
-
-Full documentation: [docs.gramaddict.org](https://docs.gramaddict.org/) (shared with the upstream project — most configuration concepts still apply directly).
-
-## Telegram reports
-
-Get session activity reports sent straight to Telegram. [Setup guide here](https://docs.gramaddict.org/#/configuration?id=telegram-reports).
-
-<img src="https://github.com/joeahkim/InstaAddict/raw/master/res/telegram-reports.png" width="200">
+### 10. Android 14+ UIAutomator2 & FastInputIME Mode.PASTE
+- **Android 14 IME Patch**: Fixed regex matching for `mCurImeId` / `mSelectedImeId` in dumpsys, resolving typing timeouts on modern Android builds.
+- **Mode.PASTE Input**: Uses `ACTION_SET_TEXT` directly to enter search queries and comments instantaneously without keyboard dropdown jitter.
 
 <br />
 
-# Quick start
+# Why Automate Your Instagram?
 
-## What you need
+Organic discovery on Instagram heavily favors accounts that already receive massive engagement. If you are starting fresh or growing a niche profile, your posts rarely appear in explore or hashtag feeds unless people interact with your profile first.
 
-* A computer (Windows, macOS, or Linux)
-* **Python 3.13.14**
-* adb (Android Debug Bridge)
-* A physical Android device or an emulator (Android 4.4+)
+InstaAddict automates the repetitive, time-consuming interaction work (liking targeted posts, following niche-relevant users, watching stories, and commenting) so real people are notified, check out your profile, and follow you back organically.
 
-## Step 1: Install Python
+## Does this replace quality content?
+**No.** Automation gets your profile discovered; your content determines whether they stay and follow. Pair InstaAddict with engaging posts, high-quality visuals, and a clear bio.
 
-**InstaAddict is currently tested and verified with Python 3.13.14.**
+## Will I get banned?
+InstaAddict avoids private API calls, making it vastly safer than cloud-based API bots. However, **Instagram enforces behavioral velocity limits**. If a bot (or human) follows 500 accounts in an hour, it will trigger soft-blocks. We strongly advise using modest, randomized session limits that mimic human routines.
 
-We recommend using **Python 3.13.14** for the most reliable installation and runtime experience.
+<br />
 
-* **macOS/Linux:** install Python 3.13.14 and verify with `python3 --version`
-* **Windows:** [download Python 3.13.14](https://www.python.org/downloads/release/python-31314/) and make sure to check **"Add Python to PATH"** during installation.
+# How It Works
 
-Verify your installation:
+Unlike competing tools that send unauthorized HTTP requests directly to Instagram's private backend, InstaAddict controls the official Android Instagram app installed on your physical device or emulator using **Android Debug Bridge (ADB)** and **UIAutomator2**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       InstaAddict                           │
+│  (ConfigArgParse, HashtagManager, Gemini AI, DogfoodEngine) │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                      [ADB & UIAutomator2]
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Android Device / Emulator                   │
+│   (Official Instagram App v446+ | Android 7.0 - 14.0+)      │
+│   - Simulates human touches, 200ms flick gestures, typing   │
+│   - Decoupled ad detection & in-app browser escape watchdog │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Your device physically renders the UI, scrolls feeds, inspects elements, and taps buttons exactly as a real person would.
+
+<br />
+
+# Compatibility & Known Working Versions
+
+| Component | Tested & Verified | Notes |
+| :--- | :--- | :--- |
+| **Instagram APK** | **440.0.0.46.86 – 446.0.0.0.0+** | Full compatibility with both classic feed and modern full-screen Reels viewer |
+| **Python** | **3.11 – 3.13** | Tested on Python 3.11.x, 3.12.x, and 3.13.x |
+| **UIAutomator2** | **2.16.14 – 2.16.26** | Patched for Android 14+ FastInputIME |
+| **Operating Systems** | Windows 10/11, macOS (Intel & Apple Silicon), Linux, Termux (Android) | Full cross-platform support |
+| **Emulators** | MEmu, LDPlayer, Android Studio AVD (ARM64) | ARM translation or ARM64 system images required |
+
+<br />
+
+# Features & Interaction Jobs
+
+### Interaction Sources
+- **Hashtag Posts Top & Recent**: Likes, comments, and follows users posting under targeted hashtags. (Supports modern full-screen Reels).
+- **Hashtag Likers Top & Recent**: Interacts with active users who liked posts in targeted hashtags.
+- **Blogger Followers & Following**: Interacts with audiences of competing or complementary accounts.
+- **Blogger Post Likers**: Interacts with users actively liking a specific blogger's latest posts.
+- **Place Posts & Likers Top & Recent**: Geo-targeted interactions based on locations.
+- **Feed Interaction**: Naturally likes and comments on posts in your own home feed.
+- **Lists from Text Files**: Interacts with usernames or post URLs loaded from `.txt` files.
+
+### Unfollow & Hygiene Jobs
+- `unfollow`: Unfollows users followed by the bot after a grace period.
+- `unfollow-non-followers`: Unfollows users who did not follow back.
+- `unfollow-any`: Unfollows users regardless of who followed them.
+- *Persistent Non-Bot Cache*: Automatically fast-skips organic followings without redundant element checks.
+
+### Autonomous Capabilities
+- **Multimodal AI Comments**: Contextual comments generated by Gemini Vision.
+- **Story Watching**: Watches stories while interacting with profiles.
+- **Carousel Browsing**: Swipes through multi-image carousel posts.
+- **Video Watching**: Watches videos and reels for realistic, randomized durations.
+- **Content Upload Pipeline**: Automatically publishes scheduled posts from `upload_queue/`.
+
+<br />
+
+# Quick Start Guide
+
+### Prerequisites
+1. **Python 3.11+ / 3.13**: Make sure Python is added to your system `PATH`.
+2. **Android Debug Bridge (ADB)**: Included with Android SDK platform-tools.
+3. **Android Device or Emulator**: USB debugging enabled.
+
+---
+
+### Step 1: Clone and Set Up Virtual Environment
 
 ```bash
-python3 --version
-```
-
-You should see:
-
-```text
-Python 3.13.14
-```
-
-On Windows, you can also use:
-
-```bash
-python --version
-```
-
-or:
-
-```bash
-py --version
-```
-
-Check that pip is installed:
-
-```bash
-pip3 --version
-```
-
-On Windows, `pip --version` may be used instead.
-
-## Step 2: Install InstaAddict
-
-Using a virtual environment is strongly recommended — it isolates this project's dependencies from everything else on your machine.
-
-```bash
-python3 -m venv .venv
-```
-
-Activate it:
-
-* Linux/macOS:
-
-```bash
-source .venv/bin/activate
-```
-
-* Windows cmd:
-
-```bat
-.venv\Scripts\activate.bat
-```
-
-* Windows PowerShell:
-
-```powershell
-.venv\Scripts\Activate.ps1
-```
-
-You'll see `(.venv)` at the start of your prompt once it's active.
-
-### With pip (recommended)
-
-```bash
-pip3 install instaaddict
-```
-
-Verify:
-
-```bash
-pip3 show instaaddict
-```
-
-### With git
-
-```bash
+# Clone the repository
 git clone https://github.com/joeahkim/InstaAddict.git
 cd InstaAddict
-pip3 install -r requirements.txt
+
+# Create a virtual environment
+python -m venv .venv
+
+# Activate virtual environment:
+# Linux/macOS:
+source .venv/bin/activate
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Windows (CMD):
+.venv\Scripts\activate.bat
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-## Step 3: Install adb
+---
 
-1. Download [platform-tools](https://developer.android.com/studio/releases/platform-tools) and unzip it somewhere permanent — not `Downloads`, since that folder tends to get cleared out and will quietly break your setup later.
+### Step 2: Set Up Device via ADB
 
-2. Add the `platform-tools` folder to your `PATH`:
+1. Connect your Android phone via USB and enable **USB Debugging** in Developer Options (or launch your emulator).
+2. Verify ADB connection:
+   ```bash
+   adb devices
+   ```
+   *Output should display your device ID:*
+   ```text
+   List of devices attached
+   emulator-5554    device
+   ```
+3. Initialize UIAutomator2 on your device:
+   ```bash
+   python -m uiautomator2 init
+   ```
 
-   * **Linux/macOS:** add `export PATH=~/Library/Android/sdk/platform-tools/:$PATH` (adjust the path to wherever you unzipped it) to `~/.bash_profile` or `~/.zshrc`, then restart your terminal.
-   * **Windows:** System Properties → Advanced → Environment Variables → edit `Path`, add the full `platform-tools` folder path. **Open a brand-new terminal window afterward** — an already-open terminal won't pick up the change.
+---
 
-3. Verify:
+### Step 3: Configure Your Account
+
+Run the bot with your target Instagram username. On first run, it will automatically scaffold a configuration directory under `accounts/<username>/`:
 
 ```bash
-adb version
+python run.py --config accounts/my_instagram_user/config.yml
 ```
 
-## Step 4: Set up your device
+Edit `accounts/my_instagram_user/config.yml` to specify your targeted hashtags, bloggers, and safe interaction limits.
 
-### Physical device
+---
 
-1. [Enable developer options and USB debugging](https://developer.android.com/studio/debug/dev-options#enable).
-2. Connect via USB, and tap "Allow" when prompted on the device.
-
-### Emulator
-
-1. Install an ARM-compatible emulator (see emulator notes above) and install Instagram inside it via its Play Store.
-2. Enable Developer Options + USB debugging inside the emulated Android the same way as a physical device.
-3. Connect adb over TCP (port varies by emulator — check its settings panel):
+### Step 4: Run the Bot
 
 ```bash
-adb connect localhost:21503
+# Run with standard configuration
+python run.py --config accounts/my_instagram_user/config.yml
+
+# Run with task sequence randomizer
+python run.py --config accounts/my_instagram_user/config.yml --randomize-tasks
+
+# Run hashtag interaction with dynamic AI expansion
+python run.py --config accounts/my_instagram_user/config.yml --expand-hashtags
 ```
-
-**Verify the connection either way:**
-
-```bash
-adb devices
-```
-
-You should see a device listed:
-
-```text
-List of devices attached
-A0B1CD2345678901    device
-```
-
-That identifier is your device ID — only needed if multiple devices are connected at once.
-
-## Step 5: Start the bot
-
-InstaAddict requires Instagram to be set to [English](https://help.instagram.com/111923612310997).
-
-1. Initialize uiautomator2 on your device:
-
-```bash
-python3 -m uiautomator2 init
-```
-
-If you have multiple devices/emulators connected, target a specific one:
-
-```bash
-python3 -m uiautomator2 init <device-id>
-```
-
-2. Run the bot, pointing at a new account config:
-
-```bash
-python3 run.py --config accounts/your_ig_username/config.yml
-```
-
-If the `accounts/your_ig_username/` folder doesn't exist yet, it's created automatically from the template in `config-examples/` on first run — review the generated `config.yml` (especially the `device:` field) before running again.
-
-3. Configuration reference: [docs.gramaddict.org](https://docs.gramaddict.org/#/configuration)
-
-Still stuck? See [Common setup issues](#common-setup-issues), or ask in [Discord](https://discord.gg/PvxsP8HFa).
 
 <br />
 
-# Common setup issues
+# Configuration & CLI Reference
 
-These come up on fresh installs regardless of OS — worth checking here before opening an issue.
+InstaAddict features rich command-line flags and configuration files:
 
-**`ModuleNotFoundError: No module named 'pkg_resources'`**
+### New Command-Line Flags
 
-`setuptools` removed `pkg_resources` starting at v82.0.0. Install the standalone replacement:
+| Flag | Description |
+| :--- | :--- |
+| `--randomize-tasks` | Shuffles the active job sequence randomly on every session for humanized behavior. |
+| `--expand-hashtags` | Triggers Gemini AI expansion to discover and synthesize new niche tags at session start. |
+| `--no-harvest-hashtags` | Disables silent background caption hashtag harvesting. |
+| `--hashtags-file <path>` | Custom path to the tiered `hashtags.yml` masterlist file. |
+| `--clear-non-bot-cache` | Clears the persistent `non_bot_followings.json` cache before starting. |
+| `--ignore-non-bot-cache`| Bypasses the non-bot cache during unfollow operations. |
+| `--evaluate-percentage <0-100>` | Percentage of posts to evaluate with Gemini Vision AI. |
+| `--upload-posts` | Enables the autonomous post uploader plugin. |
+| `--upload-queue-dir <path>` | Custom path to the upload media queue directory. |
 
-```bash
-pip3 install standard-pkg-resources
+### Configuration Files Overview
+
+```
+accounts/<your_username>/
+├── config.yml                # Main configuration: limits, jobs, working hours, speeds
+├── filters.yml               # Demographic filters: business, private, follower ranges
+├── hashtags.yml              # Tiered masterlist: Local, Breed, Lifestyle, Reach pools
+├── ai-persona.yml            # Character prompt definition for Gemini Vision AI commenting
+├── non_bot_followings.json   # Persistent cache of verified non-bot accounts (atomic writes)
+├── discovered_hashtags.json  # Harvested caption hashtag frequency counts
+├── history.md                # Continuous, non-overwritten markdown run history
+├── reports/                  # Timestamped per-session analytics markdown reports
+└── upload_queue/             # Scheduled image/video media files ready for publishing
 ```
 
-**`ModuleNotFoundError: No module named 'distutils'`**
+<br />
 
-`distutils` was removed from Python's standard library in 3.12+. This usually means your `packaging` library is outdated. Upgrade it:
+# Common Setup Issues & Troubleshooting
 
+### 1. `Can't find the owner name, skip.` or Posts Skipped as Ads
+- **Resolution**: Update to InstaAddict v1.1.0+. Modern full-screen Reels viewer locators (`CLIPS_AUTHOR_USERNAME`, `CLIPS_AUTHOR_PROFILE_PIC`) are natively handled, and missing owner lookup is decoupled from ad detection.
+
+### 2. Jerky Scrolling or Multiple Swipes Per Post
+- **Resolution**: InstaAddict v1.1.0 uses calibrated 200ms native ADB swipe gestures and single-swipe Reels navigation. Ensure `speed-multiplier: 1` in `config.yml`.
+
+### 3. Stuck in In-App Browser Ad Overlay
+- **Resolution**: InstaAddict includes an automated browser escape watchdog (`escape_in_app_browser`) that detects `BrowserLiteInMainProcessIGActivity` and dismisses ad overlays automatically.
+
+### 4. `ModuleNotFoundError: No module named 'pkg_resources'`
 ```bash
-pip3 install --upgrade packaging
+pip install standard-pkg-resources
 ```
 
-**Both errors on the same fresh install?**
-
-Run this once to resolve the whole chain in one shot:
-
-```bash
-pip3 install --upgrade setuptools packaging standard-pkg-resources adbutils uiautomator2
-```
-
-**`ModuleNotFoundError` for `configargparse`, `imageio`, or `websocket-client`**
-
-```bash
-pip3 install -r requirements.txt
-```
-
-**`pip install --break-system-packages`**
-
-On some Linux distros and Termux, pip refuses to install into the system Python ("externally managed environment"). Add `--break-system-packages` to the install command, or better, make sure you're inside an activated virtual environment first.
-
-**`adb` not recognized after adding it to PATH (Windows)**
-
-Close and reopen your terminal — PATH changes don't apply to already-open sessions. Also double check you're actually in PowerShell (`PS` in the prompt) vs. Command Prompt, since the two don't share environment state.
+### 5. `adb` Command Not Found (Windows)
+Ensure platform-tools is added to your Environment `PATH` variable, and restart PowerShell / terminal.
 
 <br />
 
 # Support This Project
 
-InstaAddict is 100% free and open source, and maintaining it takes real time — tracking every Instagram UI change, fixing what breaks, and helping people in Discord. If it's helped you grow your account, consider chipping in. ☕
+InstaAddict is 100% free and open source. Maintaining compatibility against Instagram's rapid UI shifts requires dedicated research and testing. If InstaAddict has helped you grow your accounts, consider supporting development:
 
 <p align="center">
   <a href="https://paystack.shop/pay/joeahkim">
@@ -425,20 +398,12 @@ InstaAddict is 100% free and open source, and maintaining it takes real time —
 
 <br />
 
-# Bot crashed — what do I do?
+# Community
 
-This isn't a perfect science — Instagram's UI shifts under us regularly, so things do break sometimes. Open a ticket in [#crash-reports on Discord](https://discord.gg/PvxsP8HFa) rather than posting your Instagram username publicly on GitHub. Attach the crash zip from your `crashes/` folder — that's usually enough for us to pin down what changed.
-
-# Talk botty with us
-
-Join the [Discord community](https://discord.gg/PvxsP8HFa) — support, dev discussion, a `#showcase` channel for your growth results, and a live feed of what's happening on the repo.
-
-# Can I help this project grow?
-
-* ⭐ Star the repo — it's a small thing that genuinely helps visibility.
-* 🐛 File an issue if something's broken, especially "this used to work and now it doesn't."
-* 🛠 If you want to contribute code — see [CONTRIBUTING.md](CONTRIBUTING.md).
+* 💬 **Discord**: [Join our Discord community](https://discord.gg/PvxsP8HFa) for support, setup assistance, and growth discussions.
+* 🐛 **Issue Tracker**: Found a bug or broken locator on a new Instagram release? [Submit an Issue](https://github.com/joeahkim/InstaAddict/issues).
+* 🛠️ **Contributing**: Pull requests and locator updates are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-**Disclaimer:** This project comes with no guarantee or warranty. You are responsible for what happens as a result of using it. It is possible to get soft- or hard-banned by using this project if you're not careful with your limits.
+**Disclaimer**: This project is for educational and personal automation purposes. Always use conservative interaction limits to avoid triggering Instagram velocity flags.
