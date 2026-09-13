@@ -89,3 +89,19 @@
     - added-unit-test-suite-test-ad-detection-and-escape
   deferred: []
   key_fact: "Instagram ads use BrowserLiteInMainProcessIGActivity which traps uiautomator searches; dismissing via ig_browser_close_button or escape_in_app_browser watchdog before interacting with posts prevents session stalls."
+
+- date: 2026-09-13
+  executor: Antigravity
+  branch: master
+  tasks_completed: [persistent-followings-cache]
+  done:
+    - audited-action-unfollow-followers-and-storage-py
+    - created-audit-030-audit-031-audit-032-and-review-030-reports
+    - implemented-persistent-non-bot-followings-json-storage-with-atomicwrites
+    - added-o1-in-memory-lookup-and-batch-persistence-at-scroll-boundaries
+    - added-cache-invalidation-on-followed-and-unfollowed-state-transitions
+    - scoped-checked-pre-seeding-to-script-unfollow-modes-preserving-unfollow-any
+    - added-clear-non-bot-cache-and-ignore-non-bot-cache-cli-arguments
+    - added-10-test-suite-in-test-non-bot-followings-cache-with-100-pass-rate
+  deferred: []
+  key_fact: "Storing non-bot followings in accounts/<username>/non_bot_followings.json with atomicwrites and pre-seeding checked set eliminates repetitive UI element polling and log spam on organic followings, while scoping pre-seeding preserves --unfollow-any."

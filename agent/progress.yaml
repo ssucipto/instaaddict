@@ -262,6 +262,16 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-13
+  description: 'Implemented Persistent Non-Bot Followings Cache and Fast-Skip Unfollow Optimization.'
+  items:
+  - "✓ Created persistent non_bot_followings.json storage in Storage core with atomicwrites"
+  - "✓ Added O(1) in-memory cache lookup and batch disk persistence at scroll boundaries"
+  - "✓ Implemented automatic cache invalidation on followed=True and unfollowed=True"
+  - "✓ Pre-seeded checked set in ActionUnfollowFollowers for script-based unfollow modes"
+  - "✓ Fast-skipped known non-bot followings without redundant element lookups or log spam"
+  - "✓ Added --clear-non-bot-cache and --ignore-non-bot-cache CLI flags"
+  - "✓ Added 10-case unit test suite (test_non_bot_followings_cache.py) with 100% pass rate"
+- date: 2026-09-13
   description: 'Implemented Production-Grade Advertisement Detection and In-App Browser Escape Watchdog.'
   items:
   - "✓ Built UniversalActions.escape_in_app_browser with native close button, fallback back(), and foreground recovery"

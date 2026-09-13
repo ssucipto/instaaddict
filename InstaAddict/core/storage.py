@@ -14,6 +14,7 @@ ACCOUNTS = "accounts"
 REPORTS = "reports"
 FILENAME_HISTORY_FILTER_USERS = "history_filters_users.json"
 FILENAME_INTERACTED_USERS = "interacted_users.json"
+FILENAME_NON_BOT_FOLLOWINGS = "non_bot_followings.json"
 OLD_FILTER = "filter.json"
 FILTER = "filters.yml"
 USER_LAST_INTERACTION = "last_interaction"
@@ -37,6 +38,8 @@ class Storage:
             os.makedirs(self.account_path)
         self.interacted_users = {}
         self.history_filter_users = {}
+        self.non_bot_followings = {}
+        self._non_bot_followings_dirty = False
 
         self.interacted_users_path = os.path.join(
             self.account_path, FILENAME_INTERACTED_USERS
@@ -63,6 +66,19 @@ class Storage:
                         f"Please check {json_file.name}, it contains this error: {e}"
                     )
                     sys.exit(0)
+
+        self.non_bot_followings_path = os.path.join(
+            self.account_path, FILENAME_NON_BOT_FOLLOWINGS
+        )
+        if os.path.isfile(self.non_bot_followings_path):
+            with open(self.non_bot_followings_path, encoding="utf-8") as json_file:
+                try:
+                    self.non_bot_followings = json.load(json_file)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load {json_file.name}, starting with empty non-bot followings cache: {e}"
+                    )
+                    self.non_bot_followings = {}
         self.filter_path = os.path.join(self.account_path, FILTER)
         if not os.path.exists(self.filter_path):
             self.filter_path = os.path.join(self.account_path, OLD_FILTER)
@@ -130,6 +146,71 @@ class Storage:
         else:
             return FollowingStatus[user[USER_FOLLOWING_STATUS].upper()]
 
+    def is_non_bot_following(self, username: str) -> bool:
+        """Check if username is recorded in the non-bot followings cache."""
+        if not username:
+            return False
+        return username.casefold() in self.non_bot_followings
+
+    def add_non_bot_following(
+        self, username: str, reason: str = "not_followed_by_bot", save: bool = True
+    ) -> None:
+        """Add username to non-bot followings cache with timestamp."""
+        if not username:
+            return
+        key = username.casefold()
+        self.non_bot_followings[key] = {
+            "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+            "reason": reason,
+        }
+        self._non_bot_followings_dirty = True
+        if save:
+            self.save_non_bot_followings()
+
+    def add_non_bot_followings_batch(
+        self, usernames: list, reason: str = "not_followed_by_bot"
+    ) -> None:
+        """Add a batch of usernames and atomically flush to disk."""
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        for username in usernames:
+            if username:
+                self.non_bot_followings[username.casefold()] = {
+                    "checked_at": now_str,
+                    "reason": reason,
+                }
+                self._non_bot_followings_dirty = True
+        self.save_non_bot_followings()
+
+    def save_non_bot_followings(self) -> None:
+        """Flush in-memory non_bot_followings to disk atomically if dirty."""
+        if not self._non_bot_followings_dirty:
+            return
+        if self.non_bot_followings_path is not None:
+            try:
+                with atomic_write(
+                    self.non_bot_followings_path, overwrite=True, encoding="utf-8"
+                ) as outfile:
+                    json.dump(self.non_bot_followings, outfile, indent=4, sort_keys=False)
+                self._non_bot_followings_dirty = False
+            except Exception as e:
+                logger.error(f"Failed to write non_bot_followings.json: {e}")
+
+    def remove_non_bot_following(self, username: str) -> None:
+        """Remove a username from non-bot followings cache and flush to disk."""
+        if not username:
+            return
+        key = username.casefold()
+        if key in self.non_bot_followings:
+            del self.non_bot_followings[key]
+            self._non_bot_followings_dirty = True
+            self.save_non_bot_followings()
+
+    def clear_non_bot_followings(self) -> None:
+        """Clear all entries in non-bot followings cache and persist to disk."""
+        self.non_bot_followings = {}
+        self._non_bot_followings_dirty = True
+        self.save_non_bot_followings()
+
     def add_filter_user(self, username, profile_data, skip_reason=None):
         user = profile_data.__dict__
         user["follow_button_text"] = (
@@ -168,8 +249,18 @@ class Storage:
                 user[USER_FOLLOWING_STATUS] = FollowingStatus.REQUESTED.name.casefold()
             else:
                 user[USER_FOLLOWING_STATUS] = FollowingStatus.FOLLOWED.name.casefold()
+            # If the bot has now followed this user, invalidate them from non_bot_followings
+            if username and username.casefold() in self.non_bot_followings:
+                del self.non_bot_followings[username.casefold()]
+                self._non_bot_followings_dirty = True
+                self.save_non_bot_followings()
         elif unfollowed:
             user[USER_FOLLOWING_STATUS] = FollowingStatus.UNFOLLOWED.name.casefold()
+            # If the user was unfollowed, also remove from non_bot_followings as they are now tracked in interacted_users
+            if username and username.casefold() in self.non_bot_followings:
+                del self.non_bot_followings[username.casefold()]
+                self._non_bot_followings_dirty = True
+                self.save_non_bot_followings()
         elif scraped:
             user[USER_FOLLOWING_STATUS] = FollowingStatus.SCRAPED.name.casefold()
         else:
