@@ -327,8 +327,8 @@ class DeviceFacade:
                 sx = max(w * 0.1, cx - (w * scale / 2))
                 ex = min(w * 0.9, cx + (w * scale / 2))
 
-            logger.debug(f"Fast Drag from ({sx},{sy}) to ({ex},{ey}).")
-            self.deviceV2.drag(sx, sy, ex, ey, duration=0.03)
+            logger.debug(f"ADB Shell Swipe from ({sx},{sy}) to ({ex},{ey}) over 150ms.")
+            self.deviceV2.shell(f"input swipe {int(sx)} {int(sy)} {int(ex)} {int(ey)} 150")
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
             raise DeviceFacade.JsonRpcError(e)
