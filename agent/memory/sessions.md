@@ -105,3 +105,23 @@
     - added-10-test-suite-in-test-non-bot-followings-cache-with-100-pass-rate
   deferred: []
   key_fact: "Storing non-bot followings in accounts/<username>/non_bot_followings.json with atomicwrites and pre-seeding checked set eliminates repetitive UI element polling and log spam on organic followings, while scoping pre-seeding preserves --unfollow-any."
+
+- date: 2026-09-13
+  executor: Antigravity
+  branch: master
+  tasks_completed: [tiered-hashtag-engine]
+  done:
+    - audited-hashtag-recent-and-hashtag-expansion-strategies-audit-033-034-035
+    - created-60-plus-curated-tiered-masterlist-in-accounts-lolatheozjack-hashtags-yml
+    - implemented-hashtag-manager-singleton-core-subsystem
+    - implemented-strategy-1-gemini-ai-persona-expansion
+    - implemented-strategy-2-in-app-caption-harvester-with-zero-overhead
+    - implemented-deterministic-r-add-1-to-4-promotion-and-spam-blacklist-rules
+    - implemented-deterministic-r-rot-1-to-3-balanced-tier-sampling-and-anti-fatigue-cooldown
+    - implemented-deterministic-r-prn-1-to-2-dead-tag-pruning-and-saturation-benching
+    - hooked-caption-harvesting-dead-tag-detection-and-saturation-into-handle-sources
+    - updated-interact-hashtag-posts-with-cli-args-and-tiered-source-sampling
+    - created-9-case-unit-test-suite-test-hashtag-manager-with-100-pass-rate
+    - authored-audit-036-and-review-031-verification-reports
+  deferred: []
+  key_fact: "HashtagManager combines a curated 4-tier masterlist (local/breed/lifestyle/reach) with zero-overhead in-app caption harvesting and Gemini AI expansion; deterministic rules (2:2:1:1 tier-balanced sampling, 2-session anti-fatigue cooldown, 7-day saturation benching, and 0-result dead tag pruning) completely prevent bot burnout and maximize niche engagement."
