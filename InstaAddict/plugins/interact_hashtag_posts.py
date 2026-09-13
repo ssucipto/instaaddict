@@ -45,6 +45,24 @@ class InteractHashtagPosts(Plugin):
                 "default": None,
                 "operation": True,
             },
+            {
+                "arg": "--expand-hashtags",
+                "action": "store_true",
+                "help": "dynamically expand hashtags via AI Gemini model",
+                "default": False,
+            },
+            {
+                "arg": "--no-harvest-hashtags",
+                "action": "store_true",
+                "help": "disable harvesting new hashtags from encountered post captions",
+                "default": False,
+            },
+            {
+                "arg": "--hashtags-file",
+                "nargs": "?",
+                "help": "custom path to hashtags.yml (defaults to accounts/<username>/hashtags.yml)",
+                "default": None,
+            },
         ]
 
     def run(self, device, configs, storage, sessions, profile_filter, plugin):
@@ -74,8 +92,42 @@ class InteractHashtagPosts(Plugin):
             else:
                 sources.append(s)
 
+        from InstaAddict.core.hashtag_manager import HashtagManager
+
+        manager = HashtagManager.get_instance(
+            username=self.session_state.my_username,
+            hashtags_file=getattr(self.args, "hashtags_file", None),
+        )
+
+        # Strategy 1: AI Gemini Expansion if requested
+        if getattr(self.args, "expand_hashtags", False):
+            try:
+                ai_persona = getattr(configs, "ai_persona", None) or getattr(
+                    self.args, "ai_persona", None
+                )
+                added = manager.expand_via_gemini(persona=ai_persona)
+                logger.info(
+                    f"HashtagManager: Gemini AI expanded {len(added)} new candidates."
+                )
+            except Exception as e:
+                logger.warning(f"HashtagManager: Gemini expansion failed: {e}")
+
+        # Strategy 2 & Masterlist: Sample from tiered pool if available, else fallback
+        if manager.has_tiered_sources():
+            truncate_count = get_value(self.args.truncate_sources, None, None)
+            sampled_sources = manager.get_session_sources(
+                fallback_sources=sources,
+                total_limit=int(truncate_count) if truncate_count else None,
+            )
+            logger.info(
+                f"HashtagManager active: sampled {len(sampled_sources)} tiered hashtags: {sampled_sources}"
+            )
+            effective_sources = sampled_sources
+        else:
+            effective_sources = sample_sources(sources, self.args.truncate_sources)
+
         # Start
-        for source in sample_sources(sources, self.args.truncate_sources):
+        for source in effective_sources:
             (
                 active_limits_reached,
                 _,

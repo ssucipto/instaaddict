@@ -531,6 +531,15 @@ def handle_posts(
         count = 0
         PostsViewList(device)._refresh_feed()
     elif not nav_to_hashtag_or_place(device, target, current_job):
+        if isinstance(current_job, str) and current_job.startswith("hashtag"):
+            try:
+                from InstaAddict.core.hashtag_manager import HashtagManager
+
+                HashtagManager.get_instance(
+                    username=getattr(session_state, "my_username", None)
+                ).record_hashtag_result(target, posts_found=False)
+            except Exception as e:
+                logger.debug(f"HashtagManager record dead tag failed: {e}")
         return
 
     post_description = ""
@@ -562,6 +571,23 @@ def handle_posts(
         ) = post_view_list._check_if_last_post(post_description, current_job)
         has_likers, number_of_likers = post_view_list._find_likers_container()
         already_liked, _ = opened_post_view._is_post_liked()
+
+        is_hashtag_job = isinstance(current_job, str) and current_job.startswith("hashtag")
+        no_harvest = (
+            getattr(self.args, "no_harvest_hashtags", False)
+            if hasattr(self, "args")
+            else False
+        )
+        if is_hashtag_job and post_description and not is_ad and not no_harvest:
+            try:
+                from InstaAddict.core.hashtag_manager import HashtagManager
+
+                HashtagManager.get_instance(
+                    username=getattr(session_state, "my_username", None)
+                ).harvest_from_caption(post_description, source_tag=target)
+            except Exception as e:
+                logger.debug(f"HashtagManager harvest failed: {e}")
+
         if is_ad:
             logger.info(
                 "Post is an advertisement, skip.", extra={"color": f"{Fore.CYAN}"}
@@ -580,6 +606,17 @@ def handle_posts(
                 logger.info(
                     f"Limit of {already_liked_count_limit} already liked posts limit reached, finish."
                 )
+                if is_hashtag_job:
+                    try:
+                        from InstaAddict.core.hashtag_manager import HashtagManager
+
+                        HashtagManager.get_instance(
+                            username=getattr(session_state, "my_username", None)
+                        ).record_hashtag_result(
+                            target, posts_found=True, already_liked_exhausted=True
+                        )
+                    except Exception as e:
+                        logger.debug(f"HashtagManager record saturation failed: {e}")
                 break
             if is_same_post:
                 nr_same_post += 1
@@ -657,6 +694,17 @@ def handle_posts(
                                 liked = post_view_list._check_if_liked()
                             if liked:
                                 session_state.totalLikes += 1
+                                if is_hashtag_job:
+                                    try:
+                                        from InstaAddict.core.hashtag_manager import HashtagManager
+
+                                        HashtagManager.get_instance(
+                                            username=getattr(session_state, "my_username", None)
+                                        ).record_hashtag_result(
+                                            target, posts_found=True, already_liked_exhausted=False
+                                        )
+                                    except Exception as e:
+                                        logger.debug(f"HashtagManager reset saturation failed: {e}")
                                 if current_job == "feed":
                                     count += 1
                                     logger.info(
@@ -698,6 +746,17 @@ def handle_posts(
                                 on_interaction=on_interaction,
                             ):
                                 break
+                            if is_hashtag_job:
+                                try:
+                                    from InstaAddict.core.hashtag_manager import HashtagManager
+
+                                    HashtagManager.get_instance(
+                                        username=getattr(session_state, "my_username", None)
+                                    ).record_hashtag_result(
+                                        target, posts_found=True, already_liked_exhausted=False
+                                    )
+                                except Exception as e:
+                                    logger.debug(f"HashtagManager reset saturation failed: {e}")
                             device.back()
             else:
                 logger.info(

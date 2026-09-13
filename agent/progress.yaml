@@ -262,6 +262,19 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-13
+  description: 'Implemented Tiered Masterlist Pool and Dynamic Hashtag Discovery & Rotation Engine.'
+  items:
+  - "✓ Created curated 60+ hashtag masterlist in accounts/lolatheozjack/hashtags.yml across 4 tiers (local, breed, lifestyle, reach)"
+  - "✓ Built HashtagManager core singleton subsystem with atomicwrites for YAML and JSON"
+  - "✓ Implemented Strategy 1 (AI Gemini persona expansion) and Strategy 2 (zero-overhead caption harvester)"
+  - "✓ Enforced deterministic addition rules R-ADD-1 to R-ADD-4 with anti-spam blacklist and semantic relevance checks"
+  - "✓ Enforced deterministic rotation rules R-ROT-1 to R-ROT-3 with 2:2:1:1 tier-balanced sampling and 2-session anti-fatigue cooldown"
+  - "✓ Enforced deterministic pruning rules R-PRN-1 to R-PRN-2 with 0-result dead tag pruning and 7-day saturation benching"
+  - "✓ Hooked caption harvesting and navigation/saturation feedback into handle_sources.py"
+  - "✓ Added --expand-hashtags, --no-harvest-hashtags, and --hashtags-file CLI flags to interact_hashtag_posts.py"
+  - "✓ Created 9-case unit test suite (test_hashtag_manager.py) with 100% pass rate"
+  - "✓ Authored audit-033, audit-034, audit-035, audit-036, and review-031 reports"
+- date: 2026-09-13
   description: 'Implemented Persistent Non-Bot Followings Cache and Fast-Skip Unfollow Optimization.'
   items:
   - "✓ Created persistent non_bot_followings.json storage in Storage core with atomicwrites"
