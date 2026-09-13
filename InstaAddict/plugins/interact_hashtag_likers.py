@@ -62,14 +62,18 @@ class InteractHashtagLikers(Plugin):
         self.current_mode = plugin
 
         # IMPORTANT: in each job we assume being on the top of the Profile tab already
-        sources = [
-            source
-            for source in (
-                self.args.hashtag_likers_top
-                if self.current_mode == "hashtag-likers-top"
-                else self.args.hashtag_likers_recent
-            )
-        ]
+        raw_sources = (
+            self.args.hashtag_likers_top
+            if self.current_mode == "hashtag-likers-top"
+            else self.args.hashtag_likers_recent
+        )
+        sources = []
+        for s in (raw_sources or []):
+            if isinstance(s, str):
+                for item in s.split():
+                    sources.append(item)
+            else:
+                sources.append(s)
         # Start
         for source in sample_sources(sources, self.args.truncate_sources):
             (

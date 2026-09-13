@@ -331,7 +331,7 @@ class DeviceFacade:
             self.deviceV2.shell(f"input swipe {int(sx)} {int(sy)} {int(ex)} {int(ey)} 150")
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
-            raise DeviceFacade.JsonRpcError(e)
+            raise DeviceFacade.JsonRpcError(e) from e
 
     def swipe_points(self, sx, sy, ex, ey, random_x=True, random_y=True):
         if random_x:
@@ -341,11 +341,11 @@ class DeviceFacade:
             ey = int(ey * uniform(0.98, 1.02))
         sy = int(sy)
         try:
-            logger.debug(f"Drag (No-Fling) from ({sx},{sy}) to ({ex},{ey}).")
-            self.deviceV2.drag(sx, sy, ex, ey, duration=0.03)
+            logger.debug(f"ADB Shell Swipe from ({sx},{sy}) to ({ex},{ey}) over 150ms.")
+            self.deviceV2.shell(f"input swipe {int(sx)} {int(sy)} {int(ex)} {int(ey)} 150")
             DeviceFacade.sleep_mode(SleepTime.TINY)
         except Exception as e:
-            raise DeviceFacade.JsonRpcError(e)
+            raise DeviceFacade.JsonRpcError(e) from e
 
     def get_info(self):
         import time
@@ -357,7 +357,7 @@ class DeviceFacade:
             except Exception as e:
                 last_exc = e
                 time.sleep(1)
-        raise DeviceFacade.JsonRpcError(last_exc)
+        raise DeviceFacade.JsonRpcError(last_exc) from last_exc
     @staticmethod
     def sleep_mode(mode):
         mode = SleepTime.DEFAULT if mode is None else mode
@@ -390,13 +390,13 @@ class DeviceFacade:
                     children.append(DeviceFacade.View(view=item, device=self.deviceV2))
                 return iter(children)
             except Exception as e:
-                raise DeviceFacade.JsonRpcError(e)
+                raise DeviceFacade.JsonRpcError(e) from e
 
         def ui_info(self):
             try:
                 return self.viewV2.info
             except Exception as e:
-                raise DeviceFacade.JsonRpcError(e)
+                raise DeviceFacade.JsonRpcError(e) from e
 
         def get_desc(self):
             try:

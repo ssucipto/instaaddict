@@ -132,10 +132,17 @@ class TabBarView:
         return ProfileView(self.device, is_own_profile=True)
 
     def _get_new_profile_position(self) -> Optional[DeviceFacade.View]:
-        buttons = self.device.find(className=ResourceID.BUTTON)
-        for button in buttons:
-            if button.get_desc() == "Profile":
-                return button
+        obj = self.device.find(
+            classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+            descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC),
+        )
+        if obj.exists(Timeout.SHORT):
+            return obj
+        obj = self.device.find(
+            descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC)
+        )
+        if obj.exists(Timeout.SHORT):
+            return obj
         return None
 
     def _navigateTo(self, tab: TabBarTabs):
@@ -242,6 +249,10 @@ class HashTagView:
         obj = recycler.child(
             resourceIdMatches=ResourceID.IMAGE_BUTTON,
         )
+        if not obj.exists():
+            obj = recycler.child(
+                className=ClassName.IMAGE_VIEW,
+            )
         if obj.exists(Timeout.LONG):
             logger.debug("First image in view exists.")
         else:
@@ -280,6 +291,10 @@ class PlacesView:
         obj = recycler.child(
             resourceIdMatches=ResourceID.IMAGE_BUTTON,
         )
+        if not obj.exists():
+            obj = recycler.child(
+                className=ClassName.IMAGE_VIEW,
+            )
         if obj.exists(Timeout.LONG):
             logger.debug("First image in view exists.")
         else:
@@ -412,7 +427,7 @@ class SearchView:
             return True
         search_edit_text.set_text(
             target,
-            Mode.PASTE if args.dont_type else Mode.TYPE,
+            Mode.PASTE,
         )
         if self._check_current_view(target, job):
             logger.info(f"{target} is in top view.")
@@ -453,6 +468,23 @@ class SearchView:
                 text=target,
                 resourceIdMatches=ResourceID.SEARCH_ROW_ITEM,
             )
+            if not obj.exists():
+                obj = self.device.find(
+                    text=target,
+                    className=ClassName.TEXT_VIEW,
+                )
+            if not obj.exists():
+                obj = self.device.find(
+                    description=target,
+                )
+            if not obj.exists() and target.startswith("#"):
+                clean_tag = target[1:]
+                tag_obj = self.device.find(
+                    text=clean_tag,
+                    className=ClassName.TEXT_VIEW,
+                )
+                if tag_obj.exists():
+                    obj = tag_obj
         if obj.exists():
             obj.click()
             return True
@@ -559,6 +591,11 @@ class PostsViewList:
                 obj2 = ac_bottom + 20
             else:
                 obj2 = media_bounds["top"] if media_bounds else displayHeight * 0.25
+
+            if (obj1 - obj2) < (displayHeight * 0.4):
+                logger.debug(f"Calculated swipe distance {obj1 - obj2} is too small. Overriding to prevent snap-back.")
+                obj1 = displayHeight * 0.8
+                obj2 = displayHeight * 0.2
 
             self.device.swipe_points(
                 displayWidth / 2,
@@ -1461,7 +1498,7 @@ class AccountView:
             exit(0)
 
     def navigate_to_main_account(self):
-        logger.debug("Navigating to main account...")
+        logger.info("Navigating to profile / main account...")
         profile_view = ProfileView(self.device)
         profile_view.click_on_avatar()
         if profile_view.getFollowingCount() is None:
@@ -2036,28 +2073,38 @@ class ProfileView(ActionBarView):
             return None, None, None
 
     def _new_ui_profile_button(self) -> bool:
-        found = False
-        buttons = self.device.find(className=ResourceID.BUTTON)
-        for button in buttons:
-            if button.get_desc() == "Profile":
-                button.click()
-                found = True
-        return found
+        obj = self.device.find(
+            classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+            descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC),
+        )
+        if obj.exists(Timeout.SHORT):
+            obj.click()
+            return True
+        obj = self.device.find(
+            descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC)
+        )
+        if obj.exists(Timeout.SHORT):
+            obj.click()
+            return True
+        return False
 
     def _old_ui_profile_button(self) -> bool:
-        found = False
         obj = self.device.find(resourceIdMatches=ResourceID.TAB_AVATAR)
-        if obj.exists(Timeout.MEDIUM):
+        if obj.exists(Timeout.SHORT):
             obj.click()
-            found = True
-        return found
+            return True
+        return False
 
     def click_on_avatar(self):
-        while True:
+        max_attempts = 4
+        for attempt in range(max_attempts):
             if self._new_ui_profile_button():
-                break
+                return
             if self._old_ui_profile_button():
-                break
+                return
+            logger.debug(
+                f"Profile button not visible yet (attempt {attempt+1}/{max_attempts}), pressing back..."
+            )
             self.device.back()
 
     def getFollowButton(self):

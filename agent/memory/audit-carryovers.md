@@ -70,3 +70,26 @@ carryovers:
       - InstaAddict/core/views.py
     fix_applied_date: null
     verified_in_audit: null
+
+  - id: CO-006
+    audit_report: agent/reports/audit-015-swipe-distance-snapback.md
+    date_raised: 2026-09-13
+    severity: high
+    status: pending
+    summary: Hardcoded pixel defaults in UniversalActions._swipe_points and scattered micro-scrolls cause snap-backs on modern IG layouts
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/interaction.py
+    fix_applied_date: null
+    verified_in_audit: null
+
+  - id: CO-007
+    audit_report: agent/reports/audit-015-swipe-distance-snapback.md
+    date_raised: 2026-09-13
+    severity: medium
+    status: pending
+    summary: swipe_points uses drag instead of swipe, lacking fling momentum necessary for Reels-like feed navigation
+    affected_files:
+      - InstaAddict/core/device_facade.py
+    fix_applied_date: null
+    verified_in_audit: null
