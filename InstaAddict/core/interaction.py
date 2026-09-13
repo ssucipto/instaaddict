@@ -1141,6 +1141,8 @@ def _watch_stories(
                         )
                         break
                 for _ in range(4):
+                    if UniversalActions.escape_in_app_browser(device):
+                        break
                     if (
                         story_view.getUsername().strip().casefold()
                         == username.casefold()

@@ -19,6 +19,17 @@ class ResourceID:
         self.ACTION_BAR_TITLE_CHEVRON = f"{APP_ID}:id/action_bar_title_chevron"
         self.ACTION_ICON = f"{APP_ID}:id/action_icon"
         self.ACTION_SHEET_ROW_TEXT_VIEW = f"{APP_ID}:id/action_sheet_row_text_view"
+        self.AD_ACTION_BUTTON = f"{APP_ID}:id/ad_action_button"
+        self.AD_CALL_TO_ACTION = f"{APP_ID}:id/ad_call_to_action"
+        self.POST_AD_CTA_BUTTON = f"{APP_ID}:id/post_ad_cta_button"
+        self.BROWSER_LITE_ROOT_CONTAINER = (
+            f"{APP_ID}:id/browser_lite_root_container"
+        )
+        self.BROWSER_CHROME_CONTAINER = (
+            f"{APP_ID}:id/browser_chrome_container"
+        )
+        self.IG_BROWSER_CLOSE_BUTTON = f"{APP_ID}:id/ig_browser_close_button"
+        self.WEBVIEW_CONTAINER = f"{APP_ID}:id/webview_container"
         self.BOTTOM_SHEET_CONTAINER_VIEW = f"{APP_ID}:id/bottom_sheet_container_view"
         self.BUTTON = f"{APP_ID}:id/button"
         self.CAROUSEL_MEDIA_GROUP = f"{APP_ID}:id/carousel_media_group"

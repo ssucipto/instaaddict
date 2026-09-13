@@ -135,3 +135,15 @@ carryovers:
       - InstaAddict/plugins/upload_posts.py
       - InstaAddict/plugins/data_analytics.py
       - InstaAddict/core/dogfood.py
+
+  - id: CO-011
+    audit_report: agent/reports/audit-027-ad-detection-and-browser-escape.md
+    date_raised: 2026-09-13
+    severity: critical
+    status: fixed
+    summary: Implement universal in-app browser watchdog/escape mechanism (BrowserLiteInMainProcessIGActivity) and modernize multi-vector ad detection across all interaction pipelines.
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/core/resources.py

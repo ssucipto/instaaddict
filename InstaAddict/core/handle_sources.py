@@ -2,6 +2,7 @@ import logging
 import os
 from functools import partial
 from os import path
+from random import randint
 
 from atomicwrites import atomic_write
 from colorama import Fore
@@ -311,10 +312,37 @@ def handle_likers(
     nr_same_post = 0
     nr_same_posts_max = 3
     while True:
-        flag, post_description, _, _, _, _ = PostsViewList(device)._check_if_last_post(
+        if UniversalActions.escape_in_app_browser(device):
+            logger.info(
+                "Escaped in-app browser or advertisement overlay; swiping past."
+            )
+            UniversalActions(device)._swipe_points(
+                direction=Direction.DOWN, delta_y=randint(450, 700)
+            )
+            random_sleep(inf=1, sup=3)
+            continue
+
+        (
+            flag,
+            post_description,
+            username,
+            is_ad,
+            is_hashtag,
+            has_tags,
+        ) = PostsViewList(device)._check_if_last_post(
             post_description, current_job
         )
-        has_likers, number_of_likers = PostsViewList(device)._find_likers_container()
+        if is_ad:
+            logger.info(
+                "Post is an advertisement, skipping in likers.",
+                extra={"color": f"{Fore.CYAN}"},
+            )
+            PostsViewList(device).swipe_to_fit_posts(SwipeTo.NEXT_POST)
+            continue
+
+        has_likers, number_of_likers = PostsViewList(
+            device
+        )._find_likers_container()
         if flag:
             nr_same_post += 1
             logger.info(f"Warning: {nr_same_post}/{nr_same_posts_max} repeated posts.")
@@ -515,6 +543,15 @@ def handle_posts(
     post_view_list = PostsViewList(device)
     opened_post_view = OpenedPostView(device)
     while True:
+        if UniversalActions.escape_in_app_browser(device):
+            logger.info(
+                "Escaped in-app browser or advertisement overlay; swiping past."
+            )
+            UniversalActions(device)._swipe_points(
+                direction=Direction.DOWN, delta_y=randint(450, 700)
+            )
+            random_sleep(inf=1, sup=3)
+            continue
         (
             is_same_post,
             post_description,
@@ -525,7 +562,20 @@ def handle_posts(
         ) = post_view_list._check_if_last_post(post_description, current_job)
         has_likers, number_of_likers = post_view_list._find_likers_container()
         already_liked, _ = opened_post_view._is_post_liked()
+        if is_ad:
+            logger.info(
+                "Post is an advertisement, skip.", extra={"color": f"{Fore.CYAN}"}
+            )
+            post_view_list.swipe_to_fit_posts(SwipeTo.NEXT_POST)
+            continue
         if not (is_ad or is_hashtag):
+            if not username or username == "False" or len(username.strip()) == 0:
+                logger.info(
+                    "No valid username found for post (unidentifiable author or ad). Skip.",
+                    extra={"color": f"{Fore.YELLOW}"},
+                )
+                post_view_list.swipe_to_fit_posts(SwipeTo.NEXT_POST)
+                continue
             if already_liked_count == already_liked_count_limit:
                 logger.info(
                     f"Limit of {already_liked_count_limit} already liked posts limit reached, finish."

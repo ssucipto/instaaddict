@@ -72,3 +72,20 @@
     - resolved-all-co-010-audit-findings
   deferred: []
   key_fact: "RotatingFileHandlers must be explicitly closed before unlinking on Windows; SessionState metrics must be explicitly registered in SessionStateEncoder.default to persist in sessions.json."
+
+- date: 2026-09-13
+  executor: Antigravity
+  branch: master
+  tasks_completed: [CO-011]
+  done:
+    - diagnosed-apple-tv-ad-trapping-in-inappbrowser-activity
+    - added-ad-and-in-app-browser-resource-ids-to-resources-py
+    - implemented-universal-actions-escape-in-app-browser-watchdog
+    - integrated-browser-escape-into-detect-block-and-handle-sources-post-loop
+    - universalized-ad-detection-across-all-jobs-in-post-owner-and-check-if-ad-or-hashtag
+    - added-cta-button-sponsored-regex-and-server-component-detection
+    - guarded-against-empty-author-and-ad-profile-interactions
+    - hardened-reels-ad-escape-and-expanded-cta-regex
+    - added-unit-test-suite-test-ad-detection-and-escape
+  deferred: []
+  key_fact: "Instagram ads use BrowserLiteInMainProcessIGActivity which traps uiautomator searches; dismissing via ig_browser_close_button or escape_in_app_browser watchdog before interacting with posts prevents session stalls."

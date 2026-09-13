@@ -262,6 +262,17 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-13
+  description: 'Implemented Production-Grade Advertisement Detection and In-App Browser Escape Watchdog.'
+  items:
+  - "✓ Built UniversalActions.escape_in_app_browser with native close button, fallback back(), and foreground recovery"
+  - "✓ Whitelisted Android system packages (systemui, android, IME) against false-positive ad dismissals"
+  - "✓ Universalized multi-vector ad detection across all interaction pipelines (feed, hashtags, places, likers)"
+  - "✓ Added CTA button resource and text pattern detection with post-relative vertical coordinate bounding"
+  - "✓ Protected handle_likers against scraping or clicking ad posts"
+  - "✓ Guarded _post_owner(Owner.OPEN) against arbitrary clicks on empty/nameless ad authors"
+  - "✓ Integrated browser escape watchdog into watch_stories exit loop"
+  - "✓ Created 12-case unit test suite (test_ad_detection_and_escape.py) with 100% pass rate"
+- date: 2026-09-13
   description: 'Completed Milestone 7: Production Telemetry, Error Hardening & Self-Learning System.'
   items:
   - "✓ Fixed Windows file lock descriptors leak in log handlers"
