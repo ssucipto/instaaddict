@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.1.0 — Modern Reels Architecture, Dynamic Hashtag Engine & Fluid Swiping
+
+Comprehensive release introducing modern Instagram (v446+) Reels viewer compatibility, tiered dynamic hashtag discovery, persistent non-bot followings caching, universal in-app browser escape watchdog, and fluid native swipe physics.
+
+### Added
+- **Modern Reels & Clips Viewer Compatibility**:
+  - Full support for Instagram's full-screen video viewer (`clips_viewer_view_pager`, `root_clips_layout`, `clips_viewer_container`).
+  - Added multi-tier author resolution for `clips_author_username`, `clips_author_profile_pic` (regex content description extraction), and `clips_author_info_component`.
+  - Added native Reels like button support (`ResourceID.LIKE_BUTTON`).
+  - Added fast Reel caption extraction (`CLIPS_CAPTION_COMPONENT`) with immediate termination to prevent futile scroll loops.
+- **Tiered Masterlist & Dynamic Hashtag Discovery Engine (`HashtagManager`)**:
+  - Curated 4-tier pool in `accounts/<username>/hashtags.yml` across Local Community, Breed/Niche, Lifestyle/Adventure, and Reach tiers.
+  - Strategy 1: AI Gemini Persona Expansion (`--expand-hashtags`) synthesizing high-conversion niche tags grounded in account persona.
+  - Strategy 2: Zero-overhead in-app caption harvesting (`harvest_from_caption`) tracking cross-session tag frequency in `discovered_hashtags.json`.
+  - Enforced deterministic rules: R-ADD-1..4 (promotion thresholds, anti-spam blacklist, semantic relevance, tier assignment), R-ROT-1..3 (2:2:1:1 tier-balanced sampling, 2-session anti-fatigue cooldowns, shuffle), and R-PRN-1..2 (0-result dead tag pruning, 7-day saturation benching).
+  - Added CLI options: `--expand-hashtags`, `--no-harvest-hashtags`, and `--hashtags-file`.
+- **Persistent Non-Bot Followings Cache**:
+  - High-performance atomic JSON storage in `accounts/<username>/non_bot_followings.json`.
+  - Instant O(1) in-memory lookups and batch disk writes at scroll boundaries.
+  - Pre-seeded checked set in `ActionUnfollowFollowers` for fast-skipping known non-bot accounts without UI polling or log spam.
+  - Automatic cache invalidation on follow and unfollow state transitions.
+  - Added CLI options: `--clear-non-bot-cache` and `--ignore-non-bot-cache`.
+- **Universal Ad Detection & In-App Browser Escape Watchdog**:
+  - Automated detection and dismissal of `BrowserLiteInMainProcessIGActivity` and external browser overlays via native close buttons, fallback back-presses, and foreground recovery.
+  - Whitelisted Android system packages (`com.android.systemui`, `android`, IME keyboards) against false dismissal.
+  - Bounded CTA button coordinate detection to prevent false ad classifications.
+- **Task Sequence Randomizer**:
+  - Implemented `--randomize-tasks` / `randomize_task_sequence` to shuffle job execution order on every session for human-like behavior.
+
+### Changed & Improved
+- **Decoupled Author Resolution from Ad Detection**:
+  - Removed faulty `(False, True, is_hashtag)` return in `views.py` when author view is unclickable; returns `(False, False, is_hashtag)`. Organic posts with non-clickable headers are no longer falsely marked as advertisements and skipped.
+- **Fluid Single-Swipe Navigation & 200ms Swipe Physics**:
+  - Replaced jerky multi-swipe sequences with a single vertical swipe (80% down to 20% height) for Reels.
+  - Removed redundant `HALF_PHOTO` swipe call in `handle_sources.py`.
+  - Stripped obsolete 3-retry gap-view loop searching for deprecated `GAP_VIEW_AND_FOOTER_SPACE`.
+  - Calibrated native ADB swipe duration to 200ms (`adb shell input swipe x1 y1 x2 y2 200`), achieving snappy and natural mobile flick gestures.
+
+**Full diff**: `v1.0.3...v1.1.0`
+
 ## v1.0.3 — Production Telemetry, Error Hardening & Self-Learning System
 
 Production-grade error handling, automated telemetry, continuous non-overwritten reporting, and closed-loop self-learning parameter optimization.

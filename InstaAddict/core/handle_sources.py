@@ -765,7 +765,6 @@ def handle_posts(
         if likes_failed == 10:
             logger.warning("You failed to do 10 likes! Soft-ban?!")
             return
-        post_view_list.swipe_to_fit_posts(SwipeTo.HALF_PHOTO)
         post_view_list.swipe_to_fit_posts(SwipeTo.NEXT_POST)
     TabBarView(device).navigateToProfile()
 
