@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import shutil
 import logging
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -39,6 +40,12 @@ class UploadPostsPlugin(Plugin):
                 "type": float,
                 "default": None,
                 "help": "Rate limit between uploads in hours (default: 12.0 in config or fallback, 0 to disable)",
+            },
+            {
+                "arg": "--upload-queue-dir",
+                "metavar": "path/to/queue",
+                "default": None,
+                "help": "Custom path to the upload media queue directory",
             },
         ]
 
@@ -240,25 +247,56 @@ class UploadPostsPlugin(Plugin):
         if hasattr(configs, "args") and hasattr(configs.args, "config"):
             config_path = str(configs.args.config)
 
-        # Support standard content_queue and legacy upload_queue
-        pending_candidates = [
-            os.path.join("accounts", username, "content_queue", "pending"),
-            os.path.join("accounts", username, "upload_queue", "pending"),
-        ]
-        pending_dir = None
-        for cand in pending_candidates:
-            if os.path.exists(cand):
-                pending_dir = cand
-                break
+        # Check for custom queue directory via CLI args or YAML config
+        custom_queue_dir = None
+        if hasattr(configs, "args") and hasattr(configs.args, "upload_queue_dir"):
+            raw_dir = configs.args.upload_queue_dir
+            if isinstance(raw_dir, str) and raw_dir.strip():
+                custom_queue_dir = raw_dir.strip()
 
-        if not pending_dir:
-            pending_dir = pending_candidates[0]
-            logger.info(
-                f"UploadPostsPlugin: Pending queue directory does not exist: {pending_dir}. Skipping upload."
-            )
-            return
+        if not custom_queue_dir and config_path and os.path.exists(config_path):
+            try:
+                import yaml
 
-        published_dir = os.path.join(os.path.dirname(pending_dir), "published")
+                with open(config_path, "r", encoding="utf-8") as f:
+                    user_conf = yaml.safe_load(f) or {}
+                    raw_dir = user_conf.get("upload-queue-dir")
+                    if isinstance(raw_dir, str) and raw_dir.strip():
+                        custom_queue_dir = raw_dir.strip()
+            except Exception:
+                pass
+
+        if custom_queue_dir:
+            custom_queue_dir = str(custom_queue_dir).strip()
+            if os.path.exists(os.path.join(custom_queue_dir, "pending")):
+                pending_dir = os.path.join(custom_queue_dir, "pending")
+                published_dir = os.path.join(custom_queue_dir, "published")
+            elif os.path.exists(custom_queue_dir):
+                pending_dir = custom_queue_dir
+                published_dir = os.path.join(os.path.dirname(custom_queue_dir), "published")
+            else:
+                pending_dir = custom_queue_dir
+                published_dir = os.path.join(os.path.dirname(custom_queue_dir), "published")
+        else:
+            # Support standard content_queue and legacy upload_queue
+            pending_candidates = [
+                os.path.join("accounts", username, "content_queue", "pending"),
+                os.path.join("accounts", username, "upload_queue", "pending"),
+            ]
+            pending_dir = None
+            for cand in pending_candidates:
+                if os.path.exists(cand):
+                    pending_dir = cand
+                    break
+
+            if not pending_dir:
+                pending_dir = pending_candidates[0]
+                logger.info(
+                    f"UploadPostsPlugin: Pending queue directory does not exist: {pending_dir}. Skipping upload."
+                )
+                return
+
+            published_dir = os.path.join(os.path.dirname(pending_dir), "published")
 
         rate_limit_hours = self._get_rate_limit_hours(configs, config_path)
         if self._is_rate_limited(published_dir, rate_limit_hours):
@@ -305,16 +343,22 @@ class UploadPostsPlugin(Plugin):
                 # Move media file
                 dest_media = os.path.join(published_dir, media_file)
                 if os.path.exists(dest_media):
-                    os.remove(dest_media)
-                os.rename(media_path, dest_media)
+                    try:
+                        os.remove(dest_media)
+                    except OSError:
+                        pass
+                shutil.move(media_path, dest_media)
 
                 # Move .txt sidecar if present
                 txt_path = os.path.join(pending_dir, f"{base_name}.txt")
                 if os.path.exists(txt_path):
                     dest_txt = os.path.join(published_dir, f"{base_name}.txt")
                     if os.path.exists(dest_txt):
-                        os.remove(dest_txt)
-                    os.rename(txt_path, dest_txt)
+                        try:
+                            os.remove(dest_txt)
+                        except OSError:
+                            pass
+                    shutil.move(txt_path, dest_txt)
 
                 # Move .json sidecar if present
                 json_path = os.path.join(pending_dir, f"{base_name}.json")
@@ -323,8 +367,11 @@ class UploadPostsPlugin(Plugin):
                         published_dir, f"{base_name}.json"
                     )
                     if os.path.exists(dest_json):
-                        os.remove(dest_json)
-                    os.rename(json_path, dest_json)
+                        try:
+                            os.remove(dest_json)
+                        except OSError:
+                            pass
+                    shutil.move(json_path, dest_json)
 
                 if sessions and len(sessions) > 0:
                     current_session = sessions[-1]
@@ -549,9 +596,9 @@ class UploadPostsPlugin(Plugin):
                 break
 
             # Check if "Sharing posts" or OK modal is blocking
-            ok_btn = d(textMatches="(?i)^OK$")
+            ok_btn = d(textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss)$")
             if ok_btn.exists(timeout=2):
-                logger.info("Dismissing 'Sharing posts' modal dialog...")
+                logger.info("Dismissing informational composer modal dialog...")
                 ok_btn.click()
                 random_sleep(1, 2)
                 continue

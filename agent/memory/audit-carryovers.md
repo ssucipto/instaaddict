@@ -163,3 +163,23 @@ carryovers:
       - InstaAddict/core/views.py
       - InstaAddict/core/utils.py
       - test/test_upload_posts.py
+
+  - id: CO-013
+    audit_report: agent/reports/audit-043-implementation-gaps-inconsistencies-shortcuts.md
+    date_raised: 2026-09-14
+    severity: high
+    status: fixed
+    fix_applied_date: 2026-09-14
+    verified_in_audit: agent/reports/audit-044-remediation-verification.md
+    summary: Address all 9 findings from Audit #043 and Review #034 including registering missing CLI arguments (--reels-topic, --upload-queue-dir), module globals initialization, shutil.move cross-device fixes, bare except remediation, modal regex expansion, and report upload metrics parity.
+    affected_files:
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/plugins/upload_posts.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/core/report.py
+      - config-examples/config.yml
+      - test/test_upload_posts.py
+      - test/test_interact_reels.py
+

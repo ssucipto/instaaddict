@@ -43,6 +43,11 @@ from InstaAddict.core.views import (
 
 logger = logging.getLogger(__name__)
 
+# Module-level globals initialized to prevent NameError prior to load_config
+args = None
+configs = None
+ResourceID = None
+
 
 def load_config(config):
     global args

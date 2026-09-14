@@ -81,11 +81,11 @@ milestones:
   name: Production Auto-Upload Pipeline Overhaul & Robust Job Scheduling
   status: completed
   progress: 100
-  tasks_total: 1
-  tasks_completed: 1
-  started: '2026-09-14'
+  tasks_total: 2
+  tasks_completed: 2
+  started: 2026-09-14
   completed: '2026-09-14'
-  notes: Overhauled UploadPostsPlugin with case-insensitive discovery, .txt/.json sidecars, configurable rate limits, decoupled job scheduling in bot_flow, native ADD_TO_FEED intent sharing, and exception hardening.
+  notes: Overhauled UploadPostsPlugin with case-insensitive discovery, .txt/.json sidecars, configurable rate limits, decoupled job scheduling in bot_flow, native ADD_TO_FEED intent sharing, and exception hardening. Remediated implementation gaps and uninitialized globals (Route-042).
   file: agent/milestones/milestone-8-auto-upload-pipeline.md
 tasks:
   milestone_1:
@@ -269,6 +269,16 @@ tasks:
     actual_hours: 3
     route_file: agent/routing/tasks/route-041-auto-upload-pipeline-overhaul.md
     notes: Resolved all 7 findings from Audit #040 and closed carryover CO-012. Overhauled UploadPostsPlugin with case-insensitive extensions, .txt/.json sidecars, configurable rate limits, decoupled bot_flow scheduling, native MediaStore ADD_TO_FEED intent sharing, and exception hardening. Verified live on emulator-5554 with 16 automated unit tests.
+  - id: task-36
+    name: Comprehensive Implementation Audit & Code Quality Remediation
+    priority: 1
+    status: completed
+    started: 2026-09-14
+    completed_date: '2026-09-14'
+    estimated_hours: 3
+    actual_hours: 3
+    route_file: agent/routing/tasks/route-042-comprehensive-audit-review-remediation.md
+    notes: Remediated all 9 findings from Audit #043 and Review #034 (zero shortcuts). Resolved missing CLI arguments (--reels-topic, --upload-queue-dir), safe getattr fallbacks, module global initialization in views.py and interaction.py, OCR UnboundLocalError and crash safety, shutil.move cross-filesystem file moves, composer modal regex expansion, bare except cleanup in gemini_vision.py, upload telemetry in full print report, and restored corrupted Unicode. 72/72 tests passing.
 documentation:
   design_documents: 1
   milestone_documents: 5
@@ -278,10 +288,23 @@ documentation:
 progress:
   planning: 100
   implementation: 100
-  testing: 90
-  documentation: 98
+  testing: 100
+  documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-14
+  description: 'Remediated Audit #043 and Review #034 findings across core, plugins, and CLI interfaces (Route-042).'
+  items:
+  - "✓ Registered --reels-topic CLI argument with safe fallback getattr(configs.args, 'reels_topic', None) or 'dogs or animals'"
+  - "✓ Registered --upload-queue-dir CLI argument in UploadPostsPlugin and supported custom queue directory routing"
+  - "✓ Replaced os.rename with shutil.move and cross-filesystem target collision deletion for file archiving"
+  - "✓ Initialized module globals (args = None, configs = None, ResourceID = None) in views.py and interaction.py"
+  - "✓ Guarded LanguageView.setLanguage against args is None and isolated OCR TesseractNotFoundError against UnboundLocalError"
+  - "✓ Remediated bare except in gemini_vision.py to specific (IndexError, OSError, yaml.YAMLError) with index bounds checks"
+  - "✓ Expanded composer modal dismissal regex to (?i)^(OK|Continue|Not now|Got it|Dismiss)$"
+  - "✓ Added total and session upload success/failure telemetry to report.py print_full_report"
+  - "✓ Restored corrupted UTF-8 emojis in interact_reels.py"
+  - "✓ Expanded test suite to 72 automated tests (test_interact_reels.py, test_upload_posts.py) with 100% pass rate"
 - date: 2026-09-14
   description: 'Completed Milestone 8: Production Auto-Upload Pipeline Overhaul & Robust Job Scheduling.'
   items:
