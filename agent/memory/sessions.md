@@ -147,3 +147,23 @@
     - validated-acp-documentation-with-zero-errors-and-zero-warnings
   deferred: []
   key_fact: "Hashtag grid taps on video posts open Instagram's full-screen Reels viewer (`clips_author_username`, `clips_author_profile_pic`) rather than standard feed containers. In `views.py:1270`, failing to find `post_owner_clickable` returned `(False, True, is_hashtag)` where the second element falsely flagged the post as an advertisement; decoupling owner discovery failure from ad detection and adding dedicated Reels swipe handling eliminated both the false ad skips and scroll jerkiness. Bumping to v1.1.0 accurately reflects the cumulative addition of 10 major architectural subsystems over GramAddict."
+
+- date: 2026-09-14
+  executor: Antigravity
+  branch: master
+  tasks_completed: [task-35, route-041]
+  done:
+    - audited-auto-upload-pipeline-audit-040-041-042
+    - resolved-co-012-auto-upload-broken-pipeline
+    - implemented-native-media-store-indexing-and-add-to-feed-intent-sharing
+    - added-case-insensitive-media-matching-and-txt-json-ai-sidecar-captions
+    - decoupled-upload-posts-from-interaction-limits-in-bot-flow
+    - added-upload-rate-limit-hours-cli-option-and-yaml-config
+    - added-modern-ig-v446-composer-locators-in-resources-py
+    - guarded-views-py-and-utils-py-against-unhandled-crashes-and-unbound-args
+    - created-16-case-unit-test-suite-test-upload-posts-with-100-pass-rate
+    - fixed-test-load-txt-and-test-telegram-path-independence-bringing-full-suite-to-68-of-68-passing
+    - verified-live-post-upload-flow-on-android-emulator-with-real-queued-media
+    - authored-review-033-quality-report-and-updated-readme-and-progress-tracking
+  deferred: []
+  key_fact: "Directly launching `com.instagram.share.ADD_TO_FEED` via Instagram's `ShareHandlerActivity` with a MediaStore URI (`content://media/external/images/media/<id>`) bypasses all bottom tab navigation, deprecations, and file picker dropdowns in 1 step, while prioritizing raw `.txt` sidecars provides frictionless content authoring."

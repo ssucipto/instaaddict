@@ -34,6 +34,11 @@ from InstaAddict.core.storage import ACCOUNTS
 http = urllib3.PoolManager()
 logger = logging.getLogger(__name__)
 
+args = None
+configs = None
+app_id = None
+ResourceID = None
+
 
 def load_config(config: Config):
     global app_id
@@ -464,7 +469,12 @@ def _restore_keyboard(device):
 
 def random_sleep(inf=0.5, sup=3.0, modulable=True, log=True):
     MIN_INF = 0.3
-    multiplier = float(args.speed_multiplier)
+    multiplier = 1.0
+    try:
+        if args is not None and hasattr(args, "speed_multiplier"):
+            multiplier = float(args.speed_multiplier)
+    except Exception:
+        multiplier = 1.0
     delay = uniform(inf, sup) / (multiplier if modulable else 1.0)
     delay = max(delay, MIN_INF)
     if log:
@@ -492,7 +502,7 @@ def save_crash(device):
         device.dump_hierarchy(os.path.join(crash_path, "hierarchy" + hierarchy_format))
     except RuntimeError:
         logger.error(f"Cannot save 'hierarchy.{hierarchy_format}'.")
-    if args.screen_record:
+    if args is not None and getattr(args, "screen_record", False):
         try:
             device.stop_screenrecord(crash=True)
         except Exception as e:

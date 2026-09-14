@@ -1509,7 +1509,13 @@ class PostsViewList:
             resourceId=ResourceID.SECONDARY_LABEL,
         )
 
-        owner_name = post_owner_obj.get_text() or post_owner_obj.get_desc() or ""
+        owner_name = ""
+        try:
+            if post_owner_obj.exists():
+                owner_name = post_owner_obj.get_text() or post_owner_obj.get_desc() or ""
+        except Exception as e:
+            logger.debug(f"Could not extract owner_name directly: {e}")
+
         if not isinstance(owner_name, str):
             owner_name = str(owner_name) if owner_name else ""
 
@@ -1535,15 +1541,20 @@ class PostsViewList:
 
         # Check secondary label / subtitle for sponsored indicators
         ad_regex = r"\b(sponsored|ad|promoted|advertisement|paid partnership)\b"
-        if ad_like_obj.exists():
-            ad_like_txt = ad_like_obj.get_text() or ad_like_obj.get_desc() or ""
-            if not isinstance(ad_like_txt, str):
-                ad_like_txt = str(ad_like_txt) if ad_like_txt else ""
-            if re.search(ad_regex, ad_like_txt, re.IGNORECASE):
-                logger.debug(f"Looks like an AD (label: '{ad_like_txt}'), skip.")
-                is_ad = True
-            elif is_hashtag and owner_name:
-                owner_name = owner_name.split("•")[0].strip()
+        ad_like_txt = ""
+        try:
+            if ad_like_obj.exists():
+                ad_like_txt = ad_like_obj.get_text() or ad_like_obj.get_desc() or ""
+        except Exception as e:
+            logger.debug(f"Could not extract secondary label: {e}")
+
+        if not isinstance(ad_like_txt, str):
+            ad_like_txt = str(ad_like_txt) if ad_like_txt else ""
+        if re.search(ad_regex, ad_like_txt, re.IGNORECASE):
+            logger.debug(f"Looks like an AD (label: '{ad_like_txt}'), skip.")
+            is_ad = True
+        elif is_hashtag and owner_name:
+            owner_name = owner_name.split("•")[0].strip()
 
         # Check if owner name itself indicates sponsored content
         if owner_name and re.search(ad_regex, owner_name, re.IGNORECASE):
@@ -2237,11 +2248,6 @@ class ProfileView(ActionBarView):
 
     def _getSomeText(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Get some text from the profile to check the language"""
-        obj = self.device.find(
-            resourceIdMatches=ResourceID.ROW_PROFILE_HEADER_TEXTVIEW_POST_CONTAINER
-        )
-        if not obj.exists(Timeout.MEDIUM):
-            UniversalActions(self.device)._swipe_points(Direction.UP)
         try:
             post = (
                 self.device.find(
@@ -2264,14 +2270,36 @@ class ProfileView(ActionBarView):
                 .child(index=1)
                 .get_text()
             )
-            return post.casefold(), followers.casefold(), following.casefold()
+            if post and followers and following:
+                return post.casefold(), followers.casefold(), following.casefold()
         except Exception as e:
-            logger.debug(f"Exception: {e}")
-            logger.warning(
-                "Can't get post/followers/following text for check the language! Save a crash to understand the reason."
+            logger.debug(f"Exception reading profile header children: {e}")
+
+        # Modern Instagram v446 fallback
+        try:
+            post_lbl = self.device.find(
+                resourceIdMatches=r".*profile_header_familiar_post_count_label|.*profile_header.*post.*label"
             )
-            save_crash(self.device)
-            return None, None, None
+            fol_lbl = self.device.find(
+                resourceIdMatches=r".*profile_header_familiar_followers_label|.*profile_header.*followers.*label"
+            )
+            ing_lbl = self.device.find(
+                resourceIdMatches=r".*profile_header_familiar_following_label|.*profile_header.*following.*label"
+            )
+            if post_lbl.exists(Timeout.SHORT) and fol_lbl.exists(Timeout.SHORT) and ing_lbl.exists(Timeout.SHORT):
+                p = post_lbl.get_text()
+                f = fol_lbl.get_text()
+                i = ing_lbl.get_text()
+                if p and f and i:
+                    return p.casefold(), f.casefold(), i.casefold()
+        except Exception as e:
+            logger.debug(f"Exception in modern profile label fallback: {e}")
+
+        logger.warning(
+            "Can't get post/followers/following text for check the language! Save a crash to understand the reason."
+        )
+        save_crash(self.device)
+        return None, None, None
 
     def _new_ui_profile_button(self) -> bool:
         obj = self.device.find(

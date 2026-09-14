@@ -1,3 +1,4 @@
+import os
 import json
 from unittest.mock import mock_open
 
@@ -10,7 +11,8 @@ import InstaAddict.plugins.telegram as TelegramReports
 @pytest.fixture
 def mock_session_data_raw():
     """Provides session data in raw format"""
-    with open(r"mock_data\sessions.json", "r") as file:
+    file_path = os.path.join(os.path.dirname(__file__), "mock_data", "sessions.json")
+    with open(file_path, "r") as file:
         return file.read()
 
 

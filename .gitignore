@@ -31,3 +31,5 @@ docs/acp-enhanced-dev-team-feedback-consolidated.md
 .env
 
 /run_multiple.py
+scratch/
+ui.xml

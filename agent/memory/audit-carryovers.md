@@ -147,3 +147,19 @@ carryovers:
       - InstaAddict/core/handle_sources.py
       - InstaAddict/plugins/interact_reels.py
       - InstaAddict/core/resources.py
+
+  - id: CO-012
+    audit_report: agent/reports/audit-040-auto-upload-investigation.md
+    date_raised: 2026-09-13
+    severity: critical
+    status: fixed
+    fix_applied_date: 2026-09-14
+    verified_in_audit: agent/reports/audit-042-auto-upload-verification.md
+    summary: Resolve auto-upload non-functionality across case-sensitive file matching, silent failure exits, fragile username resolution, job scheduling limit abortion, missing .txt sidecars, and broken modern IG v446+ UI navigation via native ADD_TO_FEED intent sharing.
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/resources.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/utils.py
+      - test/test_upload_posts.py
