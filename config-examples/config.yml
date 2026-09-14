@@ -81,6 +81,12 @@ telegram-reports: false # for using telegram-reports you have also to configure 
 ## Content Auto-Publishing (queue in accounts/<username>/content_queue/pending)
 upload-posts: false
 upload-rate-limit-hours: 12.0 # minimum hours between automated posts (0 to disable)
+# upload-queue-dir: accounts/myusername/content_queue/pending # optional custom queue directory path
+
+## Reels Explorer & Vision AI Stalker
+# interact-reels: 10-20 # number of explore reels to watch, like, and comment on
+# reels-topic: "dogs or animals" # target topic/niche for Gemini Vision AI evaluation
+# evaluate-percentage: 25 # percentage of reels to evaluate with Vision AI (preserves quota)
 
 ## Special actions
 # pre-script: pre_script_path_here

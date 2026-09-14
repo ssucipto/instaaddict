@@ -1,9 +1,13 @@
 import os
 import re
 import io
+import time
 import logging
-from PIL import Image
+import json
+import sys
+import yaml
 import warnings
+from PIL import Image
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -14,21 +18,19 @@ VISION_API_DEAD = False
 SESSION_API_CALLS = 0
 MAX_API_CALLS_PER_SESSION = 400
 
-import json
-import sys
-import yaml
-
 UNIVERSAL_PERSONA = "Lola the Oz dog. a Jack Russell terrier. she is living in Perth Western Australia."
 try:
     if "--config" in sys.argv:
         idx = sys.argv.index("--config")
-        conf_path = sys.argv[idx+1]
-        with open(conf_path, 'r') as yc:
-            user_conf = yaml.safe_load(yc)
-            if "ai-persona" in user_conf:
-                UNIVERSAL_PERSONA = user_conf["ai-persona"]
-except:
-    pass
+        if idx + 1 < len(sys.argv):
+            conf_path = sys.argv[idx + 1]
+            if os.path.exists(conf_path):
+                with open(conf_path, "r", encoding="utf-8") as yc:
+                    user_conf = yaml.safe_load(yc) or {}
+                    if "ai-persona" in user_conf:
+                        UNIVERSAL_PERSONA = user_conf["ai-persona"]
+except (IndexError, OSError, yaml.YAMLError) as e:
+    logger.debug(f"Could not pre-load ai-persona from CLI config: {e}")
 
 
 
@@ -238,15 +240,7 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
                 continue
             break
     return ""
-import os
-import re
-import io
-import logging
-from PIL import Image
-import warnings
-import google.generativeai as genai
 
-logger = logging.getLogger(__name__)
 
 def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
     """1-Shot VLM: Validates if a reel matches the topic AND generates a comment if true."""

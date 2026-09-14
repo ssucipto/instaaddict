@@ -40,6 +40,12 @@ class InteractReelsPlugin(Plugin):
                 "default": 25,
                 "type": int,
             },
+            {
+                "arg": "--reels-topic",
+                "metavar": "dogs or animals",
+                "default": "dogs or animals",
+                "help": "Target topic or niche for Gemini Vision AI Reel evaluation",
+            },
         ]
 
     def run(self, device, configs, storage, sessions, profile_filter, plugin):
@@ -103,13 +109,14 @@ class InteractReelsPlugin(Plugin):
                 continue
 
             raw_png = d.screenshot(format="raw")
+            reels_topic = getattr(configs.args, "reels_topic", None) or "dogs or animals"
             comment_text = evaluate_and_comment_reel(
-                raw_png, topic=configs.args.reels_topic or "dogs or animals"
+                raw_png, topic=reels_topic
             )
 
             if comment_text:
                 logger.info(
-                    "?? Vision AI Detected Animal! Engaging with target..."
+                    "🐾 Vision AI Detected Target! Engaging with target..."
                 )
                 random_sleep(10, 25)
 
@@ -135,7 +142,7 @@ class InteractReelsPlugin(Plugin):
                     logger.error(f"Reels Stalker Comment Error: {e}")
             else:
                 logger.info(
-                    "?? Non-Animal Reel. Skipping to train algorithm!"
+                    "⏭️ Non-Target Reel. Skipping to train algorithm!"
                 )
                 random_sleep(1, 2)
 

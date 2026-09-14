@@ -37,6 +37,11 @@ class TestUploadPostsPlugin(unittest.TestCase):
         self.assertEqual(rate_arg["metavar"], "12.0")
         self.assertEqual(rate_arg["type"], float)
 
+        self.assertIn("--upload-queue-dir", args_by_name)
+        queue_arg = args_by_name["--upload-queue-dir"]
+        self.assertIn("metavar", queue_arg)
+        self.assertEqual(queue_arg["metavar"], "path/to/queue")
+
     def test_resolve_username_from_cli(self):
         """CLI argument takes highest priority for username resolution."""
         configs = MagicMock()
@@ -276,6 +281,34 @@ class TestUploadPostsPlugin(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(pending_dir, media_file)))
         self.assertFalse(os.path.exists(os.path.join(published_dir, media_file)))
 
+    @patch.object(UploadPostsPlugin, "_upload_to_ig", return_value=True)
+    def test_custom_upload_queue_dir(self, mock_upload):
+        """Verifies that --upload-queue-dir correctly routes to custom directory."""
+        custom_dir = os.path.join(self.test_dir, "my_custom_queue", "pending")
+        published_dir = os.path.join(self.test_dir, "my_custom_queue", "published")
+        os.makedirs(custom_dir, exist_ok=True)
+
+        media_file = "custom_dog.png"
+        with open(os.path.join(custom_dir, media_file), "w") as f:
+            f.write("custom img")
+
+        configs = MagicMock()
+        configs.args.username = "custom_user"
+        configs.args.upload_queue_dir = custom_dir
+        configs.args.upload_rate_limit_hours = 0.0
+
+        session = MagicMock()
+        session.totalUploadsSuccess = 0
+        session.uploadHistory = []
+        sessions = [session]
+
+        device = MagicMock()
+        self.plugin.run(device, configs, None, sessions, None, "upload-posts")
+
+        self.assertTrue(mock_upload.called)
+        self.assertEqual(session.totalUploadsSuccess, 1)
+        self.assertTrue(os.path.exists(os.path.join(published_dir, media_file)))
+
     def test_mediastore_id_parsing(self):
         """Verifies regex extraction of _id from content query output."""
         with patch("subprocess.run") as mock_sub:
@@ -292,3 +325,4 @@ class TestUploadPostsPlugin(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

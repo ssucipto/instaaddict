@@ -64,6 +64,13 @@ def print_full_report(sessions, scrape_mode):
                     f"Total unfollowed: {session.totalUnfollowed}",
                     extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                 )
+                uploads_ok = getattr(session, "totalUploadsSuccess", 0)
+                uploads_fail = getattr(session, "totalUploadsFailed", 0)
+                if uploads_ok > 0 or uploads_fail > 0:
+                    logger.info(
+                        f"Total uploads: {uploads_ok} succeeded, {uploads_fail} failed",
+                        extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                    )
             else:
                 logger.info(
                     f"Total scraped: {_stringify_interactions(session.totalScraped)}",
@@ -167,6 +174,17 @@ def print_full_report(sessions, scrape_mode):
             f"Total unfollowed: {total_unfollowed}",
             extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
         )
+        total_uploads_ok = sum(
+            getattr(session, "totalUploadsSuccess", 0) for session in sessions
+        )
+        total_uploads_fail = sum(
+            getattr(session, "totalUploadsFailed", 0) for session in sessions
+        )
+        if total_uploads_ok > 0 or total_uploads_fail > 0:
+            logger.info(
+                f"Total uploads: {total_uploads_ok} succeeded, {total_uploads_fail} failed",
+                extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+            )
     else:
         logger.info(
             f"Total users scraped: ({total_scraped_num}) {_stringify_interactions(total_scraped)}",

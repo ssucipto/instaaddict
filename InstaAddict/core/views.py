@@ -32,6 +32,11 @@ from InstaAddict.core.utils import (
 
 logger = logging.getLogger(__name__)
 
+# Module-level globals initialized to prevent NameError prior to load_config
+args = None
+configs = None
+ResourceID = None
+
 
 def load_config(config):
     global args
@@ -1524,16 +1529,19 @@ class PostsViewList:
             try:
                 import pytesseract as pt
 
-                owner_name = self.get_text_from_screen(pt, post_owner_obj)
-                if not isinstance(owner_name, str):
-                    owner_name = str(owner_name) if owner_name else ""
+                try:
+                    owner_name = self.get_text_from_screen(pt, post_owner_obj)
+                    if not isinstance(owner_name, str):
+                        owner_name = str(owner_name) if owner_name else ""
+                except pt.TesseractNotFoundError:
+                    logger.error(
+                        "You need to install Tesseract engine in order to use OCR feature."
+                    )
+                except Exception as e:
+                    logger.debug(f"OCR execution failed: {e}")
             except ImportError:
-                logger.error(
-                    "You need to install pytesseract (the wrapper: pip install pytesseract) in order to use OCR feature."
-                )
-            except pt.TesseractNotFoundError:
-                logger.error(
-                    "You need to install Tesseract (the engine: it depends on your system) in order to use OCR feature."
+                logger.debug(
+                    "Pytesseract not installed; skipping OCR owner name extraction."
                 )
         if owner_name and owner_name.startswith("#"):
             is_hashtag = True
@@ -1656,7 +1664,8 @@ class LanguageView:
             resourceId=ResourceID.SEARCH,
             className=ClassName.EDIT_TEXT,
         )
-        search_edit_text.set_text(language, Mode.PASTE if args.dont_type else Mode.TYPE)
+        dont_type = getattr(args, "dont_type", False) if args is not None else False
+        search_edit_text.set_text(language, Mode.PASTE if dont_type else Mode.TYPE)
 
         list_view = self.device.find(
             resourceId=ResourceID.LANGUAGE_LIST_LOCALE,
