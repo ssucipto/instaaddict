@@ -93,6 +93,16 @@ class ResourceID:
         self.LIVE_BADGE_VIEW = f"{APP_ID}:id/live_badge_view"
         self.MEDIA_GROUP = f"{APP_ID}:id/media_group"
         self.MEDIA_CONTENT_LOCATION = f"{APP_ID}:id/media_content_location"
+        self.MEDIA_THUMBNAIL_TRAY_BUTTON = (
+            f"{APP_ID}:id/media_thumbnail_tray_button"
+        )
+        self.MEDIA_THUMBNAIL_TRAY_BUTTON_TEXT = (
+            f"{APP_ID}:id/media_thumbnail_tray_button_text"
+        )
+        self.CAPTION_INPUT_TEXT_VIEW = (
+            f"{APP_ID}:id/caption_input_text_view"
+        )
+        self.SHARE_FOOTER_BUTTON = f"{APP_ID}:id/share_footer_button"
         self.MENU_SETTINGS_ROW = f"{APP_ID}:id/menu_settings_row"
         self.MENU_OPTION_TEXT = f"{APP_ID}:id/menu_option_text"
         self.NEGATIVE_BUTTON = f"{APP_ID}:id/negative_button"

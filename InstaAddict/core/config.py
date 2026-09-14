@@ -123,12 +123,16 @@ class Config:
                                 action=arg.get("action", None),
                             )
                         else:
+                            kwargs = {
+                                "nargs": arg.get("nargs", None),
+                                "help": arg.get("help", None),
+                                "default": arg.get("default", None),
+                            }
+                            if "metavar" in arg and arg["metavar"] is not None:
+                                kwargs["metavar"] = arg["metavar"]
                             self.parser.add_argument(
                                 arg["arg"],
-                                nargs=arg["nargs"],
-                                help=arg["help"],
-                                metavar=arg["metavar"],
-                                default=arg["default"],
+                                **kwargs,
                             )
                         if arg.get("operation", False):
                             self.actions[arg["arg"][2:]] = plugin

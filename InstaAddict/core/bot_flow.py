@@ -335,12 +335,13 @@ def start_bot(**kwargs):
                 unfollow_jobs.remove(plugin)
                 print_limits = True
             else:
-                if active_limits_reached:
+                if active_limits_reached and plugin != "upload-posts":
                     logger.warning(
                         f"Can't perform {plugin} job because a limit for active-jobs has been reached."
                     )
                     print_limits = None
-                    if unfollow_jobs:
+                    remaining_jobs = jobs_list[jobs_list.index(plugin) :]
+                    if unfollow_jobs or "upload-posts" in remaining_jobs:
                         continue
                     else:
                         logger.info(

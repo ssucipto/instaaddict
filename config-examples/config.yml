@@ -78,6 +78,10 @@ delete-removed-followers: true
 # analytics: false # no more supported
 telegram-reports: false # for using telegram-reports you have also to configure telegram.yml in your account folder
 
+## Content Auto-Publishing (queue in accounts/<username>/content_queue/pending)
+upload-posts: false
+upload-rate-limit-hours: 12.0 # minimum hours between automated posts (0 to disable)
+
 ## Special actions
 # pre-script: pre_script_path_here
 # post-script: post_script_path_here

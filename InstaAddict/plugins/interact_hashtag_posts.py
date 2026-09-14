@@ -61,6 +61,7 @@ class InteractHashtagPosts(Plugin):
                 "arg": "--hashtags-file",
                 "nargs": "?",
                 "help": "custom path to hashtags.yml (defaults to accounts/<username>/hashtags.yml)",
+                "metavar": "hashtags.yml",
                 "default": None,
             },
         ]

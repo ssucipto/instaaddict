@@ -147,9 +147,16 @@ InstaAddict introduces major architectural enhancements, new subsystems, and cri
 ---
 
 ### 7. Autonomous Content Queue & Post Uploader
-- **Local Content Queuing (`UploadPostsPlugin`)**: Reads scheduled media from `accounts/<username>/upload_queue/`.
-- **Automatic Formatting**: Automatically adjusts aspect ratios, trims videos, applies spintax or AI-generated captions, and appends optimized hashtag arrays.
-- **Session State Telemetry**: Persists upload attempts, success/failure counts, and detailed media logs in `sessions.json`.
+- **Native Intent Architecture (`com.instagram.share.ADD_TO_FEED`)**: Bypasses fragile tab navigation, bottom navigation bars, and Android file pickers by pushing queued media directly to device storage, registering it with the Android MediaStore (`content://media/external/images/media/<id>`), and dispatching an explicit intent to Instagram's `ShareHandlerActivity`.
+- **Dual Content Queue Paths**: Supports modern `accounts/<username>/content_queue/pending/` as well as legacy `upload_queue/` with case-insensitive media matching (`.jpg`, `.jpeg`, `.png`, `.mp4`).
+- **Flexible Captioning & Sidecars**:
+  - *Raw Text Sidecars*: Plain text `.txt` sidecars (e.g. `photo.txt`).
+  - *Structured JSON Sidecars*: Rich metadata `.json` sidecars (e.g. `{"caption": "..."}`).
+  - *Multimodal AI Fallback*: Uses Gemini Vision AI to automatically generate contextual captions when no sidecar file is present.
+- **Configurable Rate Limiting**: Added `--upload-rate-limit-hours` (default: `12.0` hours, set to `0` to disable) to enforce safe cadences and prevent over-posting.
+- **Interaction Limit Decoupling**: Uploads are decoupled from interaction quotas (likes/follows), ensuring scheduled content publishes reliably even when daily engagement targets have been met.
+- **Modern IG v446+ Composer Automation**: Multi-step composer automation (Next buttons via `media_thumbnail_tray_button`, dismissal of modal dialogs, typing into `caption_input_text_view`, tapping `share_footer_button`, and verifying return to the Home feed).
+- **Post-Upload Archiving**: Successfully published media and sidecars are automatically archived to `content_queue/published/`.
 
 ---
 
@@ -344,6 +351,7 @@ InstaAddict features rich command-line flags and configuration files:
 | `--ignore-non-bot-cache`| Bypasses the non-bot cache during unfollow operations. |
 | `--evaluate-percentage <0-100>` | Percentage of posts to evaluate with Gemini Vision AI. |
 | `--upload-posts` | Enables the autonomous post uploader plugin. |
+| `--upload-rate-limit-hours <float>` | Minimum hours between post uploads (default: 12.0, 0 to disable). |
 | `--upload-queue-dir <path>` | Custom path to the upload media queue directory. |
 
 ### Configuration Files Overview
@@ -358,7 +366,8 @@ accounts/<your_username>/
 ├── discovered_hashtags.json  # Harvested caption hashtag frequency counts
 ├── history.md                # Continuous, non-overwritten markdown run history
 ├── reports/                  # Timestamped per-session analytics markdown reports
-└── upload_queue/             # Scheduled image/video media files ready for publishing
+├── content_queue/            # Autonomous post queue (pending/ and published/ archives)
+└── upload_queue/             # Legacy upload directory (backwards-compatible)
 ```
 
 <br />
