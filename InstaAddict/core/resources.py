@@ -201,6 +201,11 @@ class ResourceID:
         self.SPONSORED_CONTENT_SERVER_RENDERED_ROOT = (
             f"{APP_ID}:id/sponsored_content_server_rendered_root"
         )
+        self.FEED_TAB = f"{APP_ID}:id/feed_tab"
+        self.SEARCH_TAB = f"{APP_ID}:id/search_tab"
+        self.CLIPS_TAB = f"{APP_ID}:id/clips_tab"
+        self.DIRECT_TAB = f"{APP_ID}:id/direct_tab"
+        self.PROFILE_TAB = f"{APP_ID}:id/profile_tab"
         self.TAB_AVATAR = f"{APP_ID}:id/tab_avatar"
         self.TAB_BAR = f"{APP_ID}:id/tab_bar"
         self.TAB_BUTTON_NAME_TEXT = f"{APP_ID}:id/tab_button_name_text"

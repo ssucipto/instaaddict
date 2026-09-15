@@ -1,4 +1,4 @@
-﻿with open("agent/memory/audit-carryovers.md", "r") as f:
+with open("agent/memory/audit-carryovers.md", "r") as f:
     text = f.read()
 
 text = text.replace(

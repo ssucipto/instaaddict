@@ -1,4 +1,4 @@
-﻿import re
+import re
 
 with open("dump_screen.xml", "r", encoding="utf-8") as f:
     xml = f.read()

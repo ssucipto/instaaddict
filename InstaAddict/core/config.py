@@ -115,6 +115,15 @@ class Config:
             if plugin.arguments:
                 for arg in plugin.arguments:
                     try:
+                        arg_name = arg.get("arg")
+                        if arg_name and arg_name in self.parser._option_string_actions:
+                            logger.debug(
+                                f"Argument '{arg_name}' already registered; skipping duplicate for {plugin.__class__.__name__}."
+                            )
+                            if arg.get("operation", False):
+                                self.actions[arg_name[2:]] = plugin
+                            continue
+
                         action = arg.get("action", None)
                         if action:
                             self.parser.add_argument(
@@ -138,7 +147,7 @@ class Config:
                             self.actions[arg["arg"][2:]] = plugin
                     except Exception as e:
                         logger.error(
-                            f"Error while importing arguments of plugin {plugin.__class__.__name__}. Error: Missing key from arguments dictionary - {e}"
+                            f"Error while importing argument '{arg.get('arg', 'unknown')}' of plugin {plugin.__class__.__name__}: {e}"
                         )
 
     def parse_args(self):

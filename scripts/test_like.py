@@ -1,4 +1,4 @@
-﻿import uiautomator2 as u2
+import uiautomator2 as u2
 
 d = u2.connect("emulator-5554")
 btn = d(resourceId="com.instagram.android:id/row_feed_button_like")

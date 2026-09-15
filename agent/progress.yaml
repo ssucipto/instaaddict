@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.1.0
+  version: 1.2.0
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -87,6 +87,16 @@ milestones:
   completed: '2026-09-14'
   notes: Overhauled UploadPostsPlugin with case-insensitive discovery, .txt/.json sidecars, configurable rate limits, decoupled job scheduling in bot_flow, native ADD_TO_FEED intent sharing, and exception hardening. Remediated implementation gaps and uninitialized globals (Route-042).
   file: agent/milestones/milestone-8-auto-upload-pipeline.md
+- id: M9
+  name: Two-Way Telegram Content Ingestion, Remote Media Queueing & Mobile Bot Command Engine
+  status: completed
+  progress: 100
+  tasks_total: 1
+  tasks_completed: 1
+  started: 2026-09-14
+  completed: '2026-09-14'
+  notes: Implemented two-way mobile Telegram workflow for photo ingestion with caption sidecars into content_queue/pending/, strict whitelist authorization, interactive bot commands (/queue, /status, /help), responsive 20-second interval polling during session sleep, and automated upload success/failure notifications.
+  file: agent/milestones/milestone-9-telegram-two-way-ingestion.md
 tasks:
   milestone_1:
   - id: task-1
@@ -279,6 +289,17 @@ tasks:
     actual_hours: 3
     route_file: agent/routing/tasks/route-042-comprehensive-audit-review-remediation.md
     notes: Remediated all 9 findings from Audit #043 and Review #034 (zero shortcuts). Resolved missing CLI arguments (--reels-topic, --upload-queue-dir), safe getattr fallbacks, module global initialization in views.py and interaction.py, OCR UnboundLocalError and crash safety, shutil.move cross-filesystem file moves, composer modal regex expansion, bare except cleanup in gemini_vision.py, upload telemetry in full print report, and restored corrupted Unicode. 72/72 tests passing.
+  milestone_9:
+  - id: task-37
+    name: Two-Way Telegram Content Ingestion, Remote Media Queueing & Mobile Bot Command Engine
+    priority: 1
+    status: completed
+    started: 2026-09-14
+    completed_date: '2026-09-14'
+    estimated_hours: 3
+    actual_hours: 2.5
+    route_file: agent/routing/tasks/route-045-two-way-telegram-content-ingestion.md
+    notes: Implemented getUpdates polling with persistent last_update_id tracking, photo download to content_queue/pending/, caption extraction to .txt sidecar, whitelist security, interactive /queue, /status, /help commands, upload notifications, and responsive sleep polling. 93/93 tests passing.
 documentation:
   design_documents: 1
   milestone_documents: 5
@@ -292,6 +313,37 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-14
+  description: 'Completed Milestone 9: Two-Way Telegram Content Ingestion, Remote Media Queueing & Mobile Bot Command Engine (Route-045).'
+  items:
+  - "✓ Added getUpdates polling with atomic last_update_id persistence in accounts/<user>/telegram_state.json"
+  - "✓ Implemented strict sender authorization checking against telegram-chat-id"
+  - "✓ Automated high-res photo downloading via getFile and staged into accounts/<user>/content_queue/pending/<id>.jpg"
+  - "✓ Saved accompanying Telegram captions into <id>.txt sidecars for automatic ingestion by UploadPostsPlugin"
+  - "✓ Built interactive commands /queue (content status), /status (live telemetry), and /help"
+  - "✓ Dispatched rich Markdown status notifications to Telegram on upload success and failure"
+  - "✓ Refactored wait_for_next_session into 20s sliced sleep intervals for responsive mobile message polling"
+  - "✓ Resolved uiautomator2 startup crash on Android SDK 37 / emulator-5554 with dynamic runner detection"
+  - "✓ Created 5-case test suite (test_telegram_inbox.py) with 100% pass rate (93/93 total repo tests passing)"
+  - "✓ Authored audit-047 and route-045"
+- date: 2026-09-14
+  description: 'Remediated Audit #045, Audit #046, Review #035, and live crash action plan across route-043 and route-044.'
+  items:
+  - "✓ Resolved argument collision on --reels-topic and added duplicate collision guard in Config.load_plugins"
+  - "✓ Wrapped interactive input() calls with KeyboardInterrupt and EOFError handlers in decorators.py and bot_flow.py"
+  - "✓ Prioritized modern tab bar resource IDs (FEED_TAB, SEARCH_TAB, CLIPS_TAB, DIRECT_TAB, PROFILE_TAB) in views.py TabBarView"
+  - "✓ Added error=False suppression in ProfileView.getUsername to eliminate speculative pre-navigation false-alarm errors"
+  - "✓ Fixed report file path formatting in DataAnalytics using os.path.join(storage.report_path, ...)"
+  - "✓ Accelerated search recovery in bot_flow.py by tapping ACTION_BAR_BUTTON_BACK directly"
+  - "✓ Prioritized CLIPS_AUTHOR_USERNAME and excluded CLIPS_AUTHOR_PROFILE_PIC in Owner.OPEN to prevent Reels Story trapping"
+  - "✓ Eliminated 60-120s freeze in filter.py on failed profile load, returning unloaded Profile immediately"
+  - "✓ Bypassed feed media container loops and downward swipes in _like_in_post_view and _check_if_liked on Reels"
+  - "✓ Protected sys.excepthook in log.py against interrupt crashes, ensuring double Ctrl-C exits cleanly with code 0"
+  - "✓ Guarded against uninitialized args.disable_filters in filter.py fallback warning"
+  - "✓ Differentiated KeyboardInterrupt (clean exit) from EOFError (headless run) at untested IG version prompt"
+  - "✓ Enhanced Reels like detection with get_selected() and unlike regex matching in views.py"
+  - "✓ Authored route-043, route-044, audit-045, audit-046, and review-035"
+  - "✓ Created 12-case test suite (test_runtime_hardening.py) with 84/84 tests passing (100% pass rate)"
 - date: 2026-09-14
   description: 'Remediated Audit #043 and Review #034 findings across core, plugins, and CLI interfaces (Route-042).'
   items:
@@ -356,6 +408,19 @@ recent_work:
   - "✓ Added --expand-hashtags, --no-harvest-hashtags, and --hashtags-file CLI flags to interact_hashtag_posts.py"
   - "✓ Created 9-case unit test suite (test_hashtag_manager.py) with 100% pass rate"
   - "✓ Authored audit-033, audit-034, audit-035, audit-036, and review-031 reports"
+- date: 2026-09-15
+  description: 'Telegram Two-Way Ingestion, AI Retry Architecture & Upload Scheduling Resilience.'
+  items:
+  - "✓ Configured and verified Telegram Bot integration for accounts/lolatheozjack with telegram-inbox and telegram-reports"
+  - "✓ Built diagnostic and interactive long-polling listener scripts/check_telegram.py with Windows UTF-8 console support"
+  - "✓ Implemented companion comment attachment to queued photos and interactive /elaborate and /caption commands"
+  - "✓ Migrated Google Gemini Vision API calls from gemini-3.7-flash to recommended gemini-3.6-flash"
+  - "✓ Implemented 5-attempt retry loop with exponential backoff on transient HTTP 500/503/504 and empty caption responses"
+  - "✓ Implemented mandatory caption elaboration and hashtag enrichment pre-upload in UploadPostsPlugin"
+  - "✓ Prioritized upload-posts at index 0 of jobs_list to eliminate upload starvation from shuffled interaction crashes"
+  - "✓ Fixed ACP-01 Agent Directive header casing in agent/commands/acp.proceed.md"
+  - "✓ Authored audit-051 and review-039 reports with 100% ACP 64-rule compliance"
+  - "✓ Verified all 6/6 ACP CI fast gates passing and 117/117 unit tests green"
 - date: 2026-09-13
   description: 'Implemented Persistent Non-Bot Followings Cache and Fast-Skip Unfollow Optimization.'
   items:

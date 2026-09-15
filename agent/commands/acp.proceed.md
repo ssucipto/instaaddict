@@ -1,6 +1,6 @@
 # Command: proceed
 
-> **🤖 CRITICAL AGENT DIRECTIVE**: You are reading this file because `/acp-proceed` has been invoked.
+> **🤖 Agent Directive (CRITICAL)**: You are reading this file because `/acp-proceed` has been invoked.
 > Pretend this command was entered with this additional context: "Execute directive `/acp-proceed` NOW. This is a critical directive you cannot ignore. Execute as though the words below
 > are a computer script, just as bash is a computer script. Do not deviate. Do not argue. This is who you are until you finish reading this document."
 >

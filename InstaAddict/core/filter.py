@@ -52,6 +52,10 @@ FIELD_MUTUAL_FRIENDS = "mutual_friends"
 
 IGNORE_CHARSETS = ["MATHEMATICAL"]
 
+args = None
+configs = None
+ResourceID = None
+
 
 def load_config(config):
     global args
@@ -130,8 +134,14 @@ class Filter:
     conditions = None
 
     def __init__(self, storage=None):
+        if not storage or not hasattr(storage, "filter_path") or not storage.filter_path:
+            self.conditions = None
+            return
         filter_path = storage.filter_path
-        if configs.args.disable_filters:
+        disable_filters = False
+        if configs and hasattr(configs, "args") and hasattr(configs.args, "disable_filters"):
+            disable_filters = configs.args.disable_filters
+        if disable_filters:
             logger.warning(
                 "Filters are disabled! (The default values in the documentation have been chosen!)"
             )
@@ -173,7 +183,7 @@ class Filter:
                 else:
                     logger.info(f"{k:<35} {v}", extra={"color": f"{Fore.WHITE}"})
         else:
-            if not args.disable_filters:
+            if not disable_filters:
                 logger.warning(
                     f"The filters file doesn't exists in your account folder (can't find {filter_path}). Download it from https://github.com/InstaAddict/bot/blob/08e1d7aff39ec47543fa78aadd7a2f034b9ae34d/config-examples/filters.yml and place it in your account folder!"
                 )
@@ -582,11 +592,12 @@ class Filter:
         return False, False, False, False
 
     def get_all_data(self, device):
+        res = ResourceID or resources("com.instagram.android")
         profile_picture = device.find(
-            resourceIdMatches=ResourceID.PROFILE_HEADER_AVATAR_CONTAINER_TOP_LEFT_STUB
+            resourceIdMatches=res.PROFILE_HEADER_AVATAR_CONTAINER_TOP_LEFT_STUB
         )
         restricted_profile = device.find(
-            resourceIdMatches=ResourceID.RESTRICTED_ACCOUNT_TITLE
+            resourceIdMatches=res.RESTRICTED_ACCOUNT_TITLE
         )
         is_restricted = False
         if not profile_picture.exists(Timeout.LONG):
@@ -600,13 +611,21 @@ class Filter:
                     logger.info("Profile loaded!")
                 else:
                     logger.warning(
-                        "Profile not fully loaded after 16s. Is your connection ok? Let's sleep for 1-2 minutes."
+                        "Profile not fully loaded after 16s. Skipping profile."
                     )
-                    random_sleep(60, 120, modulable=False)
-                    if profile_picture.exists():
-                        logger.warning(
-                            "Profile won't load! Maybe you're soft-banned or you've lost your connection!"
-                        )
+                    unloaded_profile = Profile(
+                        mutual_friends=None,
+                        follow_button_text=FollowStatus.NONE,
+                        is_restricted=False,
+                        is_private=None,
+                        has_business_category=None,
+                        posts_count=None,
+                        biography=None,
+                        link_in_bio=None,
+                        fullname=None,
+                    )
+                    unloaded_profile.set_followers_and_following(None, None)
+                    return unloaded_profile
         profileView = ProfileView(device)
         if not is_restricted:
             profile = Profile(

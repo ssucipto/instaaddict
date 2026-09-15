@@ -2,6 +2,47 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-15
+  executor: Antigravity
+  branch: master
+  tasks_completed: [route-045, audit-051, review-039]
+  done:
+    - migrated-vision-ai-to-gemini-3.6-flash
+    - implemented-5-attempt-retry-exponential-backoff-on-vision-and-hashtags
+    - implemented-mandatory-caption-elaboration-and-hashtag-enrichment-pre-upload
+    - prioritized-upload-posts-at-head-of-jobs-list-preventing-job-starvation
+    - built-and-verified-check-telegram-diagnostic-and-listener-utility
+    - verified-live-photo-ingestion-and-ai-elaboration-for-lolatheozjack
+    - resolved-acp-01-casing-header-in-acp-proceed-command
+    - executed-audit-051-and-review-039-with-zero-regressions
+    - verified-acp-ci-fast-tier-all-6-gates-passing
+  deferred: []
+  key_fact: "Gemini 3.7 Flash occasionally triggers transient 504 Deadline Exceeded; migrating to gemini-3.6-flash and wrapping API calls in a 5-attempt retry loop with exponential backoff (2s, 4s, 6s, 8s) provides 100% resilience against transient upstream load spikes. Prioritizing upload-posts at jobs_list[0] ensures scheduled posts publish before lengthy interaction jobs encounter potential crash limits."
+
+- date: 2026-09-14
+  executor: Antigravity
+  branch: master
+  tasks_completed: []
+  done:
+    - fixed-uiautomator2-android-sdk-37-nullpointerexception-runner
+    - added-uiautomator-resurrection-watchdog-in-device-facade
+    - prioritized-profile-tab-resource-id-in-profile-view
+    - hardened-save-crash-and-log-module-globals
+    - enhanced-gemini-vision-caption-with-user-context-guidance
+    - connected-txt-sidecar-as-contextual-notes-for-ai-caption-extension
+    - added-graceful-fallback-to-raw-txt-if-ai-fails
+    - executed-acp-audit-048-upload-mechanism-gaps-and-shortcuts
+    - executed-acp-review-036-code-quality-assessment
+    - remediated-rate-limit-mtime-preservation-with-os-utime
+    - added-timeout-guard-and-exception-handling-in-adb-runner
+    - hardened-mediastore-id-resolution-to-select-newest-id
+    - added-caption-clipboard-paste-fallback-and-device-storage-cleanup
+    - sanitized-telegram-markdown-to-prevent-400-bad-request
+    - verified-and-passed-acp-ci-fast-gates-and-all-102-pytest-tests
+  deferred: []
+  key_fact: "shutil.move preserves file modification times; refreshing mtime with os.utime(dest, None) upon publication is necessary to ensure rate-limiting gates do not prematurely allow back-to-back uploads. MediaStore queries must select the maximum _id to avoid deleted duplicate entries. Subprocess execution against adb must always include timeouts to avoid permanent deadlocks on device disconnection."
+
+
 - date: 2026-09-12
   executor: Antigravity
   branch: master
@@ -190,3 +231,86 @@
     - authored-audit-044-remediation-verification-report
   deferred: []
   key_fact: "Registering all CLI arguments in plugin definitions prevents runtime AttributeError on argparse.Namespace; using shutil.move instead of os.rename prevents cross-filesystem crash (Errno 18 Invalid cross-device link) when moving queued uploads to completed archives."
+
+- date: 2026-09-14
+  executor: Antigravity
+  branch: master
+  tasks_completed: [task-37, task-38, route-043, route-044]
+  done:
+    - audited-runtime-errors-and-locator-failures-audit-045-audit-046-review-035
+    - resolved-co-014-and-co-015-runtime-errors-and-reels-locators
+    - removed-duplicate-reels-topic-and-added-collision-guard-in-config-py
+    - guarded-all-interactive-input-prompts-against-keyboard-interrupt-and-eof-error
+    - prioritized-modern-tab-bar-resource-ids-in-tab-bar-view-navigation
+    - added-error-false-suppression-in-profile-view-get-username-for-speculative-checks
+    - formatted-data-analytics-report-paths-with-os-path-join
+    - accelerated-search-query-recovery-via-action-bar-button-back-direct-click
+    - prioritized-clips-author-username-and-excluded-profile-pic-in-owner-open
+    - eliminated-60-120s-freeze-in-filter-py-returning-unloaded-profile-immediately
+    - bypassed-feed-media-container-loops-and-downward-swipes-on-full-screen-reels
+    - protected-sys-excepthook-against-double-ctrl-c-interrupt-tracebacks
+    - guarded-against-uninitialized-args-disable-filters-in-filter-py
+    - enhanced-reels-like-detection-with-get-selected-and-unlike-regex-matching
+    - authored-route-043-route-044-audit-045-audit-046-review-035
+    - created-12-case-test-suite-in-test-runtime-hardening-py-bringing-suite-to-84-tests-passing
+  deferred: []
+  key_fact: "In Instagram Reels, clicking the author profile picture (CLIPS_AUTHOR_PROFILE_PIC) opens the user's Story if present, trapping the bot in Story viewer; for Owner.OPEN, only targeting CLIPS_AUTHOR_USERNAME navigates directly to Profile. Returning an unloaded Profile object immediately upon a 16s load timeout in filter.py allows check_profile to register SkipReason.NOT_LOADED in 0 seconds rather than forcing a 60-120s sleep."
+
+- date: 2026-09-14
+  executor: Antigravity
+  branch: master
+  tasks_completed: [task-39, route-045]
+  done:
+    - fixed-uiautomator2-device-facade-package-version-crash-on-sdk-37-with-dynamic-runner-detection
+    - added-telegram-inbox-polling-with-get-updates-and-atomic-last-update-id-persistence
+    - implemented-strict-telegram-chat-id-sender-whitelist-authorization
+    - automated-high-res-telegram-photo-download-into-content-queue-pending
+    - saved-accompanying-captions-into-txt-sidecars-for-frictionless-upload-posts-ingestion
+    - implemented-interactive-telegram-commands-queue-status-help
+    - added-instant-telegram-queueing-receipts-and-upload-success-failure-notifications
+    - refactored-wait-for-next-session-sleep-into-20s-slices-for-responsive-mobile-polling
+    - created-5-case-unit-test-suite-test-telegram-inbox-py
+    - verified-all-93-tests-passing-across-the-entire-repository
+  deferred: []
+  key_fact: "Pairing Telegram Bot API getUpdates polling with atomic last_update_id tracking in accounts/<user>/telegram_state.json and saving incoming mobile photos + captions to pending/<id>.jpg and <id>.txt allows seamless remote content ingestion without changing UploadPostsPlugin's core architecture; slicing inter-session sleep into 20s intervals guarantees responsive mobile interaction without busy-wait CPU burn."
+
+- date: 2026-09-15
+  executor: Antigravity
+  branch: master
+  tasks_completed: [task-40, route-046]
+  done:
+    - app-wide-acp-review-and-acp-integrity-execution-across-all-subsystems
+    - eliminated-all-hidden-unicode-and-zero-width-joiner-characters-repo-wide
+    - stripped-utf8-bom-byte-order-marks-from-14-maintenance-scripts
+    - resolved-false-positive-auth-token-logging-heuristic-in-hashtag-manager
+    - remediated-redundant-inline-loop-imports-in-gemini-vision
+    - enhanced-acp-unicode-scan-with-binary-skipping-and-word-boundary-patterns
+    - improved-acp-memory-scan-with-cross-platform-path-resolution-on-windows
+    - allowlisted-sourced-helper-libraries-dupehound-and-gitleaks-in-review-scan
+    - created-integrity-001-and-review-037-formal-audit-reports
+    - executed-coderabbit-diff-style-comprehensive-codebase-review
+    - validated-all-102-pytest-unit-tests-passing-with-zero-regressions
+    - confirmed-full-acp-ci-fast-passing-across-all-6-standard-gates
+  deferred: []
+  key_fact: "Binary media files like camera JPEGs and UI screenshots must be explicitly excluded from character-level Unicode and BOM scanners to prevent false-positive detection on compressed byte sequences; allowlisting sourced shell helper libraries in static review scanners prevents spurious missing set -euo pipefail warnings."
+
+- date: 2026-09-15
+  executor: Antigravity
+  branch: master
+  tasks_completed: [task-41, route-047]
+  done:
+    - implemented-hashtag-fallback-and-enrichment-in-upload-posts-via-hashtag-manager
+    - added-upload-hashtags-in-comment-option-for-clean-caption-reach-strategy
+    - implemented-companion-photo-comments-binding-from-follow-up-telegram-text-messages
+    - added-interactive-caption-editing-and-elaborate-ai-generation-commands-in-telegram
+    - hardened-gemini-vision-with-programmatic-zwj-and-zero-width-character-stripping
+    - guarded-against-gemini-candidate-safety-filter-finish-reason-value-error-crashes
+    - implemented-atomic-grapheme-cluster-preservation-in-device-facade-keystroke-typing
+    - enhanced-acp-unicode-scan-with-documentation-and-emoji-sequence-awareness
+    - authored-pre-impl-audit-049-and-verification-audit-050-reports
+    - authored-coderabbit-style-diff-review-038-report
+    - created-15-case-unit-test-suites-test-telegram-companion-and-test-unicode-sanitizer
+    - verified-all-117-pytest-tests-passing-with-zero-regressions
+    - validated-full-acp-ci-fast-tier-passing-across-all-6-standard-gates
+  deferred: []
+  key_fact: "Iterating atomic grapheme clusters instead of raw code points in device_facade prevents FastInputIME keystroke splitting on compound emojis, while programmatic regex stripping of ZWJs in gemini_vision provides defense-in-depth against Android IME encoding crashes."

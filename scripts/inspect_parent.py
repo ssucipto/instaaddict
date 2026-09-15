@@ -1,4 +1,4 @@
-﻿import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET
 
 tree = ET.parse("dump_screen.xml")
 root = tree.getroot()

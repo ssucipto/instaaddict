@@ -1,5 +1,6 @@
 import logging
 import random
+import sys
 from datetime import datetime, timedelta
 from time import sleep
 
@@ -49,6 +50,7 @@ from InstaAddict.core.utils import (
     stop_bot,
     wait_for_next_session,
 )
+from InstaAddict.core.resources import ResourceID
 from InstaAddict.core.views import (
     AccountView,
     ProfileView,
@@ -126,6 +128,15 @@ def start_bot(**kwargs):
         if not inside_working_hours:
             wait_for_next_session(time_left, session_state, sessions, device)
         pre_post_script(path=configs.args.pre_script)
+        if getattr(configs.args, "telegram_inbox", False) or getattr(
+            configs.args, "telegram_reports", False
+        ):
+            try:
+                from InstaAddict.plugins.telegram import check_telegram_inbox
+
+                check_telegram_inbox(configs.args.username)
+            except Exception as e:
+                logger.debug(f"check_telegram_inbox loop error: {e}")
         if configs.args.restart_atx_agent:
             restart_atx_agent(device)
         get_device_info(device)
@@ -174,7 +185,15 @@ def start_bot(**kwargs):
                         logger.warning(
                             "If you want to avoid pressing ENTER next run, add allow-untested-ig-version: true in your config.yml file. (read the docs for more info)"
                         )
-                        input()
+                        try:
+                            input()
+                        except KeyboardInterrupt:
+                            logger.info("Bot aborted by user at version prompt.")
+                            sys.exit(0)
+                        except EOFError:
+                            logger.info(
+                                "Proceeding with untested IG version (non-interactive session detected)."
+                            )
                     else:
                         logger.info(
                             "Proceeding with untested IG version (allow-untested-ig-version is enabled)."
@@ -256,6 +275,9 @@ def start_bot(**kwargs):
             jobs_list.remove("telegram-reports")
             if configs.args.telegram_reports:
                 telegram_reports_at_end = True
+        if "upload-posts" in jobs_list:
+            jobs_list.remove("upload-posts")
+            jobs_list.insert(0, "upload-posts")
         print_limits = True
         unfollow_jobs = [x for x in jobs_list if "unfollow" in x]
         logger.info(
@@ -289,15 +311,22 @@ def start_bot(**kwargs):
                     extra={"color": f"{Fore.CYAN}"},
                 )
                 break
-            if profile_view.getUsername() != session_state.my_username:
+            if profile_view.getUsername(error=False) != session_state.my_username:
                 logger.debug("Not in your main profile.")
                 recovered = False
                 for _ in range(5):
                     if tab_bar_view.is_tab_bar_visible():
                         recovered = True
                         break
-                    logger.debug("Tab bar not visible, go back.")
-                    device.back()
+                    back_btn = device.find(
+                        resourceIdMatches=ResourceID.ACTION_BAR_BUTTON_BACK
+                    )
+                    if back_btn.exists():
+                        logger.debug("Tapping action_bar_button_back to exit search.")
+                        back_btn.click()
+                    else:
+                        logger.debug("Tab bar not visible, go back.")
+                        device.back()
                     random_sleep(1, 2, modulable=False)
                 if recovered:
                     tab_bar_view.navigateToProfile()

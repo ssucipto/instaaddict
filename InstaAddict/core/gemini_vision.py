@@ -35,7 +35,14 @@ except (IndexError, OSError, yaml.YAMLError) as e:
 
 
 def _sanitize_response(text: str) -> str:
-    """Regex block to prevent LLM outings like 'I cannot assist'."""
+    """Sanitizes LLM outputs: strips hidden zero-width Unicode/ZWJ characters, skin tones, and AI outings."""
+    if not text:
+        return ""
+    # Strip zero-width and invisible control characters (ZWJ U+200D, ZWSP U+200B, BOM U+FEFF, soft hyphen, bidi overrides)
+    text = re.sub(r"[\u200B-\u200D\uFEFF\u00AD\u200E\u200F\u202A-\u202E\u2066-\u2069]", "", text)
+    # Strip emoji skin-tone modifiers (U+1F3FB - U+1F3FF) to avoid compound mojibake on Android IME
+    text = re.sub(r"[\U0001F3FB-\U0001F3FF]", "", text)
+
     forbidden = re.compile(
         r"(AI|language model|cannot assist|safety reasons|I'm an AI|As an AI|I can't|sorry)", 
         re.IGNORECASE
@@ -46,6 +53,23 @@ def _sanitize_response(text: str) -> str:
     
     text = text.replace('"', '').strip()
     return text
+
+
+def _safe_extract_text(response, default: str = "") -> str:
+    """Safely extracts text from Gemini response without throwing on safety blocks or empty candidates."""
+    if not response:
+        return default
+    try:
+        if hasattr(response, "candidates") and response.candidates:
+            candidate = response.candidates[0]
+            finish_reason = getattr(candidate, "finish_reason", None)
+            if str(finish_reason) in ("2", "FinishReason.SAFETY", "SAFETY"):
+                logger.warning("Gemini Vision response blocked by safety filter (finish_reason=2).")
+                return default
+        return response.text
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+        return default
 
 def get_vision_comment(device, _reserved: str = '') -> str:
     global VISION_API_DEAD, SESSION_API_CALLS
@@ -91,7 +115,7 @@ def get_vision_comment(device, _reserved: str = '') -> str:
             )
 
             model = genai.GenerativeModel(
-                model_name='gemini-3.7-flash',
+                model_name='gemini-3.6-flash',
                 system_instruction=system_prompt,
                 generation_config=genai.GenerationConfig(
                     max_output_tokens=150,
@@ -112,12 +136,10 @@ def get_vision_comment(device, _reserved: str = '') -> str:
                 request_options={"timeout": 30.0}
             )
             
-            try:
-                comment = response.text
-                return _sanitize_response(comment)
-            except (ValueError, AttributeError) as e:
-                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+            comment = _safe_extract_text(response)
+            if not comment:
                 return ""
+            return _sanitize_response(comment)
             
         except Exception as e:
             error_msg = str(e)
@@ -142,7 +164,11 @@ def get_vision_comment(device, _reserved: str = '') -> str:
     return ""
 
 
-def get_vision_caption(media_path: str, persona: str = "casual Instagram user") -> str:
+def get_vision_caption(
+    media_path: str,
+    persona: str = "casual Instagram user",
+    user_context: str = "",
+) -> str:
     global VISION_API_DEAD, SESSION_API_CALLS
     
     if VISION_API_DEAD:
@@ -162,7 +188,8 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
     SESSION_API_CALLS += 1
     genai.configure(api_key=api_key)
     
-    for attempt in range(3):
+    max_retries = 5
+    for attempt in range(max_retries):
         try:
             mime = "video/mp4" if media_path.lower().endswith(('.mp4', '.mov')) else "image/jpeg"
             
@@ -176,19 +203,29 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
                 img.thumbnail((512, 512), Image.Resampling.LANCZOS)
                 media_item = img
             
-            
             # Override local argument with global if available
             active_persona = UNIVERSAL_PERSONA if UNIVERSAL_PERSONA else persona
+
+            context_clause = ""
+            if user_context and str(user_context).strip():
+                context_clause = (
+                    f" The user provided this contextual guidance / draft notes about the post: '{user_context.strip()}'. "
+                    "Incorporate and extend these notes naturally based on what you visually observe in the media. "
+                    "Blend the user's intent smoothly into your persona's authentic voice."
+                )
+
             system_prompt = (
                 f"You are managing an Instagram account. Your Persona: '{active_persona}'. "
-                "Look at this media payload. Write a concise, highly organic caption (1-2 short sentences). "
+                "Look at this media payload."
+                f"{context_clause} "
+                "Write a concise, highly organic caption (1-2 short sentences). "
                 "Then, add exactly 3-5 highly relevant hashtags. "
                 "UNDER ABSOLUTELY NO CIRCUMSTANCES CAN YOU USE THE '@' SYMBOL OR TAG ANY USERS! "
                 "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text)."
             )
 
             model = genai.GenerativeModel(
-                model_name='gemini-3.7-flash',
+                model_name='gemini-3.6-flash',
                 system_instruction=system_prompt,
                 generation_config=genai.GenerationConfig(
                     temperature=0.9
@@ -202,42 +239,50 @@ def get_vision_caption(media_path: str, persona: str = "casual Instagram user") 
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
             ]
             
-            logger.info("Executing Vision-AI Caption Generation...")
+            logger.info(f"Executing Vision-AI Caption Generation (attempt {attempt + 1}/{max_retries})...")
             response = model.generate_content(
                 media_item,
                 safety_settings=safety_settings,
                 request_options={"timeout": 60.0} # Sufficient timeout for video chunking
             )
             
-            try:
-                caption = response.text
-                # Markdown & Spam Sanitizer
-                caption = caption.replace("*", "").replace("@", "").strip()
-                logger.info(f"AI Caption generated: {caption}")
-                return caption
-            except (ValueError, AttributeError) as e:
-                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+            caption = _safe_extract_text(response)
+            if not caption:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Vision AI returned empty caption (attempt {attempt + 1}/{max_retries}). Retrying after 2s...")
+                    time.sleep(2)
+                    continue
                 return ""
+            # Markdown, User Mentions & Unicode Sanitizer
+            caption = caption.replace("*", "").replace("@", "")
+            caption = _sanitize_response(caption)
+            logger.info(f"AI Caption generated: {caption}")
+            return caption
             
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"Gemini Vision Caption API Exception: {error_msg}")
+            logger.error(f"Gemini Vision Caption API Exception (attempt {attempt + 1}/{max_retries}): {error_msg}")
             if "401" in error_msg:
                 logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
                 VISION_API_DEAD = True
                 break
             elif "429" in error_msg or "Quota exceeded" in error_msg:
-                wait_time = 60
-                import re
+                wait_time = 30
                 m = re.search(r"retry in ([\d\.]+)s", error_msg)
                 if not m:
                     m = re.search(r"seconds:\s*(\d+)", error_msg)
                 if m:
-                    wait_time = int(float(m.group(1))) + 5
-                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
-                import time
+                    wait_time = int(float(m.group(1))) + 2
+                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt + 1}/{max_retries})...")
                 time.sleep(wait_time)
                 continue
+            else:
+                # Short interval retry for transient errors (504, 503, connection drops, etc.)
+                if attempt < max_retries - 1:
+                    short_delay = 2 * (attempt + 1)
+                    logger.warning(f"Transient error encountered. Retrying in {short_delay}s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(short_delay)
+                    continue
             break
     return ""
 
@@ -278,7 +323,7 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
             )
             
             model = genai.GenerativeModel(
-                model_name='gemini-3.7-flash',
+                model_name='gemini-3.6-flash',
                 system_instruction=prompt,
                 generation_config=genai.GenerationConfig(
                     max_output_tokens=150,
@@ -299,14 +344,10 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
                 request_options={"timeout": 30.0}
             )
             
-            try:
-                answer = response.text.strip()
-                if answer.upper() == "NO":
-                    return ""
-                return _sanitize_response(answer)
-            except (ValueError, AttributeError) as e:
-                logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
+            answer = _safe_extract_text(response).strip()
+            if not answer or answer.upper() == "NO":
                 return ""
+            return _sanitize_response(answer)
                 
         except Exception as e:
             error_msg = str(e)

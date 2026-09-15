@@ -1,4 +1,4 @@
-﻿import re
+import re
 with open("InstaAddict/core/views.py", "r", encoding="utf-8") as f:
     code = f.read()
 

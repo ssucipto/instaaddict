@@ -156,16 +156,20 @@ class TabBarView:
         button = None
         UniversalActions.close_keyboard(self.device)
         if tab == TabBarTabs.HOME:
-            button = self.device.find(
-                classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
-                descriptionMatches=case_insensitive_re(TabBarText.HOME_CONTENT_DESC),
-            )
+            button = self.device.find(resourceIdMatches=ResourceID.FEED_TAB)
+            if not button.exists():
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(TabBarText.HOME_CONTENT_DESC),
+                )
 
         elif tab == TabBarTabs.SEARCH:
-            button = self.device.find(
-                classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
-                descriptionMatches=case_insensitive_re(TabBarText.SEARCH_CONTENT_DESC),
-            )
+            button = self.device.find(resourceIdMatches=ResourceID.SEARCH_TAB)
+            if not button.exists():
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(TabBarText.SEARCH_CONTENT_DESC),
+                )
 
             if not button.exists():
                 # Some accounts display the search btn only in Home -> action bar
@@ -174,10 +178,12 @@ class TabBarView:
                 home_view.navigateToSearch()
                 return
         elif tab == TabBarTabs.REELS:
-            button = self.device.find(
-                classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
-                descriptionMatches=case_insensitive_re(TabBarText.REELS_CONTENT_DESC),
-            )
+            button = self.device.find(resourceIdMatches=ResourceID.CLIPS_TAB)
+            if not button.exists():
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(TabBarText.REELS_CONTENT_DESC),
+                )
 
         elif tab == TabBarTabs.ORDERS:
             button = self.device.find(
@@ -194,10 +200,12 @@ class TabBarView:
             )
 
         elif tab == TabBarTabs.PROFILE:
-            button = self.device.find(
-                classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
-                descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC),
-            )
+            button = self.device.find(resourceIdMatches=ResourceID.PROFILE_TAB)
+            if not button.exists():
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC),
+                )
             if not button.exists():
                 button = self._get_new_profile_position()
 
@@ -714,6 +722,14 @@ class PostsViewList:
         )["bounds"]
 
     def _find_likers_container(self):
+        # In full-screen Reels viewer, bypass feed likers search and downward swipes
+        is_reel = self.device.find(
+            resourceIdMatches=f"{ResourceID.CLIPS_VIEWER_CONTAINER}|{ResourceID.ROOT_CLIPS_LAYOUT}|{ResourceID.CLIPS_AUTHOR_USERNAME}"
+        ).exists()
+        if is_reel:
+            logger.debug("In Reels viewer: bypassing feed likers container search.")
+            return True, 0
+
         universal_actions = UniversalActions(self.device)
         containers_gap = ResourceID.GAP_VIEW_AND_FOOTER_SPACE
         media_container = ResourceID.MEDIA_CONTAINER
@@ -1219,13 +1235,21 @@ class PostsViewList:
         """returns a tuple[var, bool, bool]"""
         is_ad = False
         is_hashtag = False
-        owner_locators = (
-            f"{ResourceID.ROW_FEED_PHOTO_PROFILE_NAME}|"
-            f"{ResourceID.CLIPS_AUTHOR_USERNAME}|"
-            f"{ResourceID.CLIPS_AUTHOR_PROFILE_PIC}|"
-            f"{ResourceID.ROW_FEED_PROFILE_HEADER}|"
-            f"{ResourceID.CLIPS_AUTHOR_INFO_COMPONENT}"
-        )
+        if mode == Owner.OPEN:
+            owner_locators = (
+                f"{ResourceID.ROW_FEED_PHOTO_PROFILE_NAME}|"
+                f"{ResourceID.CLIPS_AUTHOR_USERNAME}|"
+                f"{ResourceID.ROW_FEED_PROFILE_HEADER}|"
+                f"{ResourceID.CLIPS_AUTHOR_INFO_COMPONENT}"
+            )
+        else:
+            owner_locators = (
+                f"{ResourceID.ROW_FEED_PHOTO_PROFILE_NAME}|"
+                f"{ResourceID.CLIPS_AUTHOR_USERNAME}|"
+                f"{ResourceID.CLIPS_AUTHOR_PROFILE_PIC}|"
+                f"{ResourceID.ROW_FEED_PROFILE_HEADER}|"
+                f"{ResourceID.CLIPS_AUTHOR_INFO_COMPONENT}"
+            )
         if username is None:
             post_owner_obj = self.device.find(
                 resourceIdMatches=ResourceID.ROW_FEED_PHOTO_PROFILE_NAME
@@ -1234,7 +1258,7 @@ class PostsViewList:
                 post_owner_obj = self.device.find(
                     resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME
                 )
-            if not post_owner_obj.exists():
+            if not post_owner_obj.exists() and mode != Owner.OPEN:
                 post_owner_obj = self.device.find(
                     resourceIdMatches=ResourceID.CLIPS_AUTHOR_PROFILE_PIC
                 )
@@ -1247,21 +1271,30 @@ class PostsViewList:
                     resourceIdMatches=owner_locators
                 )
         else:
+            clean_username = username.lstrip("@").strip() if username else ""
             for _ in range(2):
                 post_owner_obj = self.device.find(
                     resourceIdMatches=ResourceID.ROW_FEED_PHOTO_PROFILE_NAME,
-                    textStartsWith=username,
+                    textStartsWith=clean_username,
                 )
                 if not post_owner_obj.exists():
                     post_owner_obj = self.device.find(
                         resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME,
-                        textStartsWith=username,
+                        textStartsWith=clean_username,
                     )
-                if not post_owner_obj.exists():
+                # Never click profile pic in Reels when opening owner, as it opens the Story!
+                if not post_owner_obj.exists() and mode != Owner.OPEN:
                     post_owner_obj = self.device.find(
                         resourceIdMatches=ResourceID.CLIPS_AUTHOR_PROFILE_PIC,
-                        descriptionMatches=f"(?i)Profile picture of {re.escape(username)}",
+                        descriptionMatches=f"(?i)Profile picture of {re.escape(clean_username)}",
                     )
+                if not post_owner_obj.exists() and mode == Owner.OPEN:
+                    # In Reels full-screen viewer, fallback directly to the author username widget
+                    clips_user = self.device.find(
+                        resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME
+                    )
+                    if clips_user.exists():
+                        post_owner_obj = clips_user
                 if not post_owner_obj.exists():
                     post_owner_obj = self.device.find(
                         resourceIdMatches=owner_locators
@@ -1297,10 +1330,12 @@ class PostsViewList:
                         resourceIdMatches=ResourceID.ROW_FEED_COMMENT_TEXTVIEW_LAYOUT,
                         textStartsWith=username,
                     )
-                    if (
-                        not comment_description.exists()
-                        and comment_description.count_items() >= 1
-                    ):
+                    count_items = 0
+                    try:
+                        count_items = int(comment_description.count_items())
+                    except Exception:
+                        count_items = 0
+                    if not comment_description.exists() and count_items >= 1:
                         comment_description = self.device.find(
                             resourceIdMatches=ResourceID.ROW_FEED_COMMENT_TEXTVIEW_LAYOUT,
                             text=comment_description.get_text(),
@@ -1441,6 +1476,19 @@ class PostsViewList:
         if skip_media_check:
             return
 
+        is_reel = self.device.find(
+            resourceIdMatches=f"{ResourceID.CLIPS_VIEWER_CONTAINER}|{ResourceID.ROOT_CLIPS_LAYOUT}|{ResourceID.CLIPS_AUTHOR_USERNAME}"
+        ).exists()
+        if is_reel:
+            logger.info("In Reels viewer: liking via dedicated Reel like button.")
+            like_btn = self.device.find(
+                resourceIdMatches=f"{ResourceID.LIKE_BUTTON}|{ResourceID.ROW_FEED_BUTTON_LIKE}|{ResourceID.TOOLBAR_LIKE_BUTTON}"
+            )
+            if like_btn.exists():
+                logger.info("Clicking on the little heart ❤️.")
+                like_btn.click()
+            return
+
         media, content_desc = self._get_media_container()
 
         # Avoid silent aborts if content_desc is completely unbound from IG UI v446+
@@ -1482,6 +1530,30 @@ class PostsViewList:
 
     def _check_if_liked(self, retries=3):
         logger.debug("Check if like succeeded in post view.")
+        is_reel = self.device.find(
+            resourceIdMatches=f"{ResourceID.CLIPS_VIEWER_CONTAINER}|{ResourceID.ROOT_CLIPS_LAYOUT}|{ResourceID.CLIPS_AUTHOR_USERNAME}"
+        ).exists()
+        if is_reel:
+            bnt_like_obj = self.device.find(
+                resourceIdMatches=f"{ResourceID.LIKE_BUTTON}|{ResourceID.ROW_FEED_BUTTON_LIKE}|{ResourceID.TOOLBAR_LIKE_BUTTON}"
+            )
+            if bnt_like_obj.exists():
+                try:
+                    if bnt_like_obj.get_selected():
+                        logger.debug("Reel like button is selected.")
+                        return True
+                except Exception:
+                    pass
+                desc = bnt_like_obj.get_desc() or ""
+                text = bnt_like_obj.get_text() or ""
+                if re.search(r"(?i)(liked|unlike)", desc) or re.search(
+                    r"(?i)(liked|unlike)", text
+                ):
+                    logger.debug("Like is present on Reel.")
+                    return True
+            logger.debug("Reel like handled.")
+            return True
+
         bnt_like_obj = self.device.find(
             resourceIdMatches=ResourceID.ROW_FEED_BUTTON_LIKE
         )
@@ -2224,7 +2296,7 @@ class ProfileView(ActionBarView):
 
         return OptionsView(self.device)
 
-    def _getActionBarTitleBtn(self, watching_stories=False):
+    def _getActionBarTitleBtn(self, watching_stories=False, error=True):
         bar = case_insensitive_re(
             [
                 ResourceID.TITLE_VIEW,
@@ -2238,7 +2310,8 @@ class ProfileView(ActionBarView):
         action_bar = self.device.find(
             resourceIdMatches=bar,
         )
-        if not watching_stories and action_bar.exists(Timeout.LONG) or watching_stories:
+        timeout = Timeout.LONG if error else Timeout.SHORT
+        if not watching_stories and action_bar.exists(timeout) or watching_stories:
             return action_bar
 
         # IG v446 fallback: The dedicated action bar resource IDs were removed.
@@ -2250,9 +2323,10 @@ class ProfileView(ActionBarView):
         if top_text.exists(Timeout.SHORT):
             return top_text
 
-        logger.error(
-            "Unable to find action bar! (The element with the username at top)"
-        )
+        if error:
+            logger.error(
+                "Unable to find action bar! (The element with the username at top)"
+            )
         return None
 
     def _getSomeText(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -2310,6 +2384,14 @@ class ProfileView(ActionBarView):
         save_crash(self.device)
         return None, None, None
 
+    def _profile_tab_button(self) -> bool:
+        if ResourceID is not None and hasattr(ResourceID, "PROFILE_TAB"):
+            obj = self.device.find(resourceIdMatches=ResourceID.PROFILE_TAB)
+            if obj.exists(Timeout.SHORT):
+                obj.click()
+                return True
+        return False
+
     def _new_ui_profile_button(self) -> bool:
         obj = self.device.find(
             classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
@@ -2336,6 +2418,8 @@ class ProfileView(ActionBarView):
     def click_on_avatar(self):
         max_attempts = 4
         for attempt in range(max_attempts):
+            if self._profile_tab_button():
+                return
             if self._new_ui_profile_button():
                 return
             if self._old_ui_profile_button():
@@ -2368,11 +2452,11 @@ class ProfileView(ActionBarView):
             )
             return None, FollowStatus.NONE
 
-    def getUsername(self, watching_stories=False):
-        action_bar = self._getActionBarTitleBtn(watching_stories)
+    def getUsername(self, watching_stories=False, error=True):
+        action_bar = self._getActionBarTitleBtn(watching_stories, error=error)
         if action_bar is not None:
-            return action_bar.get_text(error=not watching_stories).strip()
-        if not watching_stories:
+            return action_bar.get_text(error=not watching_stories and error).strip()
+        if not watching_stories and error:
             logger.error("Cannot get username.")
         return None
 

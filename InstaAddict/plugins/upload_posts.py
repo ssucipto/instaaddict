@@ -47,6 +47,11 @@ class UploadPostsPlugin(Plugin):
                 "default": None,
                 "help": "Custom path to the upload media queue directory",
             },
+            {
+                "arg": "--upload-hashtags-in-comment",
+                "help": "Post hashtags in first comment instead of main caption",
+                "action": "store_true",
+            },
         ]
 
     def _resolve_username(self, configs: Any, sessions: Any) -> str:
@@ -160,50 +165,116 @@ class UploadPostsPlugin(Plugin):
 
         return False
 
-    def _extract_caption(
-        self, pending_dir: str, media_file: str, config_path: str
+    def _enrich_hashtags_if_needed(
+        self, caption: str, username: str, max_retries: int = 5
     ) -> str:
-        """Extracts caption from .txt sidecar, .json sidecar, or Gemini Vision AI."""
+        """Enriches caption with rotating hashtags from HashtagManager, retrying up to 5 times."""
+        if not username:
+            return caption
+        existing_tags = re.findall(r"#([a-zA-Z0-9_]+)", caption)
+        if len(existing_tags) >= 3:
+            return caption
+
+        tags_to_add = []
+        for attempt in range(max_retries):
+            try:
+                from InstaAddict.core.hashtag_manager import HashtagManager
+
+                manager = HashtagManager.get_instance(username)
+                candidates = manager.get_post_hashtags(count=5)
+                lower_existing = {t.lower() for t in existing_tags}
+                for tag in candidates:
+                    clean_tag = tag.strip().lstrip("#")
+                    if clean_tag and clean_tag.lower() not in lower_existing:
+                        tags_to_add.append(f"#{clean_tag}")
+                        if len(existing_tags) + len(tags_to_add) >= 5:
+                            break
+                if tags_to_add:
+                    break
+            except Exception as e:
+                logger.debug(
+                    f"HashtagManager enrichment error (attempt {attempt + 1}/{max_retries}): {e}"
+                )
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+
+        # Fallback if HashtagManager yielded no tags
+        if not tags_to_add:
+            fallback_tags = [
+                "#jackrussell",
+                "#jackrussellterrier",
+                "#perthdogs",
+                "#dogsofinstagram",
+                "#doglife",
+            ]
+            lower_existing = {t.lower() for t in existing_tags}
+            for tag in fallback_tags:
+                clean_tag = tag.strip().lstrip("#")
+                if clean_tag.lower() not in lower_existing:
+                    tags_to_add.append(f"#{clean_tag}")
+                    if len(existing_tags) + len(tags_to_add) >= 5:
+                        break
+
+        if tags_to_add:
+            tag_block = " ".join(tags_to_add)
+            if caption:
+                caption = f"{caption.rstrip()}\n\n{tag_block}"
+            else:
+                caption = tag_block
+            logger.info(
+                f"Enriched post caption with {len(tags_to_add)} hashtags: {tag_block}"
+            )
+
+        return caption
+
+    def _extract_caption(
+        self, pending_dir: str, media_file: str, config_path: str, username: str = ""
+    ) -> str:
+        """Extracts caption from .txt sidecar (extended by AI), .json sidecar, or Gemini Vision AI."""
         base_name = os.path.splitext(media_file)[0]
         media_path = os.path.join(pending_dir, media_file)
 
-        # 1. Text file sidecar (.txt)
+        # 1. Text file sidecar (.txt) - Contextual guidance for AI captioner
         txt_path = os.path.join(pending_dir, f"{base_name}.txt")
+        txt_guidance = ""
         if os.path.exists(txt_path):
             try:
-                with open(txt_path, "r", encoding="utf-8") as f:
-                    caption = f.read().strip()
-                    if caption:
-                        logger.info(
-                            f"Human text caption override found for {media_file} ({txt_path})."
-                        )
-                        return caption
+                with open(txt_path, "r", encoding="utf-8-sig") as f:
+                    txt_guidance = f.read().strip()
             except Exception as e:
                 logger.warning(
                     f"Failed reading text caption override {txt_path}: {e}"
                 )
 
-        # 2. JSON file sidecar (.json)
-        json_path = os.path.join(pending_dir, f"{base_name}.json")
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    caption = data.get("caption", "").strip()
-                    if caption:
-                        logger.info(
-                            f"Human JSON caption override found for {media_file} ({json_path})."
-                        )
-                        return caption
-            except Exception as e:
-                logger.warning(
-                    f"Failed reading JSON caption override {json_path}: {e}"
-                )
+        # 2. JSON file sidecar (.json) - Explicit static caption override if no .txt guidance
+        if not txt_guidance:
+            json_path = os.path.join(pending_dir, f"{base_name}.json")
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, "r", encoding="utf-8-sig") as f:
+                        data = json.load(f)
+                        caption = data.get("caption", "").strip()
+                        if caption:
+                            logger.info(
+                                f"Human JSON caption override found for {media_file} ({json_path})."
+                            )
+                            return self._enrich_hashtags_if_needed(
+                                caption, username
+                            )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed reading JSON caption override {json_path}: {e}"
+                    )
 
-        # 3. Gemini Vision AI Autopilot
-        logger.info(
-            f"No caption sidecar found for {media_file}. Engaging AI Autopilot Vision-Captioner..."
-        )
+        # 3. Check if txt_guidance is already a complete elaborated caption with hashtags
+        existing_tags = re.findall(r"#([a-zA-Z0-9_]+)", txt_guidance)
+        if txt_guidance and len(existing_tags) >= 3 and len(txt_guidance) >= 50:
+            logger.info(
+                f"Existing caption in {txt_path} is already fully elaborated with {len(existing_tags)} hashtags."
+            )
+            return self._enrich_hashtags_if_needed(txt_guidance, username)
+
+        # 4. Mandatory Elaboration: Engage Gemini Vision AI to visually analyze and elaborate post
         persona = "casual Instagram user"
         if config_path and os.path.exists(config_path):
             try:
@@ -215,16 +286,54 @@ class UploadPostsPlugin(Plugin):
             except Exception:
                 pass
 
+        if txt_guidance:
+            logger.info(
+                f"Contextual guidance found for {media_file} ({txt_path}): {txt_guidance!r}. "
+                "Engaging Gemini Vision AI to elaborate caption..."
+            )
+        else:
+            logger.info(
+                f"No caption sidecar found for {media_file}. Engaging Gemini Vision AI to generate caption..."
+            )
+
+        caption = ""
         try:
-            caption = get_vision_caption(media_path, persona)
-            if caption:
-                return caption.strip()
+            caption = get_vision_caption(
+                media_path, persona, user_context=txt_guidance
+            )
         except Exception as e:
             logger.error(
                 f"Gemini Vision AI caption generation failed for {media_file}: {e}"
             )
 
-        return ""
+        # Fallback if Vision AI returned empty: use raw note or fallback
+        if not caption:
+            if txt_guidance:
+                logger.info(
+                    f"Vision AI produced no output. Falling back to raw contextual note for {media_file}."
+                )
+                caption = txt_guidance
+            else:
+                caption = f"Photo from {base_name}"
+
+        # 5. Mandatory Hashtags: Enforce proper hashtags on the elaborated caption
+        final_caption = self._enrich_hashtags_if_needed(
+            caption.strip(), username
+        )
+
+        # 6. Persist elaborated caption back to sidecar so disk record is synchronized
+        try:
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(final_caption)
+            logger.info(
+                f"Persisted mandatory elaborated caption & hashtags to {txt_path}"
+            )
+        except Exception as e:
+            logger.debug(
+                f"Failed to persist elaborated caption to {txt_path}: {e}"
+            )
+
+        return final_caption
 
     def run(
         self,
@@ -323,7 +432,7 @@ class UploadPostsPlugin(Plugin):
             media_path = os.path.join(pending_dir, media_file)
 
             caption = self._extract_caption(
-                pending_dir, media_file, config_path
+                pending_dir, media_file, config_path, username=username
             )
 
             caption_snippet = (
@@ -332,7 +441,14 @@ class UploadPostsPlugin(Plugin):
             logger.info(
                 f"Uploading {media_file} with caption: {caption_snippet!r}"
             )
-            success = self._upload_to_ig(device, media_path, caption)
+            try:
+                success = self._upload_to_ig(device, media_path, caption)
+            except Exception as e:
+                logger.error(
+                    f"Unexpected exception during Instagram upload of {media_file}: {e}",
+                    exc_info=True,
+                )
+                success = False
 
             if success:
                 logger.info(
@@ -340,7 +456,7 @@ class UploadPostsPlugin(Plugin):
                 )
                 os.makedirs(published_dir, exist_ok=True)
 
-                # Move media file
+                # Move media file and touch mtime to guarantee rate limit accuracy
                 dest_media = os.path.join(published_dir, media_file)
                 if os.path.exists(dest_media):
                     try:
@@ -348,6 +464,12 @@ class UploadPostsPlugin(Plugin):
                     except OSError:
                         pass
                 shutil.move(media_path, dest_media)
+                try:
+                    os.utime(dest_media, None)
+                except OSError as e:
+                    logger.debug(
+                        f"Failed to update publication mtime for {dest_media}: {e}"
+                    )
 
                 # Move .txt sidecar if present
                 txt_path = os.path.join(pending_dir, f"{base_name}.txt")
@@ -359,6 +481,10 @@ class UploadPostsPlugin(Plugin):
                         except OSError:
                             pass
                     shutil.move(txt_path, dest_txt)
+                    try:
+                        os.utime(dest_txt, None)
+                    except OSError:
+                        pass
 
                 # Move .json sidecar if present
                 json_path = os.path.join(pending_dir, f"{base_name}.json")
@@ -372,6 +498,10 @@ class UploadPostsPlugin(Plugin):
                         except OSError:
                             pass
                     shutil.move(json_path, dest_json)
+                    try:
+                        os.utime(dest_json, None)
+                    except OSError:
+                        pass
 
                 if sessions and len(sessions) > 0:
                     current_session = sessions[-1]
@@ -386,6 +516,20 @@ class UploadPostsPlugin(Plugin):
                             "caption": caption[:100],
                             "timestamp": str(datetime.now()),
                         }
+                    )
+
+                # Send Telegram notification if configured
+                try:
+                    from InstaAddict.plugins.telegram import (
+                        telegram_notify_upload_success,
+                    )
+
+                    telegram_notify_upload_success(
+                        username, media_file, caption
+                    )
+                except Exception as tg_err:
+                    logger.debug(
+                        f"Failed to send Telegram upload notification: {tg_err}"
                     )
             else:
                 logger.error(
@@ -406,23 +550,61 @@ class UploadPostsPlugin(Plugin):
                         }
                     )
 
+                # Send Telegram failure alert if configured
+                try:
+                    from InstaAddict.plugins.telegram import (
+                        load_telegram_config,
+                        telegram_bot_send_text,
+                    )
+
+                    tg_conf = load_telegram_config(username)
+                    if (
+                        tg_conf
+                        and tg_conf.get("telegram-api-token")
+                        and tg_conf.get("telegram-chat-id")
+                    ):
+                        fail_msg = (
+                            "⚠️ *Instagram Upload Failed!*\n\n"
+                            f"📷 *Media*: `{media_file}`\n"
+                            "Retaining file in pending queue for retry."
+                        )
+                        telegram_bot_send_text(
+                            tg_conf["telegram-api-token"],
+                            tg_conf["telegram-chat-id"],
+                            fail_msg,
+                        )
+                except Exception as tg_err:
+                    logger.debug(
+                        f"Failed to send Telegram upload failure alert: {tg_err}"
+                    )
+
             # Process exactly one post per plugin invocation
             break
 
-    def _execute_adb(self, serial: str, command_args: List[str]) -> bool:
-        """Secure isolated execution of ADB commands mapping native array signatures."""
+    def _execute_adb(
+        self, serial: str, command_args: List[str], timeout: int = 60
+    ) -> bool:
+        """Secure isolated execution of ADB commands mapping native array signatures with timeout."""
         cmd: List[str] = ["adb", "-s", serial] + command_args
         try:
             subprocess.run(
                 cmd,
                 shell=False,
                 check=True,
+                timeout=timeout,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             return True
+        except subprocess.TimeoutExpired:
+            logger.error(
+                f"ADB execution timed out after {timeout}s: {' '.join(command_args)}"
+            )
+            return False
         except subprocess.CalledProcessError as e:
-            logger.error(f"ADB execution failed ({command_args[0]}): Code {e.returncode}")
+            logger.error(
+                f"ADB execution failed ({command_args[0]}): Code {e.returncode}"
+            )
             return False
         except FileNotFoundError:
             logger.error("ADB executable not found in system PATH.")
@@ -431,7 +613,7 @@ class UploadPostsPlugin(Plugin):
     def _get_mediastore_id(
         self, serial: str, filename: str, is_video: bool = False
     ) -> Optional[str]:
-        """Queries Android MediaStore for the _id of a pushed media file."""
+        """Queries Android MediaStore for the newest _id matching pushed media file."""
         uri = (
             "content://media/external/video/media"
             if is_video
@@ -453,11 +635,14 @@ class UploadPostsPlugin(Plugin):
             res = subprocess.run(
                 cmd, capture_output=True, text=True, check=True, timeout=10
             )
+            matching_ids: List[int] = []
             for line in res.stdout.splitlines():
                 if filename in line:
                     m = re.search(r"_id=(\d+)", line)
                     if m:
-                        return m.group(1)
+                        matching_ids.append(int(m.group(1)))
+            if matching_ids:
+                return str(max(matching_ids))
         except Exception as e:
             logger.debug(f"MediaStore query error: {e}")
         return None
@@ -595,8 +780,10 @@ class UploadPostsPlugin(Plugin):
                 share_sheet_reached = True
                 break
 
-            # Check if "Sharing posts" or OK modal is blocking
-            ok_btn = d(textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss)$")
+            # Check if "Sharing posts" or modal is blocking
+            ok_btn = d(
+                textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss|Cancel|Maybe later|Skip|Keep editing)$"
+            )
             if ok_btn.exists(timeout=2):
                 logger.info("Dismissing informational composer modal dialog...")
                 ok_btn.click()
@@ -608,6 +795,10 @@ class UploadPostsPlugin(Plugin):
             if not next_btn.exists(timeout=2):
                 next_btn = d(
                     resourceId=resource_id.MEDIA_THUMBNAIL_TRAY_BUTTON_TEXT
+                )
+            if not next_btn.exists(timeout=2):
+                next_btn = d(
+                    resourceIdMatches=".*creation_next_button.*|.*next_button.*|.*action_bar_button_action.*"
                 )
             if not next_btn.exists(timeout=2):
                 next_btn = d(textMatches="(?i)^Next$")
@@ -639,6 +830,7 @@ class UploadPostsPlugin(Plugin):
 
         if not share_sheet_reached:
             logger.error("Failed to navigate to post Share Sheet.")
+            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
             return False
 
         # 6. Set caption if provided
@@ -651,7 +843,19 @@ class UploadPostsPlugin(Plugin):
 
             if caption_box.exists(timeout=5):
                 logger.info(f"Setting post caption ({len(caption)} characters)...")
-                caption_box.set_text(caption)
+                try:
+                    caption_box.set_text(caption)
+                except Exception as set_err:
+                    logger.warning(
+                        f"set_text failed on caption box ({set_err}). Attempting clipboard paste fallback..."
+                    )
+                    try:
+                        d.set_clipboard(caption)
+                        caption_box.click()
+                        random_sleep(0.5, 1.0)
+                        d.paste()
+                    except Exception as paste_err:
+                        logger.error(f"Clipboard paste fallback failed: {paste_err}")
                 random_sleep(1, 2)
             else:
                 logger.warning(
@@ -677,6 +881,7 @@ class UploadPostsPlugin(Plugin):
             home_btn = d(descriptionMatches="(?i).*Home.*")
             if home_btn.exists(timeout=5):
                 logger.info("Post uploaded successfully (Home feed visible).")
+                self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
                 return True
 
             try:
@@ -687,12 +892,15 @@ class UploadPostsPlugin(Plugin):
                     "com.instagram.mainactivity.LauncherActivity",
                 ]:
                     logger.info("Post uploaded successfully (Returned to MainTabActivity).")
+                    self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
                     return True
-            except Exception:
-                pass
+            except Exception as act_err:
+                logger.debug(f"Could not verify app activity after share: {act_err}")
 
             logger.info("Post upload completed.")
+            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
             return True
         else:
             logger.error("Cannot locate Share button on Share Sheet.")
+            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
             return False

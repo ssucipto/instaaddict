@@ -52,15 +52,20 @@ def run_safely(device, device_id, sessions, session_state, screen_record, config
                         extra={"color": Style.BRIGHT},
                     )
 
-                    input("")
+                    try:
+                        input("")
+                    except (KeyboardInterrupt, EOFError):
+                        stop_bot(device, sessions, session_state)
+                        return
 
                     logger.info(
                         f"-------- RESUMING: {datetime.now().strftime('%H:%M:%S')} --------",
                         extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                     )
                     TabBarView(device).navigateToProfile()
-                except KeyboardInterrupt:
+                except (KeyboardInterrupt, EOFError):
                     stop_bot(device, sessions, session_state)
+                    return
 
             except DeviceFacade.AppHasCrashed:
                 logger.warning("App has crashed / has been closed!")

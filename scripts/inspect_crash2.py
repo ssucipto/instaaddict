@@ -1,4 +1,4 @@
-﻿import zipfile
+import zipfile
 import re
 
 z = "crashes/1.0.2_2026-09-12-14-10-03.zip"
