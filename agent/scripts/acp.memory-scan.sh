@@ -26,7 +26,7 @@ python3 -c "
 import yaml
 from pathlib import Path
 
-root = Path('${PROJECT_ROOT}')
+root = Path('.').resolve()
 constraints_path = root / 'agent/core/constraints.yml'
 memory_dir = root / 'agent/memory'
 

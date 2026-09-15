@@ -1,4 +1,4 @@
-﻿import uiautomator2 as u2
+import uiautomator2 as u2
 import re
 
 d = u2.connect("emulator-5554")

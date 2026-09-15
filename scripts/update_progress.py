@@ -1,4 +1,4 @@
-﻿import yaml
+import yaml
 with open('agent/progress.yaml', 'r') as f:
     data = yaml.safe_load(f)
 

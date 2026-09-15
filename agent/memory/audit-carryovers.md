@@ -183,3 +183,46 @@ carryovers:
       - test/test_upload_posts.py
       - test/test_interact_reels.py
 
+  - id: CO-014
+    audit_report: agent/reports/audit-045-runtime-errors-and-locator-investigation.md
+    date_raised: 2026-09-14
+    severity: high
+    status: fixed
+    fix_applied_date: 2026-09-14
+    verified_in_audit: route-043-remediation
+    summary: Fix argument collision on --reels-topic and misleading error handling in config.py, handle EOFError in decorators.py, eliminate speculative profile check false-alarm errors, add modern tab bar resource IDs in resources.py and views.py, fix data analytics report path concatenation, and accelerate search recovery via action_bar_button_back.
+    affected_files:
+      - InstaAddict/plugins/core_arguments.py
+      - InstaAddict/core/config.py
+      - InstaAddict/core/decorators.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/resources.py
+      - InstaAddict/plugins/data_analytics.py
+
+  - id: CO-015
+    audit_report: agent/reports/audit-046-dual-implementation-remediation-audit.md
+    date_raised: 2026-09-14
+    severity: medium
+    status: fixed
+    fix_applied_date: 2026-09-14
+    verified_in_audit: review-035-runtime-hardening-and-reels-navigation
+    summary: Fix unguarded args.disable_filters in filter.py, differentiate KeyboardInterrupt from EOFError in bot_flow.py untested version prompt, enhance Reels like detection with get_selected and unlike regex in views.py, and expand test_runtime_hardening.py suite.
+    affected_files:
+      - InstaAddict/core/filter.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/views.py
+      - test/test_runtime_hardening.py
+
+  - id: CO-016
+    audit_report: agent/reports/audit-048-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-14
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-14'
+    verified_in_audit: review-036-upload-mechanism-code-quality.md
+    summary: Remediate upload mechanism gaps including rate-limit mtime preservation, MediaStore ID resolution, ADB subprocess timeouts, unhandled upload exceptions, emoji caption typing fallback, device storage cleanup, and UTF-8-sig BOM handling.
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - test/test_upload_posts.py
+

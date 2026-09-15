@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.2.0 — Telegram Two-Way Ingestion, AI Retry Architecture & Upload Scheduling Resilience
+
+Comprehensive release introducing two-way Telegram remote photo and caption ingestion, 5-attempt exponential backoff retry engine for Gemini Vision AI, mandatory caption elaboration and hashtag enrichment pre-upload, and upload queue prioritization at session startup.
+
+### Added
+- **Two-Way Telegram Bot Ingestion (`telegram.py`, `check_telegram.py`)**:
+  - Remote photo and video ingestion directly from Telegram chat into `accounts/<username>/content_queue/pending/`.
+  - Companion comment ingestion linking follow-up text messages to recently queued media sidecars (`.txt`).
+  - Interactive bot commands (`/status`, `/pending`, `/elaborate`, `/caption`) and photo preview confirmations.
+  - Standalone long-polling listener and diagnostic tool `scripts/check_telegram.py` with Windows UTF-8 console support.
+- **5-Attempt Exponential Backoff Retry Architecture**:
+  - Multi-attempt retry loop with progressive backoff delays ($2s, 4s, 6s, 8s$) across Gemini Vision API and HashtagManager calls.
+  - Resilient mitigation of Google Cloud HTTP 500, 503, 504 Deadline Exceeded, and empty response states.
+- **Mandatory Pre-Upload Caption Elaboration & Hashtag Enrichment**:
+  - Automatically evaluates incoming media with Gemini Vision AI (`gemini-3.6-flash`) using the account persona and user guidance.
+  - Automatically queries `HashtagManager` to append at least 3–5 rotating niche hashtags if fewer than 3 exist in the caption.
+  - Persists finalized, formatted captions back to `.txt` sidecars on disk.
+- **Upload Job Prioritization**:
+  - Dynamically places `upload-posts` at index 0 of the session `jobs_list` before randomized interaction tasks to prevent upload starvation from subsequent soft crash limits.
+
+### Fixed & Hardened
+- **Google Generative AI Model Migration**:
+  - Migrated from deprecated/high-load models to Google's recommended `gemini-3.6-flash`.
+- **IME Unicode Cluster Sanitization**:
+  - Stripped rogue Zero-Width Joiner (ZWJ `\u200D`), Zero-Width Space (ZWSP `\u200B`), and BOM characters from generated text to protect Android FastInputIME.
+  - Atomic grapheme cluster typing in `DeviceFacade` preventing multi-part emoji keystroke corruption.
+- **ACP-01 Casing Alignment**:
+  - Corrected header casing in `agent/commands/acp.proceed.md` to satisfy deterministic scanner requirements.
+
+**Full diff**: `v1.1.0...v1.2.0`
+
 ## v1.1.0 — Modern Reels Architecture, Dynamic Hashtag Engine & Fluid Swiping
 
 Comprehensive release introducing modern Instagram (v446+) Reels viewer compatibility, tiered dynamic hashtag discovery, persistent non-bot followings caching, universal in-app browser escape watchdog, and fluid native swipe physics.

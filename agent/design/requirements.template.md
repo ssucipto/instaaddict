@@ -169,7 +169,7 @@
 
 **Example**:
 
-### As an AI Agent
+### As an Autonomous Agent
 1. I want to store memories about user preferences so that I can personalize responses
 2. I want to search for relevant memories so that I can provide contextual answers
 3. I want to create relationships between memories so that I can understand connections

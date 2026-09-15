@@ -1,5 +1,7 @@
 import logging
+import re
 import string
+import warnings
 from datetime import datetime
 from enum import Enum, auto
 from inspect import stack
@@ -14,7 +16,122 @@ import uiautomator2
 
 from InstaAddict.core.utils import random_sleep
 
+# Silence noisy third-party deprecation warnings
+warnings.filterwarnings("ignore", message=".*forward_list is deprecated.*")
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+
 logger = logging.getLogger(__name__)
+
+_GRAPHEME_CLUSTER_RE = re.compile(
+    r"(?:"
+    r"[\U00010000-\U0010FFFF](?:[\u200D\uFE0E\uFE0F]|[\U00010000-\U0010FFFF])*"
+    r"|[\u2600-\u27BF](?:[\u200D\uFE0E\uFE0F]|[\u2600-\u27BF])*"
+    r"|.[\u0300-\u036F\uFE00-\uFE0F\u200D]*"
+    r")",
+    re.UNICODE,
+)
+
+
+def _split_into_grapheme_clusters(s: str) -> list:
+    """Splits string into atomic visual/grapheme units so emojis and modifiers are not severed."""
+    clusters = _GRAPHEME_CLUSTER_RE.findall(s)
+    return clusters if clusters else list(s)
+
+
+def _apply_uiautomator2_compatibility_patches():
+    """Patch uiautomator2 for Android 14+ / AndroidX / modern packaging compatibility."""
+    if getattr(uiautomator2.Device, "_acp_compatibility_patched", False):
+        return
+    uiautomator2.Device._acp_compatibility_patched = True
+
+    # 1. Patch current_ime regex for Android 14+ / modern IME compatibility
+    def patched_current_ime(dev_self):
+        _INPUT_METHOD_RE = re.compile(
+            r"(?:mCurMethodId|mCurImeId|mSelectedImeId)=([-_./\w]+)"
+        )
+        dim, _ = dev_self.shell(["dumpsys", "input_method"])
+        m = _INPUT_METHOD_RE.search(dim)
+        method_id = None if not m else m.group(1)
+        shown = "mInputShown=true" in dim
+        return (method_id, shown)
+
+    uiautomator2.Device.current_ime = patched_current_ime
+
+    # 2. Patch _package_version to safely handle versionName=null / missing version without crashing
+    # with packaging.version.InvalidVersion: Invalid version: ''
+    def patched_package_version(dev_self, package_name: str):
+        import packaging.version
+
+        if dev_self.shell(["pm", "path", package_name]).exit_code != 0:
+            return None
+        try:
+            dump_output = dev_self.shell(["dumpsys", "package", package_name]).output
+            m = re.compile(r"versionName=(?P<name>[\d.]+)").search(dump_output)
+            if m and m.group("name"):
+                return packaging.version.parse(m.group("name"))
+        except Exception:
+            pass
+        # Fallback version for test packages or packages where versionName is null
+        return packaging.version.parse("2.3.3")
+
+    uiautomator2.Device._package_version = patched_package_version
+
+    # 3. Patch _test_run_instrument to detect androidx.test.runner.AndroidJUnitRunner
+    def patched_test_run_instrument(dev_self):
+        runner = "androidx.test.runner.AndroidJUnitRunner"
+        try:
+            res = dev_self.shell(["pm", "list", "instrumentation"]).output
+            if "androidx.test.runner.AndroidJUnitRunner" not in res:
+                runner = "android.support.test.runner.AndroidJUnitRunner"
+        except Exception:
+            pass
+        return dev_self.shell(
+            [
+                "am",
+                "instrument",
+                "-w",
+                "-r",
+                "-e",
+                "debug",
+                "false",
+                "-e",
+                "class",
+                "com.github.uiautomator.stub.Stub",
+                f"com.github.uiautomator.test/{runner}",
+            ]
+        ).output
+
+    uiautomator2.Device._test_run_instrument = patched_test_run_instrument
+
+    # 4. Patch _Service.start to launch androidx.test.runner.AndroidJUnitRunner properly
+    # Because atx-agent on device hardcodes android.support.test.runner.AndroidJUnitRunner which fails on modern Android
+    try:
+        from uiautomator2 import _Service
+        _orig_service_start = _Service.start
+
+        def patched_service_start(srv_self):
+            try:
+                _orig_service_start(srv_self)
+            except Exception:
+                pass
+            runner = "androidx.test.runner.AndroidJUnitRunner"
+            try:
+                res = srv_self.u2obj.shell(["pm", "list", "instrumentation"]).output
+                if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
+                    runner = "android.support.test.runner.AndroidJUnitRunner"
+            except Exception:
+                pass
+            srv_self.u2obj.shell(
+                f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
+            )
+
+        _Service.start = patched_service_start
+    except Exception as e:
+        logger.debug(f"Failed to patch _Service.start: {e}")
+
+
+# Apply compatibility patches at module load
+_apply_uiautomator2_compatibility_patches()
 
 
 def create_device(device_id, app_id):
@@ -84,6 +201,7 @@ class DeviceFacade:
     def __init__(self, device_id, app_id):
         self.device_id = device_id
         self.app_id = app_id
+        _apply_uiautomator2_compatibility_patches()
         try:
             if device_id is None or "." not in device_id:
                 self.deviceV2 = uiautomator2.connect(
@@ -93,21 +211,50 @@ class DeviceFacade:
                 self.deviceV2 = uiautomator2.connect_adb_wifi(f"{device_id}")
         except ImportError:
             raise ImportError("Please install uiautomator2: pip3 install uiautomator2")
+        self.ensure_uiautomator_alive()
 
-        # Patch uiautomator2 current_ime regex for Android 14+ / modern IME compatibility
-        if not hasattr(uiautomator2.Device, "_acp_patched_ime"):
-            uiautomator2.Device._acp_patched_ime = True
-            def patched_current_ime(dev_self):
-                _INPUT_METHOD_RE = re.compile(
-                    r"(?:mCurMethodId|mCurImeId|mSelectedImeId)=([-_./\w]+)"
+    def ensure_uiautomator_alive(self) -> bool:
+        """Verify that uiautomator2's accessibility service / UiAutomation is connected and responsive."""
+        try:
+            self.deviceV2.dump_hierarchy(compressed=False)
+            return True
+        except Exception as e:
+            err_str = str(e).lower()
+            if (
+                "nullpointerexception" in err_str
+                or "deadobjectexception" in err_str
+                or "accessibilityserviceinfo" in err_str
+                or "timed out" in err_str
+                or "not respond" in err_str
+            ):
+                logger.warning(
+                    f"Detected disconnected/crashed UiAutomation service ({e}). Performing automated resurrection..."
                 )
-                dim, _ = dev_self.shell(["dumpsys", "input_method"])
-                m = _INPUT_METHOD_RE.search(dim)
-                method_id = None if not m else m.group(1)
-                shown = "mInputShown=true" in dim
-                return (method_id, shown)
-
-            uiautomator2.Device.current_ime = patched_current_ime
+                runner = "androidx.test.runner.AndroidJUnitRunner"
+                try:
+                    res = self.deviceV2.shell(["pm", "list", "instrumentation"]).output
+                    if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
+                        runner = "android.support.test.runner.AndroidJUnitRunner"
+                except Exception:
+                    pass
+                try:
+                    self.deviceV2.shell(["pkill", "-f", "com.github.uiautomator"])
+                except Exception:
+                    pass
+                try:
+                    self.deviceV2.shell(
+                        f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
+                    )
+                except Exception as launch_err:
+                    logger.debug(f"Failed to launch instrumentation: {launch_err}")
+                sleep(2)
+                try:
+                    self.deviceV2.dump_hierarchy(compressed=False)
+                    logger.info("UiAutomation service successfully resurrected.")
+                    return True
+                except Exception as r_err:
+                    logger.warning(f"Secondary UiAutomation resurrection attempt failed: {r_err}")
+            return False
 
     def _get_current_app(self):
         try:
@@ -356,6 +503,15 @@ class DeviceFacade:
                 return self.deviceV2.info
             except Exception as e:
                 last_exc = e
+                logger.debug(
+                    f"deviceV2.info attempt {attempt + 1}/5 failed: {e}. Attempting uiautomator recovery..."
+                )
+                try:
+                    self.deviceV2.reset_uiautomator(str(e))
+                except Exception as r_err:
+                    logger.debug(
+                        f"reset_uiautomator attempt {attempt + 1} raised: {r_err}"
+                    )
                 time.sleep(1)
         raise DeviceFacade.JsonRpcError(last_exc) from last_exc
     @staticmethod
@@ -613,18 +769,15 @@ class DeviceFacade:
                 if self.viewV2 is None:
                     return False
                 exists: bool = self.viewV2.exists(self.get_ui_timeout(ui_timeout))
-                if (
-                    hasattr(self.viewV2, "count")
-                    and not exists
-                    and self.viewV2.count >= 1
-                ):
-                    logger.debug(
-                        f"UIA2 BUG: exists return False, but there is/are {self.viewV2.count} element(s)!"
-                    )
-                    if ignore_bug:
-                        return "BUG!"
-                    # More info about that: https://github.com/openatx/uiautomator2/issues/689"
-                    return False
+                if ignore_bug and not exists:
+                    try:
+                        if hasattr(self.viewV2, "count") and self.viewV2.count >= 1:
+                            logger.debug(
+                                f"UIA2 BUG: exists return False, but there is/are {self.viewV2.count} element(s)!"
+                            )
+                            return "BUG!"
+                    except Exception:
+                        pass
                 return exists
             except Exception as e:
                 raise DeviceFacade.JsonRpcError(e)
@@ -748,16 +901,18 @@ class DeviceFacade:
                             for n, word in enumerate(word_list, start=1):
                                 i = 0
                                 n_single_letters = randint(1, 3)
-                                for char in word:
+                                clusters = _split_into_grapheme_clusters(word)
+                                n_clusters = len(clusters)
+                                for idx, cluster in enumerate(clusters):
                                     if i < n_single_letters:
-                                        self.deviceV2.send_keys(char, clear=False)
+                                        self.deviceV2.send_keys(cluster, clear=False)
                                         i += 1
                                     else:
-                                        if word[-1] in punct_list:
-                                            self.deviceV2.send_keys(word[i:-1], clear=False)
-                                            self.deviceV2.send_keys(word[-1], clear=False)
+                                        if clusters[-1] in punct_list and idx < n_clusters - 1:
+                                            self.deviceV2.send_keys("".join(clusters[i:-1]), clear=False)
+                                            self.deviceV2.send_keys(clusters[-1], clear=False)
                                         else:
-                                            self.deviceV2.send_keys(word[i:], clear=False)
+                                            self.deviceV2.send_keys("".join(clusters[i:]), clear=False)
                                         break
                                 if n < n_words:
                                     self.deviceV2.send_keys(" ", clear=False)

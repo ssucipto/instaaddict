@@ -1,0 +1,116 @@
+# agent/configurables/ci.yml — AE local CI runtime matrix (M86 / P-CI-1)
+
+tiers:
+  static:
+    - ci-validate
+    - npm-test
+    - validate-ts
+  fast:
+    - ci-validate
+    - npm-test
+    - validate-ts
+    - review-measure
+    - integrity-e2e
+    - integrity-v2-e2e
+  full:
+    - ci-validate
+    - npm-test
+    - validate-ts
+    - review-measure
+    - integrity-e2e
+    - integrity-v2-e2e
+    - shellcheck
+    - e2e-smoke
+    - npm-audit
+    - e2e-matrix
+
+steps:
+  ci-validate:
+    description: "Run ci-validate bash script"
+    command: ci-validate
+    ci_job: validate
+    cost_rank: 10
+    ci_rank: 40
+    tools: [bash]
+    allow_skip: true
+
+  npm-test:
+    description: "Run npm test suite"
+    command: npm-test
+    ci_job: validate
+    cost_rank: 20
+    ci_rank: 30
+    tools: [node, npm]
+    allow_skip: true
+
+  validate-ts:
+    description: "Validate TypeScript tools and schemas"
+    command: validate-ts
+    ci_job: validate
+    cost_rank: 30
+    ci_rank: 10
+    tools: [node, npm]
+    allow_skip: true
+
+  review-measure:
+    description: "Deterministic scanner rule measurement"
+    command: review-measure
+    ci_job: validate
+    cost_rank: 40
+    ci_rank: 20
+    tools: [bash]
+    allow_skip: true
+
+  integrity-e2e:
+    description: "Run integrity e2e test suite"
+    command: integrity-e2e
+    ci_job: e2e-smoke
+    cost_rank: 60
+    ci_rank: 60
+    tools: [bash]
+    allow_skip: true
+
+  integrity-v2-e2e:
+    description: "Run integrity v2 e2e test suite"
+    command: integrity-v2-e2e
+    ci_job: e2e-smoke
+    cost_rank: 70
+    ci_rank: 70
+    tools: [bash]
+    allow_skip: true
+
+  shellcheck:
+    description: "Run shellcheck on shell scripts"
+    command: shellcheck
+    ci_job: shellcheck
+    cost_rank: 50
+    ci_rank: 50
+    tools: [shellcheck]
+    allow_skip: true
+
+  e2e-smoke:
+    description: "Run e2e smoke test suite"
+    command: e2e-smoke
+    ci_job: e2e-smoke
+    cost_rank: 80
+    ci_rank: 80
+    tools: [bash]
+    allow_skip: true
+
+  npm-audit:
+    description: "Run npm audit check"
+    command: npm-audit
+    ci_job: supply-chain
+    cost_rank: 90
+    ci_rank: 90
+    tools: [npm]
+    allow_skip: true
+
+  e2e-matrix:
+    description: "Run e2e matrix tests"
+    command: e2e-matrix
+    ci_job: e2e
+    cost_rank: 100
+    ci_rank: 100
+    tools: [bash]
+    allow_skip: true

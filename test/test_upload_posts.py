@@ -134,17 +134,37 @@ class TestUploadPostsPlugin(unittest.TestCase):
         # With a 1-hour limit, it should NOT be rate limited
         self.assertFalse(self.plugin._is_rate_limited(published_dir, rate_limit_hours=1.0))
 
-    def test_extract_caption_txt_priority(self):
-        """Verifies that .txt sidecar is read and preferred over .json sidecar."""
+    @patch("InstaAddict.plugins.upload_posts.get_vision_caption")
+    def test_extract_caption_txt_feeds_vision_ai_guidance(self, mock_vision):
+        """Verifies that .txt sidecar is passed into Gemini Vision AI as contextual guidance and extended."""
+        mock_vision.return_value = "Extended: Lola enjoying the sunny beach #jackrussell #perth"
+        pending_dir = os.path.join(self.test_dir, "pending")
+        os.makedirs(pending_dir, exist_ok=True)
+
+        media_file = "photo.JPG"
+        media_path = os.path.join(pending_dir, media_file)
+        with open(os.path.join(pending_dir, "photo.txt"), "w", encoding="utf-8") as f:
+            f.write("Caption from TXT sidecar #dogs")
+
+        with open(os.path.join(pending_dir, "photo.json"), "w", encoding="utf-8") as f:
+            json.dump({"caption": "Caption from JSON sidecar"}, f)
+
+        caption = self.plugin._extract_caption(pending_dir, media_file, "")
+        mock_vision.assert_called_once_with(
+            media_path, "casual Instagram user", user_context="Caption from TXT sidecar #dogs"
+        )
+        self.assertEqual(caption, "Extended: Lola enjoying the sunny beach #jackrussell #perth")
+
+    @patch("InstaAddict.plugins.upload_posts.get_vision_caption")
+    def test_extract_caption_txt_fallback_on_ai_failure(self, mock_vision):
+        """Verifies that if Vision AI is unavailable or fails, it falls back to raw .txt content."""
+        mock_vision.return_value = ""
         pending_dir = os.path.join(self.test_dir, "pending")
         os.makedirs(pending_dir, exist_ok=True)
 
         media_file = "photo.JPG"
         with open(os.path.join(pending_dir, "photo.txt"), "w", encoding="utf-8") as f:
             f.write("Caption from TXT sidecar #dogs")
-
-        with open(os.path.join(pending_dir, "photo.json"), "w", encoding="utf-8") as f:
-            json.dump({"caption": "Caption from JSON sidecar"}, f)
 
         caption = self.plugin._extract_caption(pending_dir, media_file, "")
         self.assertEqual(caption, "Caption from TXT sidecar #dogs")
@@ -171,7 +191,9 @@ class TestUploadPostsPlugin(unittest.TestCase):
         media_file = "photo.png"
         caption = self.plugin._extract_caption(pending_dir, media_file, "")
         self.assertEqual(caption, "AI Generated Caption #adventure")
-        mock_vision.assert_called_once()
+        mock_vision.assert_called_once_with(
+            os.path.join(pending_dir, media_file), "casual Instagram user", user_context=""
+        )
 
     def test_case_insensitive_media_extensions(self):
         """Verifies uppercase extensions (.JPG, .PNG, .MP4) are discovered."""
@@ -322,7 +344,132 @@ class TestUploadPostsPlugin(unittest.TestCase):
             media_id = self.plugin._get_mediastore_id("emulator-5554", "DSCF2934.JPG")
             self.assertEqual(media_id, "52")
 
+    def test_mediastore_id_parsing_picks_highest_id(self):
+        """Verifies that the newest/highest ID is selected when multiple entries match."""
+        with patch("subprocess.run") as mock_sub:
+            mock_sub.return_value = MagicMock(
+                stdout=(
+                    "Row: 0 _id=12, _data=/storage/emulated/0/Pictures/photo.jpg\n"
+                    "Row: 1 _id=99, _data=/storage/emulated/0/Pictures/photo.jpg\n"
+                    "Row: 2 _id=45, _data=/storage/emulated/0/Pictures/other.png\n"
+                )
+            )
+            media_id = self.plugin._get_mediastore_id("emulator-5554", "photo.jpg")
+            self.assertEqual(media_id, "99")
+
+    def test_execute_adb_timeout_handling(self):
+        """Verifies that ADB timeout returns False safely without crashing."""
+        import subprocess
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="adb", timeout=5)):
+            result = self.plugin._execute_adb("emulator-5554", ["push", "a", "b"], timeout=5)
+            self.assertFalse(result)
+
+    @patch.object(UploadPostsPlugin, "_upload_to_ig", side_effect=RuntimeError("Device detached"))
+    def test_run_upload_unexpected_exception_recorded_as_failed(self, mock_upload):
+        """Verifies that unexpected exceptions during upload do not crash run() and record failure metrics."""
+        os.chdir(self.test_dir)
+        account_dir = os.path.join("accounts", "test_user")
+        pending_dir = os.path.join(account_dir, "content_queue", "pending")
+        os.makedirs(pending_dir, exist_ok=True)
+
+        media_file = "test_img.JPG"
+        with open(os.path.join(pending_dir, media_file), "w") as f:
+            f.write("data")
+
+        configs = MagicMock()
+        configs.args.username = "test_user"
+        configs.args.config = os.path.join(account_dir, "config.yml")
+        configs.args.upload_rate_limit_hours = 0.0
+
+        session = MagicMock()
+        session.totalUploadsFailed = 0
+        session.uploadHistory = []
+        sessions = [session]
+
+        device = MagicMock()
+        # Should not raise exception
+        self.plugin.run(device, configs, None, sessions, None, "upload-posts")
+
+        self.assertEqual(session.totalUploadsFailed, 1)
+        self.assertEqual(len(session.uploadHistory), 1)
+        self.assertEqual(session.uploadHistory[0]["status"], "failed")
+
+    @patch.object(UploadPostsPlugin, "_upload_to_ig", return_value=True)
+    def test_rate_limit_mtime_touched_on_publish(self, mock_upload):
+        """Verifies that file mtime is updated to current time upon publishing."""
+        import time
+        os.chdir(self.test_dir)
+        account_dir = os.path.join("accounts", "test_user")
+        pending_dir = os.path.join(account_dir, "content_queue", "pending")
+        published_dir = os.path.join(account_dir, "content_queue", "published")
+        os.makedirs(pending_dir, exist_ok=True)
+
+        media_file = "old_photo.jpg"
+        media_path = os.path.join(pending_dir, media_file)
+        with open(media_path, "w") as f:
+            f.write("photo data")
+
+        # Set old mtime from 48 hours ago
+        old_time = time.time() - (48 * 3600)
+        os.utime(media_path, (old_time, old_time))
+
+        configs = MagicMock()
+        configs.args.username = "test_user"
+        configs.args.config = os.path.join(account_dir, "config.yml")
+        configs.args.upload_rate_limit_hours = 0.0
+
+        session = MagicMock()
+        session.totalUploadsSuccess = 0
+        session.uploadHistory = []
+        sessions = [session]
+
+        device = MagicMock()
+        self.plugin.run(device, configs, None, sessions, None, "upload-posts")
+
+        published_file = os.path.join(published_dir, media_file)
+        self.assertTrue(os.path.exists(published_file))
+        new_mtime = os.path.getmtime(published_file)
+        # Should be updated to within last 5 seconds
+        self.assertAlmostEqual(new_mtime, time.time(), delta=5)
+
+    def test_sidecar_utf8_sig_bom_stripped(self):
+        """Verifies that UTF-8 BOM (\ufeff) is cleanly stripped from sidecars."""
+        pending_dir = os.path.join(self.test_dir, "pending")
+        os.makedirs(pending_dir, exist_ok=True)
+
+        media_file = "bom_photo.jpg"
+        # Write file with explicit UTF-8 BOM
+        with open(os.path.join(pending_dir, "bom_photo.txt"), "wb") as f:
+            f.write("\ufeffCaption with Windows BOM #test".encode("utf-8"))
+
+        with patch("InstaAddict.plugins.upload_posts.get_vision_caption") as mock_vision:
+            mock_vision.return_value = ""  # Force fallback to raw txt
+            caption = self.plugin._extract_caption(pending_dir, media_file, "")
+            self.assertEqual(caption, "Caption with Windows BOM #test")
+            self.assertFalse(caption.startswith("\ufeff"))
+
+    def test_hashtag_enrichment_from_manager(self):
+        """Verifies that captions with fewer than 3 hashtags are enriched from HashtagManager."""
+        with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_post_hashtags") as mock_tags:
+            mock_tags.return_value = ["perthdogs", "jrt", "beachvibes"]
+            raw_caption = "Sunny day out with the pup!"
+            enriched = self.plugin._enrich_hashtags_if_needed(raw_caption, "test_user")
+            self.assertIn("#perthdogs", enriched)
+            self.assertIn("#jrt", enriched)
+            self.assertIn("#beachvibes", enriched)
+            self.assertTrue(enriched.startswith(raw_caption))
+
+    def test_hashtag_enrichment_not_needed_if_already_tagged(self):
+        """Verifies that captions with 3 or more hashtags are not bloated with duplicate tags."""
+        with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_post_hashtags") as mock_tags:
+            mock_tags.return_value = ["perthdogs", "jrt"]
+            tagged_caption = "Awesome sunset #sunset #beach #vibes #wa"
+            result = self.plugin._enrich_hashtags_if_needed(tagged_caption, "test_user")
+            self.assertEqual(result, tagged_caption)
+            mock_tags.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

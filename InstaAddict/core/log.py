@@ -16,6 +16,15 @@ COLORS = {
 }
 
 
+# Module-level globals initialized to prevent NameError prior to configure_logger
+g_session_id = None
+g_log_file_name = None
+g_logs_dir = "logs"
+g_file_handler = None
+g_error_file_handler = None
+g_log_file_updated = False
+
+
 class ColoredFormatter(logging.Formatter):
     def __init__(self, *, fmt, datefmt=None):
         logging.Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
@@ -127,12 +136,17 @@ def configure_logger(debug, username):
     def handle_uncaught_exception(exc_type, exc_value, exc_traceback):
         import sys
 
-        if issubclass(exc_type, KeyboardInterrupt):
+        if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
-        root_logger.critical(
-            "Uncaught fatal exception:", exc_info=(exc_type, exc_value, exc_traceback)
-        )
+        try:
+            root_logger.critical(
+                "Uncaught fatal exception:", exc_info=(exc_type, exc_value, exc_traceback)
+            )
+        except (KeyboardInterrupt, SystemExit):
+            sys.exit(0)
+        except Exception:
+            pass
 
     import sys
 

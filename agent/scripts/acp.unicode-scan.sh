@@ -48,6 +48,11 @@ from pathlib import Path
 
 target = Path(os.environ.get('ACP_TARGET', '.'))
 SKIP = {'node_modules', '.git'}
+SKIP_EXT = {
+    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.bmp', '.tiff', '.tif',
+    '.pdf', '.pyc', '.zip', '.tar', '.gz', '.mp4', '.mov', '.avi', '.mkv',
+    '.exe', '.dll', '.so', '.dylib', '.bin', '.db', '.sqlite', '.sqlite3'
+}
 HIDDEN = {
     0x200B: ('IG-14', 'ZERO WIDTH SPACE'), 0x200C: ('IG-15', 'ZERO WIDTH NON-JOINER'),
     0x200D: ('IG-16', 'ZERO WIDTH JOINER'), 0xFEFF: ('IG-38', 'BOM'),
@@ -60,7 +65,17 @@ HIDDEN = {
 }
 AI = ['ignore previous instructions','ignore the above','do not flag','bypass security',
       'skip this rule','system:','assistant:','forget previous','new instruction','as an AI']
-COMMENT = re.compile(r'^\\s*(//|#|/\\*|\\*|<!--)')
+AI_REGEXES = [re.compile(r'\b' + re.escape(p), re.I) for p in AI]
+COMMENT = re.compile(r'^\s*(//|#|/\*|\*|<!--)')
+DOC_EXT = {'.md', '.txt', '.rst', '.markdown'}
+
+def is_doc_emoji_zwj(path: Path, line: str, j: int) -> bool:
+    if path.suffix.lower() not in DOC_EXT:
+        return False
+    has_left_emoji = (j > 0 and ord(line[j - 1]) >= 0x2600)
+    has_right_emoji = (j + 1 < len(line) and ord(line[j + 1]) >= 0x2600)
+    return has_left_emoji or has_right_emoji
+
 findings = []
 
 def scan(path: Path):
@@ -70,18 +85,21 @@ def scan(path: Path):
         for j, ch in enumerate(line):
             cp = ord(ch)
             if cp in HIDDEN:
+                if cp == 0x200D and is_doc_emoji_zwj(path, line, j):
+                    continue
                 rule, name = HIDDEN[cp]
                 findings.append((str(path), i, rule, f'hidden Unicode U+{cp:04X} ({name})'))
         if COMMENT.match(line):
-            low = line.lower()
-            for p in AI:
-                if p in low:
+            for p, rx in zip(AI, AI_REGEXES):
+                if rx.search(line):
                     findings.append((str(path), i, 'IG-20', f'AI-directive language: \"{p}\"'))
 
 def walk(root: Path):
-    if root.is_file(): scan(root); return
+    if root.is_file():
+        if root.suffix.lower() not in SKIP_EXT: scan(root)
+        return
     for p in root.rglob('*'):
-        if not p.is_file() or any(x in p.parts for x in SKIP): continue
+        if not p.is_file() or any(x in p.parts for x in SKIP) or p.suffix.lower() in SKIP_EXT: continue
         scan(p)
 
 walk(target)

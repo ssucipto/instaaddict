@@ -375,6 +375,20 @@ class HashtagManager:
         self.save_all()
         return selected_tags if selected_tags else (fallback_sources or [])
 
+    def get_post_hashtags(self, count: int = 5) -> List[str]:
+        """Returns balanced rotating hashtags for newly uploaded posts across active tiers."""
+        tags = self.get_session_sources(total_limit=count)
+        if not tags:
+            for tier in self.master_data.get("tiers", {}).values():
+                for t in tier.get("tags", []):
+                    if t not in tags:
+                        tags.append(t)
+                        if len(tags) >= count:
+                            break
+                if len(tags) >= count:
+                    break
+        return tags[:count]
+
     def _is_tag_saturated(self, tag: str, saturated_tags: Dict[str, Any]) -> bool:
         """Checks if a tag is benched for saturation."""
         if tag not in saturated_tags:
@@ -463,7 +477,7 @@ class HashtagManager:
         """
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key or api_key == "INSERT_YOUR_KEY_HERE":
-            logger.warning("GEMINI_API_KEY not set. Cannot run AI expansion.")
+            logger.warning("Gemini AI credential not configured. Cannot run AI expansion.")
             return []
 
         try:

@@ -47,13 +47,9 @@ class DataAnalytics(Plugin):
         if not os.path.exists(storage.report_path):
             os.makedirs(storage.report_path)
 
-        filename = (
-            storage.report_path
-            + "report_"
-            + self.username
-            + "_"
-            + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-            + ".pdf"
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        filename = os.path.join(
+            storage.report_path, f"report_{self.username}_{timestamp}.pdf"
         )
         md_filename = filename.replace(".pdf", ".md")
 

@@ -1,9 +1,9 @@
 # Project Requirements: InstaAddict
 
 **Project Name**: InstaAddict  
-**Version**: 1.1.0  
+**Version**: 1.2.0  
 **Created**: 2026-09-11  
-**Last Updated**: 2026-09-13  
+**Last Updated**: 2026-09-15  
 **Status**: Active  
 
 ---
@@ -46,9 +46,10 @@ InstaAddict is an active continuation and evolution of the GramAddict project, f
 - **Package Whitelisting**: Protect core Android OS interfaces (`systemui`, IME keyboards) from false-positive dismissals.
 
 ### 5. Multimodal Vision AI Engagement & Autonomous Uploader
-- **Gemini Vision AI (`gemini-2.5-flash`)**: High-accuracy visual post analysis, contextual commenting matching account personas (`ai-persona.yml`), and single-shot evaluate-and-comment to halve API requests.
-- **Quota & Safety Resilience**: 429 exponential backoff retries, 512x512 LANCZOS payload compression, and FinishReason safety sanitizers.
-- **Content Queue Uploading (`UploadPostsPlugin`)**: Headless image/video upload automation from `accounts/<username>/upload_queue/` with automatic aspect ratio cropping, video trimming, and AI-generated captioning.
+- **Gemini Vision AI (`gemini-3.6-flash`)**: High-accuracy visual post analysis, contextual commenting matching account personas (`ai-persona.yml`), single-shot evaluate-and-comment to halve API requests, and mandatory pre-upload caption elaboration.
+- **5-Attempt Exponential Backoff Retries**: Up to 5 retries with backoff delays ($2s, 4s, 6s, 8s$) across Gemini Vision inference and HashtagManager tag retrieval on transient HTTP 500, 503, and 504 Deadline Exceeded conditions.
+- **Autonomous Uploader (`UploadPostsPlugin`)**: Headless image/video upload automation from `accounts/<username>/content_queue/pending/` with automatic MediaStore discovery, 12-hour publication rate-limiting, and upload queue prioritization at session start.
+- **Two-Way Telegram Bot Ingestion**: Real-time two-way inbox polling (`telegram-inbox: true`, `scripts/check_telegram.py`), companion comment attachment to media sidecars, and interactive `/elaborate` and `/caption` commands.
 
 ### 6. Fluid ADB-Native Motion & Human Simulation
 - **Native Flick Gestures**: Discarded jerky `uiautomator2.drag` in favor of calibrated 200ms `adb shell input swipe` gestures.

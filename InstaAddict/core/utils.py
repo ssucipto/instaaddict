@@ -487,21 +487,21 @@ def save_crash(device):
 
     crash_path = os.path.join("crashes", directory_name)
     try:
-        os.makedirs(crash_path, exist_ok=False)
-    except OSError:
-        logger.error(f"Directory {directory_name} already exists.")
+        os.makedirs(crash_path, exist_ok=True)
+    except OSError as e:
+        logger.error(f"Cannot create directory {directory_name}: {e}")
         return
     screenshot_format = ".png"
     try:
         device.screenshot(os.path.join(crash_path, "screenshot" + screenshot_format))
-    except RuntimeError:
-        logger.error(f"Cannot save 'screenshot.{screenshot_format}'.")
+    except Exception as e:
+        logger.error(f"Cannot save 'screenshot.{screenshot_format}': {e}")
 
     hierarchy_format = ".xml"
     try:
         device.dump_hierarchy(os.path.join(crash_path, "hierarchy" + hierarchy_format))
-    except RuntimeError:
-        logger.error(f"Cannot save 'hierarchy.{hierarchy_format}'.")
+    except Exception as e:
+        logger.error(f"Cannot save 'hierarchy.{hierarchy_format}': {e}")
     if args is not None and getattr(args, "screen_record", False):
         try:
             device.stop_screenrecord(crash=True)
@@ -526,9 +526,11 @@ def save_crash(device):
         except PermissionError as e:
             logger.error(f"Cannot save crash video because it is still in use: {e}")
     g_log_file_name, g_logs_dir, _, _ = get_log_file_config()
-    src_file = os.path.join(g_logs_dir, g_log_file_name)
-    target_file = os.path.join(crash_path, "logs.txt")
-    trim_txt(source=src_file, target=target_file)  # copy logs trimmed
+    if g_log_file_name and g_logs_dir:
+        src_file = os.path.join(g_logs_dir, g_log_file_name)
+        target_file = os.path.join(crash_path, "logs.txt")
+        if os.path.exists(src_file):
+            trim_txt(source=src_file, target=target_file)  # copy logs trimmed
     shutil.make_archive(crash_path, "zip", crash_path)
     shutil.rmtree(crash_path)
     logger.info(
@@ -540,8 +542,11 @@ def save_crash(device):
         extra={"color": Fore.GREEN},
     )
     logger.info("https://discord.gg/ySMaySMCD\n", extra={"color": Fore.GREEN})
-    check_if_updated(crash=True)
-    if args.screen_record:
+    try:
+        check_if_updated(crash=True)
+    except Exception:
+        pass
+    if args is not None and getattr(args, "screen_record", False):
         try:
             device.start_screenrecord()
         except Exception as e:
@@ -760,7 +765,22 @@ def wait_for_next_session(time_left, session_state, sessions, device):
         extra={"color": f"{Fore.GREEN}"},
     )
     try:
-        sleep(time_left.total_seconds())
+        total_seconds = time_left.total_seconds()
+        while total_seconds > 0:
+            slice_sleep = min(20.0, total_seconds)
+            sleep(slice_sleep)
+            total_seconds -= slice_sleep
+            if getattr(args, "telegram_inbox", False) or getattr(
+                args, "telegram_reports", False
+            ):
+                try:
+                    from InstaAddict.plugins.telegram import check_telegram_inbox
+
+                    check_telegram_inbox(args.username)
+                except Exception as e:
+                    logger.debug(
+                        f"check_telegram_inbox during sleep error: {e}"
+                    )
     except KeyboardInterrupt:
         stop_bot(device, sessions, session_state, was_sleeping=True)
 
