@@ -422,37 +422,51 @@ class DeviceFacade:
         sleep(2)
 
     def is_screen_locked(self):
-        data = run(
-            f"adb -s {self.deviceV2.serial} shell dumpsys window",
-            encoding="utf-8",
-            stdout=PIPE,
-            stderr=PIPE,
-            shell=True,
-        )
-        if data != "":
-            flag = search("mDreamingLockscreen=(true|false)", data.stdout)
-            return flag is not None and flag.group(1) == "true"
-        else:
-            logger.debug(
-                f"'adb -s {self.deviceV2.serial} shell dumpsys window' returns nothing!"
+        try:
+            cmd = ["adb"]
+            if hasattr(self.deviceV2, "serial") and self.deviceV2.serial:
+                cmd.extend(["-s", str(self.deviceV2.serial)])
+            cmd.extend(["shell", "dumpsys", "window"])
+            data = run(
+                cmd,
+                encoding="utf-8",
+                stdout=PIPE,
+                stderr=PIPE,
+                shell=False,
+                timeout=10,
             )
+            if data and data.stdout:
+                flag = search("mDreamingLockscreen=(true|false)", data.stdout)
+                return flag is not None and flag.group(1) == "true"
+            else:
+                logger.debug("dumpsys window returned nothing.")
+                return None
+        except Exception as ex:
+            logger.debug(f"is_screen_locked error: {ex}")
             return None
 
     def _is_keyboard_show(self):
-        data = run(
-            f"adb -s {self.deviceV2.serial} shell dumpsys input_method",
-            encoding="utf-8",
-            stdout=PIPE,
-            stderr=PIPE,
-            shell=True,
-        )
-        if data != "":
-            flag = search("mInputShown=(true|false)", data.stdout)
-            return flag.group(1) == "true"
-        else:
-            logger.debug(
-                f"'adb -s {self.deviceV2.serial} shell dumpsys input_method' returns nothing!"
+        try:
+            cmd = ["adb"]
+            if hasattr(self.deviceV2, "serial") and self.deviceV2.serial:
+                cmd.extend(["-s", str(self.deviceV2.serial)])
+            cmd.extend(["shell", "dumpsys", "input_method"])
+            data = run(
+                cmd,
+                encoding="utf-8",
+                stdout=PIPE,
+                stderr=PIPE,
+                shell=False,
+                timeout=10,
             )
+            if data and data.stdout:
+                flag = search("mInputShown=(true|false)", data.stdout)
+                return flag is not None and flag.group(1) == "true"
+            else:
+                logger.debug("dumpsys input_method returned nothing.")
+                return None
+        except Exception as ex:
+            logger.debug(f"_is_keyboard_show error: {ex}")
             return None
 
     def is_alive(self):

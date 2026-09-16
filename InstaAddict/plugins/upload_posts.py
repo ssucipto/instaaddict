@@ -236,11 +236,11 @@ class UploadPostsPlugin(Plugin):
                         logger.debug(f"Could not read upload-fallback-hashtags from config: {_cfg_err}")
 
             fallback_tags = fallback_tags_from_config or [
-                "#jackrussell",
-                "#jackrussellterrier",
-                "#perthdogs",
-                "#dogsofinstagram",
-                "#doglife",
+                "#photooftheday",
+                "#instagood",
+                "#dailylife",
+                "#lifestyle",
+                "#moments",
             ]
             lower_existing = {t.lower() for t in existing_tags}
             for tag in fallback_tags:

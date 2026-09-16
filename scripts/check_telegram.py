@@ -2,7 +2,7 @@
 """
 Diagnostic utility to test and verify Telegram integration for InstaAddict.
 Usage:
-    python scripts/check_telegram.py --username lolatheozjack
+    python scripts/check_telegram.py --username <your_account>
 """
 
 import argparse
@@ -151,12 +151,30 @@ def listen_inbox(username: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Verify Telegram integration for an InstaAddict account")
-    parser.add_argument("--username", default="lolatheozjack", help="Target Instagram account username")
+    parser.add_argument("--username", default=None, help="Target Instagram account username (defaults to the single configured account in accounts/)")
     parser.add_argument("--listen", action="store_true", help="Run live polling loop to listen for incoming Telegram messages/photos")
     args = parser.parse_args()
 
+    target_user = args.username
+    if not target_user:
+        accounts_dir = "accounts"
+        if os.path.exists(accounts_dir) and os.path.isdir(accounts_dir):
+            cands = [
+                d
+                for d in os.listdir(accounts_dir)
+                if os.path.isdir(os.path.join(accounts_dir, d))
+                and not d.startswith(".")
+            ]
+            if len(cands) == 1:
+                target_user = cands[0]
+
+    if not target_user:
+        print("❌ Error: --username argument is required (no single account directory found in accounts/).")
+        print("Usage: python scripts/check_telegram.py --username <your_username>")
+        sys.exit(1)
+
     if args.listen:
-        listen_inbox(args.username)
+        listen_inbox(target_user)
     else:
-        success = check_telegram(args.username)
+        success = check_telegram(target_user)
         sys.exit(0 if success else 1)

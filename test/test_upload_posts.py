@@ -501,7 +501,7 @@ class TestUploadPostsPlugin(unittest.TestCase):
         mock_instance.get_post_hashtags.side_effect = Exception("boom")
         with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_instance", return_value=mock_instance):
             result = self.plugin._enrich_hashtags_if_needed("Plain caption", "user")
-        self.assertIn("#jackrussell", result)
+        self.assertIn("#photooftheday", result)
 
     def test_hashtags_in_comment_separates_tags(self):
         """CO-020/F-02: Hashtag separation algorithm strips hashtag-only lines from caption."""

@@ -19,8 +19,16 @@ Resilience patch release introducing universal non-destructive modal popup dismi
 - **Unit Test Coverage (`test/test_dialog_dismissal_and_stuck_recovery.py`)**:
   - 10 automated unit tests covering all dismissal tiers, rate dialog priority, back navigation fallback, and app restart triggers.
 
+- **Security & Subprocess Hardening (OWASP A03:2021)**:
+  - Converted 100% of internal ADB and OS execution calls in `InstaAddict/core/utils.py` and `InstaAddict/core/device_facade.py` from `shell=True` to parameterized argument lists with defensive timeouts.
+  - Eliminated potential command injection vectors on external URLs and system settings.
+- **Privacy Decoupling & Account Isolation**:
+  - Decoupled hardcoded persona strings and localized hashtag fallbacks in `gemini_vision.py`, `hashtag_manager.py`, and `upload_posts.py` into generic creator defaults.
+  - Enhanced `scripts/check_telegram.py` to auto-discover active account configurations without hardcoded usernames.
+
 ### Fixed
 - Fixed inter-job navigation stall where background view hierarchy reporting `is_tab_bar_visible() == True` bypassed back presses and caused profile lookups to fail under active modal overlays.
+- Verified zero credentials, personal handles, or private environment files are tracked in public git history.
 
 **Full diff**: `v1.2.0...v1.2.1`
 

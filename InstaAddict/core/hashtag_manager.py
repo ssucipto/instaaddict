@@ -489,14 +489,14 @@ class HashtagManager:
             target_persona = (
                 persona
                 or self.master_data.get("ai_persona")
-                or "Lola the Jack Russell terrier in Perth, WA"
+                or "An active Instagram creator sharing lifestyle, photography, and adventures"
             )
             prompt = (
                 f"You are an Instagram growth expert for the account described as: '{target_persona}'.\n"
                 f"Generate {count} highly relevant, engaging, and active Instagram hashtags that this account should interact with.\n"
                 f"Divide them into: 1. Local/Geographic, 2. Breed/Niche, 3. Outdoor/Lifestyle, 4. Viral/Reach.\n"
                 f"Return ONLY a clean JSON object with a single key 'hashtags' containing a list of strings without '#'. Example:\n"
-                f'{{"hashtags": ["perthdogs", "jackrussellmoments", "dogbeachperth"]}}'
+                f'{{"hashtags": ["travelmoments", "adventuretime", "dailyvibes"]}}'
             )
 
             model = genai.GenerativeModel("gemini-1.5-flash")

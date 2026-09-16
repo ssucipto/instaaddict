@@ -313,7 +313,7 @@ tasks:
 documentation:
   design_documents: 1
   milestone_documents: 5
-  pattern_documents: 1
+  pattern_documents: 2
   task_documents: 0
   last_updated: '2026-09-16'
 progress:
@@ -324,8 +324,12 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-16
-  description: 'Implemented Universal Dialog Dismissal Engine, Post-Upload Popup Sweeper, Resilient Inter-Job Recovery, and Escalated Stuck-Screen Self-Healing.'
+  description: 'Repository Security, Privacy Decoupling, Subprocess Injection Hardening, and Universal Dialog Dismissal.'
   items:
+  - "✓ Audited repository integrity and privacy: verified zero tracked credentials, tokens, or .env files in git tree and remote history"
+  - "✓ Decoupled hardcoded persona strings and regional hashtags in gemini_vision.py, hashtag_manager.py, and upload_posts.py into generic creator defaults"
+  - "✓ Eliminated shell=True from ADB and OS commands across utils.py and device_facade.py, enforcing parameterized lists with timeouts (OWASP A03:2021)"
+  - "✓ Enhanced scripts/check_telegram.py with automatic account detection, eliminating hardcoded username defaults"
   - "✓ Built UniversalActions.dismiss_dialog: handles Rate Instagram (clicks No, thanks, strictly avoids Rate Instagram), notifications, sync, and system popups"
   - "✓ Added post-upload 3-iteration dialog sweep in UploadPostsPlugin._upload_to_ig to clear blocking popups before returning"
   - "✓ Hardened bot_flow inter-job recovery loop: replaced premature tab bar check with 4-tier escalated recovery and clean app restart"

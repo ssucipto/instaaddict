@@ -20,7 +20,9 @@ VISION_API_DEAD = False
 SESSION_API_CALLS = 0
 MAX_API_CALLS_PER_SESSION = 400
 
-UNIVERSAL_PERSONA = "Lola the Oz dog. a Jack Russell terrier. she is living in Perth Western Australia."
+UNIVERSAL_PERSONA = (
+    "A friendly and engaging Instagram creator sharing daily life moments, adventures, and insights."
+)
 try:
     if "--config" in sys.argv:
         idx = sys.argv.index("--config")

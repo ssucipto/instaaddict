@@ -195,9 +195,18 @@ def get_instagram_version():
 
 def open_instagram_with_url(url) -> bool:
     logger.info(f"Open Instagram app with url: {url}")
-    cmd = f"adb{'' if configs.device_id is None else ' -s ' + configs.device_id} shell am start -a android.intent.action.VIEW -d {url}"
-    cmd_res = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
-    err = cmd_res.stderr.strip()
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", str(url)])
+    try:
+        cmd_res = subprocess.run(
+            cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=15
+        )
+        err = cmd_res.stderr.strip()
+    except Exception as ex:
+        logger.warning(f"Error executing am start: {ex}")
+        return False
     random_sleep()
     if err:
         logger.debug(err)
@@ -213,33 +222,44 @@ def head_up_notifications(enabled: bool = False):
     """
     Enable or disable head-up-notifications
     """
-    cmd: str = (
-        f"adb{'' if configs.device_id is None else ' -s ' + configs.device_id} shell settings put global heads_up_notifications_enabled {0 if not enabled else 1}"
-    )
-    return subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "settings", "put", "global", "heads_up_notifications_enabled", "1" if enabled else "0"])
+    try:
+        return subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
+    except Exception as ex:
+        logger.debug(f"Failed to update heads_up_notifications: {ex}")
+        return None
 
 
 def check_screen_timeout():
     MIN_TIMEOUT = 5 * 6_000
-    cmd: str = (
-        f"adb{'' if configs.device_id is None else f' -s {configs.device_id}'} shell settings get system screen_off_timeout"
-    )
-    resp = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "settings", "get", "system", "screen_off_timeout"])
     try:
-        if int(resp.stdout.lstrip()) < MIN_TIMEOUT:
+        resp = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
+    except Exception as ex:
+        logger.debug(f"Failed to get screen timeout: {ex}")
+        return
+
+    try:
+        if int(resp.stdout.strip()) < MIN_TIMEOUT:
             logger.info(
                 f"Setting timeout of the screen to {MIN_TIMEOUT/6_000:.0f} minutes."
             )
-            cmd: str = (
-                f"adb{'' if configs.device_id is None else f' -s {configs.device_id}'} shell settings put system screen_off_timeout {MIN_TIMEOUT}"
-            )
-
-            subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
+            set_cmd = ["adb"]
+            if configs.device_id is not None:
+                set_cmd.extend(["-s", str(configs.device_id)])
+            set_cmd.extend(["shell", "settings", "put", "system", "screen_off_timeout", str(MIN_TIMEOUT)])
+            subprocess.run(set_cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
         else:
             logger.info("Screen timeout is fine!")
-    except ValueError:
+    except (ValueError, AttributeError):
         logger.info("Unable to get screen timeout!")
-        logger.debug(resp.stdout)
+        logger.debug(resp.stdout if resp else "")
 
 
 def open_instagram(device):
@@ -285,21 +305,33 @@ def open_instagram(device):
         random_sleep()
     logger.debug("Setting FastInputIME as default keyboard.")
     device.deviceV2.set_fastinput_ime(True)
-    cmd: str = (
-        f"adb{'' if configs.device_id is None else ' -s ' + configs.device_id} shell settings get secure default_input_method"
-    )
-    cmd_res = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
-    if cmd_res.stdout.replace(nl, "") != FastInputIME:
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "settings", "get", "secure", "default_input_method"])
+    try:
+        cmd_res = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
+    except Exception as ex:
+        logger.debug(f"Failed to check default IME: {ex}")
+        cmd_res = None
+
+    if cmd_res and cmd_res.stdout.replace(nl, "") != FastInputIME:
         logger.warning(
             f"FastInputIME is not the default keyboard! Default is: {cmd_res.stdout.replace(nl, '')}. Changing it via adb.."
         )
-        cmd: str = (
-            f"adb{'' if configs.device_id is None else ' -s ' + configs.device_id} shell ime set {FastInputIME}"
-        )
-        cmd_res = subprocess.run(
-            cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8"
-        )
-        if cmd_res.stdout.startswith("Error:"):
+        set_cmd = ["adb"]
+        if configs.device_id is not None:
+            set_cmd.extend(["-s", str(configs.device_id)])
+        set_cmd.extend(["shell", "ime", "set", FastInputIME])
+        try:
+            cmd_res = subprocess.run(
+                set_cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10
+            )
+        except Exception as ex:
+            logger.debug(f"Failed to set default IME: {ex}")
+            cmd_res = None
+
+        if cmd_res and cmd_res.stdout.startswith("Error:"):
             logger.warning(
                 f"{cmd_res.stdout.replace(nl, '')}. It looks like you don't have FastInputIME installed :S"
             )
@@ -437,28 +469,33 @@ def print_telegram_reports(
 def kill_atx_agent(device):
     _restore_keyboard(device)
     logger.info("Kill atx agent.")
-    cmd: str = (
-        f"adb{'' if configs.device_id is None else f' -s {configs.device_id}'} shell pkill atx-agent"
-    )
-    subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8")
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "pkill", "atx-agent"])
+    try:
+        subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
+    except Exception as ex:
+        logger.debug(f"Failed to kill atx-agent: {ex}")
 
 
 def restart_atx_agent(device):
     kill_atx_agent(device)
     logger.info("Restarting atx agent.")
-    cmd: str = (
-        f"adb{'' if configs.device_id is None else f' -s {configs.device_id}'} shell /data/local/tmp/atx-agent server -d"
-    )
+    cmd = ["adb"]
+    if configs.device_id is not None:
+        cmd.extend(["-s", str(configs.device_id)])
+    cmd.extend(["shell", "/data/local/tmp/atx-agent", "server", "-d"])
 
     try:
         result = subprocess.run(
-            cmd, stdout=PIPE, stderr=PIPE, shell=True, encoding="utf8", check=True
+            cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", check=True, timeout=15
         )
         if result.returncode != 0:
             logger.error(f"Failed to restart atx-agent: {result.stderr}")
         else:
             logger.info("atx-agent restarted successfully.")
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         logger.error(f"Error occurred while restarting atx-agent: {e}")
 
 

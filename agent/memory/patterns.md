@@ -14,3 +14,10 @@
   context: "Android UI automation when in-app or system popups (e.g., Rate Instagram, notifications, ANR) overlay screens and deadlock accessibility tab navigation."
   solution: "Implement UniversalActions.dismiss_dialog with regex and resource ID sweeps; integrate dialog checks into TabBarView._navigateTo and post-upload steps; provide UniversalActions.recover_stuck_screen with back presses and app_stop/app_start fallback."
 
+- date: 2026-09-16
+  name: parameterized-subprocess-and-credential-isolation
+  description: "Eliminate command injection by substituting formatted shell=True strings with parameterized argument lists and defensive timeouts, while isolating all persona and token credentials strictly into uncommitted local directories."
+  context: "ADB automation, OS interaction, and LLM multimodal bot configurations requiring public git safety and OWASP A03 injection defense."
+  solution: "Enforce shell=False with explicit timeout across subprocess.run/Popen; decouple core module fallbacks to generic creator roles; load private personas and tokens dynamically from local accounts/<user>/ and .env."
+
+

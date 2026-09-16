@@ -5,7 +5,7 @@
 - date: 2026-09-16
   executor: Antigravity
   branch: master
-  tasks_completed: [audit-056, audit-057, review-041]
+  tasks_completed: [audit-056, audit-057, review-041, audit-058]
   done:
     - audited-instagram-modal-dialog-and-stuck-screen-deadlock
     - implemented-universal-actions-dismiss-dialog-with-multi-tier-matching
@@ -15,10 +15,14 @@
     - built-universal-actions-recover-stuck-screen-with-escalated-clean-app-restart
     - integrated-dialog-dismissal-fallback-in-tab-bar-view-navigate-to
     - added-10-unit-tests-in-test-dialog-dismissal-and-stuck-recovery
+    - audited-repository-integrity-and-privacy-zero-tracked-secrets-verified
+    - decoupled-hardcoded-personas-and-hashtags-into-generic-creator-defaults
+    - eliminated-shell-true-from-all-core-subprocess-and-adb-calls-owasp-a03
+    - enhanced-check-telegram-diagnostic-script-with-auto-account-discovery
     - verified-68-of-68-tests-passing-100-percent-green-with-zero-regressions
-    - resolved-all-carryovers-co-019-through-co-033-as-fixed
+    - resolved-all-carryovers-co-019-through-co-036-as-fixed
   deferred: []
-  key_fact: "Instagram modal popups (such as 'Rate Instagram') retain active window focus while background accessibility view hierarchies remain visible, causing is_tab_bar_visible() to report True and breaking subsequent tab clicks. Sweeping dismissive options ('No, thanks', 'Remind me later', 'Not now', 'Cancel') before navigation and falling back to clean app restart (app_stop + app_start) guarantees session continuation without dropping scheduled tasks."
+  key_fact: "Separation of concerns: All account-specific personas, regional hashtags, and credentials reside strictly in local accounts/ and .env files protected by .gitignore. Eliminating shell=True and replacing string concatenation with parameterized argument lists and timeouts protects core automation from command injection vulnerabilities."
 
 - date: 2026-09-15
   executor: Antigravity

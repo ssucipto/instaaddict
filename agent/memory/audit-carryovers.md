@@ -415,3 +415,41 @@ carryovers:
     affected_files:
       - InstaAddict/core/views.py
       - InstaAddict/core/bot_flow.py
+
+  - id: CO-034
+    audit_report: agent/reports/audit-058-security-integrity-privacy-review.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "SEC-01: Decoupled hardcoded persona strings and regional hashtags from core modules into generic creator defaults."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/core/hashtag_manager.py
+      - InstaAddict/plugins/upload_posts.py
+      - scripts/check_telegram.py
+
+  - id: CO-035
+    audit_report: agent/reports/audit-058-security-integrity-privacy-review.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "SEC-02: Eliminated shell=True from ADB and system calls across core/utils.py and device_facade.py (OWASP A03:2021 Injection defense)."
+    affected_files:
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/device_facade.py
+
+  - id: CO-036
+    audit_report: agent/reports/audit-058-security-integrity-privacy-review.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "SEC-03: Auto-detect single configured account in scripts/check_telegram.py and remove hardcoded username defaults."
+    affected_files:
+      - scripts/check_telegram.py
+
