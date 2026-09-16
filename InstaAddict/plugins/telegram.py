@@ -1,8 +1,11 @@
 import json
 import logging
 import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+import subprocess
+import sys
+import threading
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 import yaml
@@ -11,6 +14,165 @@ from colorama import Fore, Style
 from InstaAddict.core.plugin_loader import Plugin
 
 logger = logging.getLogger(__name__)
+
+_ACTIVE_UPLOADS: set = set()
+_UPLOAD_LOCK = threading.Lock()
+
+
+def get_adb_device_status() -> str:
+    """Returns a short status string for ADB connectivity, e.g., 'emulator-5554 (online ✅)' or 'No devices connected'."""
+    try:
+        res = subprocess.run(
+            ["adb", "devices"], capture_output=True, text=True, timeout=5
+        )
+        lines = [
+            line.strip()
+            for line in res.stdout.splitlines()
+            if line.strip() and not line.startswith("List of devices")
+        ]
+        if not lines:
+            return "❌ No ADB devices connected"
+        devices = []
+        for line in lines:
+            parts = line.split()
+            if len(parts) >= 2:
+                dev, state = parts[0], parts[1]
+                if state == "device":
+                    devices.append(f"`{dev}` (online ✅)")
+                elif state == "offline":
+                    devices.append(f"`{dev}` (offline ⚠️)")
+                else:
+                    devices.append(f"`{dev}` ({state})")
+        return ", ".join(devices) if devices else "❌ No active devices"
+    except Exception as e:
+        return f"⚠️ ADB check unavailable ({e})"
+
+
+def get_upload_cooldown_status(
+    username: str, rate_limit_hours: Optional[float] = None
+) -> Tuple[bool, float, float]:
+    """
+    Checks the latest uploaded post in accounts/<username>/content_queue/published
+    to determine if the post cooldown is currently active.
+    Returns: (is_limited: bool, elapsed_hours: float, remaining_hours: float)
+    """
+    if rate_limit_hours is None:
+        rate_limit_hours = 12.0
+        acct_conf = f"accounts/{username}/config.yml"
+        if os.path.exists(acct_conf):
+            try:
+                with open(acct_conf, "r", encoding="utf-8") as f:
+                    uconf = yaml.safe_load(f) or {}
+                    if "upload-rate-limit-hours" in uconf:
+                        rate_limit_hours = float(uconf["upload-rate-limit-hours"])
+            except Exception:
+                pass
+
+    if rate_limit_hours <= 0:
+        return False, 999.0, 0.0
+
+    published_dir = f"accounts/{username}/content_queue/published"
+    if not os.path.exists(published_dir):
+        return False, 999.0, 0.0
+
+    latest_mtime: Optional[datetime] = None
+    allowed_exts = (".jpg", ".jpeg", ".png", ".mp4")
+    for root, _, files in os.walk(published_dir):
+        for file in files:
+            if file.lower().endswith(allowed_exts):
+                fp = os.path.join(root, file)
+                try:
+                    mt = datetime.fromtimestamp(os.path.getmtime(fp))
+                    if latest_mtime is None or mt > latest_mtime:
+                        latest_mtime = mt
+                except OSError:
+                    pass
+
+    if not latest_mtime:
+        return False, 999.0, 0.0
+
+    limit_threshold = datetime.now() - timedelta(hours=rate_limit_hours)
+    if latest_mtime > limit_threshold:
+        elapsed_hours = (datetime.now() - latest_mtime).total_seconds() / 3600.0
+        remaining_hours = max(0.0, rate_limit_hours - elapsed_hours)
+        return True, elapsed_hours, remaining_hours
+
+    elapsed_hours = (datetime.now() - latest_mtime).total_seconds() / 3600.0
+    return False, elapsed_hours, 0.0
+
+
+def trigger_on_demand_upload(
+    username: str,
+    force: bool = False,
+    token: Optional[str] = None,
+    auth_chat_id: Optional[str] = None,
+) -> bool:
+    """
+    Spawns an asynchronous background upload job for the specified user account
+    using '--only-upload' (and optionally '--upload-force').
+    Prevents duplicate concurrent upload runs via an in-memory lock set.
+    """
+    global _ACTIVE_UPLOADS
+    with _UPLOAD_LOCK:
+        if username in _ACTIVE_UPLOADS:
+            if token and auth_chat_id:
+                telegram_bot_send_text(
+                    token,
+                    auth_chat_id,
+                    "⏳ *Upload in Progress*: An upload job is already running for this account! Please wait for it to complete.",
+                )
+            return False
+        _ACTIVE_UPLOADS.add(username)
+
+    def _worker():
+        try:
+            cmd = [
+                sys.executable,
+                "-m",
+                "InstaAddict",
+                "run",
+                "--config",
+                f"accounts/{username}/config.yml",
+                "--only-upload",
+            ]
+            if force:
+                cmd.append("--upload-force")
+
+            logger.info(f"Triggering on-demand upload subprocess: {' '.join(cmd)}")
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            stdout, stderr = proc.communicate()
+            if proc.returncode != 0:
+                logger.error(
+                    f"On-demand upload subprocess exited with code {proc.returncode}: {stderr}"
+                )
+                if token and auth_chat_id:
+                    telegram_bot_send_text(
+                        token,
+                        auth_chat_id,
+                        f"⚠️ *On-Demand Upload Notice*: Process exited with code {proc.returncode}.\nCheck bot logs for full details.",
+                    )
+            else:
+                logger.info("On-demand upload subprocess finished successfully.")
+        except Exception as err:
+            logger.error(f"Error executing on-demand upload subprocess: {err}")
+            if token and auth_chat_id:
+                telegram_bot_send_text(
+                    token,
+                    auth_chat_id,
+                    f"❌ *On-Demand Upload Error*: {err}",
+                )
+        finally:
+            with _UPLOAD_LOCK:
+                _ACTIVE_UPLOADS.discard(username)
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+    return True
 
 
 def _load_telegram_state(username: str) -> dict:
@@ -39,7 +201,8 @@ def _get_pending_media(pending_dir: str) -> List[str]:
     if not os.path.exists(pending_dir):
         return []
     files = [
-        f for f in os.listdir(pending_dir)
+        f
+        for f in os.listdir(pending_dir)
         if f.lower().endswith((".jpg", ".jpeg", ".png", ".mp4"))
     ]
     files.sort(key=lambda f: os.path.getmtime(os.path.join(pending_dir, f)))
@@ -167,17 +330,160 @@ def check_telegram_inbox(
                 help_msg = (
                     "🤖 *InstaAddict Telegram Assistant*\n\n"
                     "📸 *To Queue a Post*:\n"
-                    "Send any photo or video with a caption! It will be added to your upload queue and published on schedule.\n\n"
+                    "Send any photo or video with a caption! It will be added to your upload queue and published automatically.\n\n"
                     "💬 *Companion Comments*:\n"
                     "Sent a photo without a caption? Just reply or send your notes in a follow-up text message—it will attach automatically!\n\n"
-                    "📋 *Commands*:\n"
-                    "• `/queue` - View items currently waiting in upload queue\n"
-                    "• `/status` - Check live bot session status\n"
-                    "• `/caption <text>` - Update caption for the latest queued post\n"
-                    "• `/elaborate` - Generate AI caption & hashtags for latest post\n"
+                    "🚀 *Posting Commands*:\n"
+                    "• `/post` - Upload next queued post now (respects 12h cooldown)\n"
+                    "• `/post_force` or `/post now` - Force upload next post immediately (bypasses cooldown)\n"
+                    "• `/preview` - Inspect the next queued photo & caption\n"
+                    "• `/cooldown` - Check posting cooldown status\n\n"
+                    "📋 *Management Commands*:\n"
+                    "• `/queue` - View all items waiting in upload queue\n"
+                    "• `/status` - Check bot session & Android emulator status\n"
+                    "• `/caption <text>` - Update caption for latest queued post\n"
+                    "• `/elaborate` - Generate AI caption & hashtags via Gemini Vision\n"
                     "• `/help` - Show this guidance"
                 )
                 telegram_bot_send_text(token, auth_chat_id, help_msg)
+                continue
+
+            elif cmd == "/preview":
+                pending_files = _get_pending_media(pending_dir)
+                if not pending_files:
+                    telegram_bot_send_text(
+                        token,
+                        auth_chat_id,
+                        "📂 *Upload queue is currently empty.*\n"
+                        "Send me a photo with a caption to queue your next post!",
+                    )
+                    continue
+
+                target_media = pending_files[0]
+                media_path = os.path.join(pending_dir, target_media)
+                base = os.path.splitext(target_media)[0]
+                txt_file = os.path.join(pending_dir, f"{base}.txt")
+                caption_text = ""
+                if os.path.exists(txt_file):
+                    try:
+                        with open(txt_file, "r", encoding="utf-8") as f:
+                            caption_text = f.read().strip()
+                    except Exception:
+                        pass
+
+                display_caption = (
+                    caption_text
+                    or "(No caption set - Vision AI will generate one if enabled)"
+                )
+                if target_media.lower().endswith((".jpg", ".jpeg", ".png")):
+                    photo_cap = (
+                        f"👀 Next Post Preview (#1 in queue)\n\n"
+                        f"📁 File: {target_media}\n"
+                        f"📝 Caption:\n{display_caption}"
+                    )
+                    if len(photo_cap) > 1024:
+                        photo_cap = photo_cap[:1020] + "..."
+                    res = telegram_bot_send_photo(
+                        token, auth_chat_id, media_path, caption=photo_cap
+                    )
+                    if not res or not res.get("ok"):
+                        telegram_bot_send_text(
+                            token,
+                            auth_chat_id,
+                            f"👀 *Next Post Preview* (#1 in queue):\n\n"
+                            f"📁 *Media*: `{target_media}`\n\n"
+                            f"📝 *Caption*:\n\"{display_caption}\"",
+                        )
+                else:
+                    # Video or other non-image format — use sendVideo (CO-024 / F-06)
+                    video_cap = (
+                        f"👀 Next Post Preview (#1 in queue)\n\n"
+                        f"📁 File: {target_media}\n"
+                        f"📝 Caption:\n{display_caption}"
+                    )
+                    if len(video_cap) > 1024:
+                        video_cap = video_cap[:1020] + "..."
+                    res = telegram_bot_send_video(
+                        token, auth_chat_id, media_path, caption=video_cap
+                    )
+                    if not res or not res.get("ok"):
+                        telegram_bot_send_text(
+                            token,
+                            auth_chat_id,
+                            f"👀 *Next Post Preview* (#1 in queue):\n\n"
+                            f"📁 *Media*: `{target_media}`\n\n"
+                            f"📝 *Caption*:\n\"{display_caption}\"",
+                        )
+                continue
+
+            elif cmd in ["/post", "/post_force"]:
+                force = (cmd == "/post_force") or (
+                    arg.lower() in ["now", "force", "--force", "-f"]
+                )
+                pending_files = _get_pending_media(pending_dir)
+                if not pending_files:
+                    telegram_bot_send_text(
+                        token,
+                        auth_chat_id,
+                        "📂 *Upload queue is currently empty.*\n"
+                        "Send me a photo or video first before requesting an upload!",
+                    )
+                    continue
+
+                target_media = pending_files[0]
+                if not force:
+                    is_limited, elapsed_h, remaining_h = (
+                        get_upload_cooldown_status(username)
+                    )
+                    if is_limited:
+                        hours_int = int(remaining_h)
+                        mins_int = int((remaining_h - hours_int) * 60)
+                        telegram_bot_send_text(
+                            token,
+                            auth_chat_id,
+                            f"⏳ *Upload Cooldown Active!*\n\n"
+                            f"• Last post was published {elapsed_h:.1f}h ago.\n"
+                            f"• Next scheduled slot in: *{hours_int}h {mins_int}m*.\n\n"
+                            f"💡 To bypass the cooldown and post immediately, reply with:\n"
+                            f"`/post_force` or `/post now`",
+                        )
+                        continue
+
+                started = trigger_on_demand_upload(
+                    username, force=force, token=token, auth_chat_id=auth_chat_id
+                )
+                if started:
+                    mode_str = " (Cooldown Bypassed ⚡)" if force else ""
+                    telegram_bot_send_text(
+                        token,
+                        auth_chat_id,
+                        f"🚀 *Starting On-Demand Instagram Upload!*{mode_str}\n\n"
+                        f"📷 *Next Media*: `{target_media}`\n"
+                        f"📱 Initiating upload sequence on Android device...\n\n"
+                        f"✨ You will receive a confirmation message once published!",
+                    )
+                continue
+
+            elif cmd == "/cooldown":
+                is_limited, elapsed_h, remaining_h = (
+                    get_upload_cooldown_status(username)
+                )
+                if is_limited:
+                    hours_int = int(remaining_h)
+                    mins_int = int((remaining_h - hours_int) * 60)
+                    msg = (
+                        f"⏳ *Upload Cooldown Status*:\n\n"
+                        f"• Last post published: {elapsed_h:.1f}h ago\n"
+                        f"• Cooldown remaining: *{hours_int}h {mins_int}m*\n\n"
+                        f"💡 Send `/post_force` or `/post now` to override and post immediately."
+                    )
+                else:
+                    msg = (
+                        f"✅ *Upload Cooldown Inactive*:\n\n"
+                        f"• Last post published: {elapsed_h:.1f}h ago\n"
+                        f"• Cooldown status: Ready to post anytime! Send `/post` to trigger."
+                    )
+                telegram_bot_send_text(token, auth_chat_id, msg)
                 continue
 
             elif cmd == "/queue":
@@ -185,9 +491,12 @@ def check_telegram_inbox(
                 if os.path.exists(pending_dir):
                     pending_files = [
                         f
-                        for f in sorted(os.listdir(pending_dir))
-                        if f.lower().endswith(
-                            (".jpg", ".jpeg", ".png", ".mp4")
+                        for f in sorted(
+                            (
+                                fn for fn in os.listdir(pending_dir)
+                                if fn.lower().endswith((".jpg", ".jpeg", ".png", ".mp4"))
+                            ),
+                            key=lambda fn: os.path.getmtime(os.path.join(pending_dir, fn)),
                         )
                     ]
                 if not pending_files:
@@ -225,6 +534,8 @@ def check_telegram_inbox(
 
             elif cmd == "/status":
                 status_lines = ["🤖 *InstaAddict Bot Status*:"]
+                adb_status = get_adb_device_status()
+                status_lines.append(f"• *Android Device*: {adb_status}")
                 sessions = load_sessions(username)
                 if sessions and len(sessions) > 0:
                     last_s = sessions[-1]
@@ -238,15 +549,7 @@ def check_telegram_inbox(
                         f"• *Follows last session*: {last_s.get('total_followed', 0)}"
                     )
                 pending_count = (
-                    len(
-                        [
-                            f
-                            for f in os.listdir(pending_dir)
-                            if f.lower().endswith(
-                                (".jpg", ".jpeg", ".png", ".mp4")
-                            )
-                        ]
-                    )
+                    len(_get_pending_media(pending_dir))
                     if os.path.exists(pending_dir)
                     else 0
                 )
@@ -483,7 +786,15 @@ def telegram_bot_send_text(bot_api_token, bot_chat_ID, text):
         parse_mode = "markdown"
         params = {"text": text, "chat_id": bot_chat_ID, "parse_mode": parse_mode}
         url = f"https://api.telegram.org/bot{bot_api_token}/{method}"
-        return requests.get(url, params=params).json()
+        res = requests.get(url, params=params, timeout=15).json()
+        if (
+            isinstance(res, dict)
+            and not res.get("ok")
+            and "can't parse entities" in res.get("description", "").lower()
+        ):
+            params.pop("parse_mode", None)
+            res = requests.get(url, params=params, timeout=15).json()
+        return res
     except Exception as e:
         logger.error(f"Error sending Telegram message: {e}")
         return None
@@ -494,8 +805,13 @@ def telegram_notify_upload_success(
     media_file: str,
     caption: str = "",
     telegram_config: Optional[dict] = None,
+    local_media_path: Optional[str] = None,
 ) -> bool:
-    """Sends a notification to Telegram when a post is successfully published to Instagram."""
+    """Sends a notification to Telegram when a post is successfully published to Instagram.
+
+    Also sends the uploaded media as a visual thumbnail so the user can see exactly
+    what was posted (CO-024 / F-11 — audit-055).
+    """
     if not username:
         return False
     if telegram_config is None:
@@ -521,6 +837,18 @@ def telegram_notify_upload_success(
         f"👤 *Account*: @{safe_user}"
     )
     res = telegram_bot_send_text(token, chat_id, tg_msg)
+
+    # Visual confirmation — send the actual media thumbnail (CO-024 / F-11)
+    if local_media_path and os.path.isfile(local_media_path):
+        try:
+            ext = os.path.splitext(local_media_path)[1].lower()
+            if ext in (".mp4", ".mov"):
+                telegram_bot_send_video(token, chat_id, local_media_path, caption="✅ Posted!")
+            else:
+                telegram_bot_send_photo(token, chat_id, local_media_path, caption="✅ Posted!")
+        except Exception as thumb_err:
+            logger.debug(f"Could not send upload thumbnail to Telegram: {thumb_err}")
+
     return res is not None
 
 
@@ -533,9 +861,25 @@ def telegram_bot_send_photo(bot_api_token, bot_chat_id, photo_path, caption=None
             data = {"chat_id": bot_chat_id}
             if caption:
                 data["caption"] = caption
-            return requests.post(url, data=data, files=files).json()
+            return requests.post(url, data=data, files=files, timeout=30).json()
     except Exception as e:
         logger.error(f"Error sending Telegram photo: {e}")
+        return None
+
+
+def telegram_bot_send_video(bot_api_token, bot_chat_id, video_path, caption=None):
+    """Send a video file to a Telegram chat (CO-024 / F-06 — audit-055)."""
+    try:
+        method = "sendVideo"
+        url = f"https://api.telegram.org/bot{bot_api_token}/{method}"
+        with open(video_path, "rb") as video_file:
+            files = {"video": video_file}
+            data = {"chat_id": bot_chat_id, "supports_streaming": True}
+            if caption:
+                data["caption"] = caption
+            return requests.post(url, data=data, files=files, timeout=60).json()
+    except Exception as e:
+        logger.error(f"Error sending Telegram video: {e}")
         return None
 
 

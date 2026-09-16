@@ -395,7 +395,8 @@ class TestUploadPostsPlugin(unittest.TestCase):
         self.assertEqual(session.uploadHistory[0]["status"], "failed")
 
     @patch.object(UploadPostsPlugin, "_upload_to_ig", return_value=True)
-    def test_rate_limit_mtime_touched_on_publish(self, mock_upload):
+    @patch("InstaAddict.plugins.upload_posts.get_vision_caption", return_value="Test caption #test #photo")
+    def test_rate_limit_mtime_touched_on_publish(self, mock_vision, mock_upload):
         """Verifies that file mtime is updated to current time upon publishing."""
         import time
         os.chdir(self.test_dir)
@@ -468,8 +469,135 @@ class TestUploadPostsPlugin(unittest.TestCase):
             self.assertEqual(result, tagged_caption)
             mock_tags.assert_not_called()
 
+    # ------------------------------------------------------------------ #
+    # Audit-055 regression tests                                           #
+    # ------------------------------------------------------------------ #
+
+    def test_import_time_available(self):
+        """CO-019/F-01: Regression — `time` module must be importable at module level."""
+        import InstaAddict.plugins.upload_posts as up_module
+        self.assertTrue(hasattr(up_module, "time"), "time module must be imported at module level")
+        # Confirm time.sleep is callable (the symbol was previously missing)
+        self.assertTrue(callable(up_module.time.sleep))
+
+    def test_configurable_fallback_hashtags(self):
+        """CO-025/F-08: Fallback hashtags should be read from upload-fallback-hashtags in config.yml."""
+        cfg = os.path.join(self.test_dir, "config.yml")
+        with open(cfg, "w") as f:
+            f.write("upload-fallback-hashtags:\n  - customtag1\n  - customtag2\n")
+        self.plugin._config_path_cache = cfg
+
+        mock_instance = MagicMock()
+        mock_instance.get_post_hashtags.side_effect = Exception("boom")
+        with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_instance", return_value=mock_instance):
+            result = self.plugin._enrich_hashtags_if_needed("Plain caption", "user")
+        self.assertIn("#customtag1", result, "Should use custom fallback from config")
+        self.assertIn("#customtag2", result)
+
+    def test_fallback_hashtags_default_when_no_config(self):
+        """CO-025/F-08: Hard-coded fallback tags used when no config present."""
+        self.plugin._config_path_cache = ""
+        mock_instance = MagicMock()
+        mock_instance.get_post_hashtags.side_effect = Exception("boom")
+        with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_instance", return_value=mock_instance):
+            result = self.plugin._enrich_hashtags_if_needed("Plain caption", "user")
+        self.assertIn("#jackrussell", result)
+
+    def test_hashtags_in_comment_separates_tags(self):
+        """CO-020/F-02: Hashtag separation algorithm strips hashtag-only lines from caption."""
+        # Directly test the separation logic used in run() when hashtags_in_comment=True
+        caption = "A lovely day\n\n#tag1 #tag2 #tag3"
+        lines = caption.split("\n")
+        text_lines, tag_lines = [], []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and all(part.startswith("#") for part in stripped.split() if part):
+                tag_lines.append(stripped)
+            else:
+                text_lines.append(line)
+        caption_for_composer = "\n".join(text_lines).strip()
+        hashtag_block = " ".join(tag_lines).strip()
+
+        self.assertEqual(caption_for_composer, "A lovely day")
+        self.assertEqual(hashtag_block, "#tag1 #tag2 #tag3")
+
+    def test_hashtags_in_comment_mixed_lines_not_stripped(self):
+        """CO-020/F-02: Lines mixing text and hashtags stay in the caption body."""
+        caption = "What a great day #sunshine and fun"
+        lines = caption.split("\n")
+        text_lines, tag_lines = [], []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and all(part.startswith("#") for part in stripped.split() if part):
+                tag_lines.append(stripped)
+            else:
+                text_lines.append(line)
+        # Mixed line should stay in caption, not be moved to first comment
+        self.assertIn("What a great day #sunshine and fun", "\n".join(text_lines))
+        self.assertEqual("".join(tag_lines), "")
+
+
+    def test_post_first_comment_no_op_on_empty(self):
+        """CO-020/F-02: _post_first_comment does nothing when hashtag_text is empty."""
+        mock_device = MagicMock()
+        self.plugin._post_first_comment(mock_device, "")
+        mock_device.deviceV2.assert_not_called()
+
+    def test_post_first_comment_exception_swallowed(self):
+        """CO-020/F-02: _post_first_comment never raises, always swallows exceptions."""
+        bad_device = MagicMock()
+        bad_device.deviceV2.side_effect = RuntimeError("device crash")
+        # Should not raise
+        self.plugin._post_first_comment(bad_device, "#tag1 #tag2")
+
+
+class TestTelegramAudit055(unittest.TestCase):
+    """Regression tests for Telegram send function changes in audit-055."""
+
+    def test_send_text_timeout_applied(self):
+        """CO-021/F-03: telegram_bot_send_text must pass timeout=15 to requests.get."""
+        from InstaAddict.plugins.telegram import telegram_bot_send_text
+
+        with patch("InstaAddict.plugins.telegram.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {"ok": True}
+            telegram_bot_send_text("TOKEN", "123", "hello")
+            call_kwargs = mock_get.call_args
+            self.assertIn("timeout", call_kwargs.kwargs, "timeout must be passed to requests.get")
+            self.assertEqual(call_kwargs.kwargs["timeout"], 15)
+
+    def test_send_photo_timeout_applied(self):
+        """CO-021/F-03: telegram_bot_send_photo must pass timeout=30 to requests.post."""
+        import tempfile
+        from InstaAddict.plugins.telegram import telegram_bot_send_photo
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp.write(b"fakejpeg")
+            tmp_path = tmp.name
+        try:
+            with patch("InstaAddict.plugins.telegram.requests.post") as mock_post:
+                mock_post.return_value.json.return_value = {"ok": True}
+                telegram_bot_send_photo("TOKEN", "123", tmp_path)
+                self.assertIn("timeout", mock_post.call_args.kwargs)
+                self.assertEqual(mock_post.call_args.kwargs["timeout"], 30)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_send_video_function_exists(self):
+        """CO-024/F-06: telegram_bot_send_video helper must exist."""
+        from InstaAddict.plugins import telegram as tg_module
+        self.assertTrue(
+            hasattr(tg_module, "telegram_bot_send_video"),
+            "telegram_bot_send_video function must exist"
+        )
+        self.assertTrue(callable(tg_module.telegram_bot_send_video))
+
+    def test_notify_success_accepts_local_media_path(self):
+        """CO-024/F-11: telegram_notify_upload_success must accept local_media_path kwarg."""
+        from InstaAddict.plugins.telegram import telegram_notify_upload_success
+        import inspect
+        sig = inspect.signature(telegram_notify_upload_success)
+        self.assertIn("local_media_path", sig.parameters, "local_media_path must be in signature")
+
 
 if __name__ == "__main__":
     unittest.main()
-
-

@@ -2,8 +2,10 @@ import os
 import re
 import json
 import shutil
+import time
 import logging
 import subprocess
+import yaml
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
@@ -50,6 +52,21 @@ class UploadPostsPlugin(Plugin):
             {
                 "arg": "--upload-hashtags-in-comment",
                 "help": "Post hashtags in first comment instead of main caption",
+                "action": "store_true",
+            },
+            {
+                "arg": "--only-upload",
+                "help": "Execute only the upload post job and exit immediately (on-demand upload mode)",
+                "action": "store_true",
+            },
+            {
+                "arg": "--upload-now",
+                "help": "Alias for --only-upload",
+                "action": "store_true",
+            },
+            {
+                "arg": "--upload-force",
+                "help": "Force upload immediately by bypassing the 12-hour rate-limit check",
                 "action": "store_true",
             },
         ]
@@ -101,6 +118,9 @@ class UploadPostsPlugin(Plugin):
     def _get_rate_limit_hours(self, configs: Any, config_path: str) -> float:
         """Resolves effective rate limit in hours from CLI args, YAML config, or default."""
         if hasattr(configs, "args"):
+            if getattr(configs.args, "upload_force", False) is True:
+                logger.info("Upload rate limit bypassed via --upload-force.")
+                return 0.0
             cli_hours = getattr(configs.args, "upload_rate_limit_hours", None)
             if cli_hours is not None:
                 try:
@@ -198,9 +218,24 @@ class UploadPostsPlugin(Plugin):
                 if attempt < max_retries - 1:
                     time.sleep(1)
 
-        # Fallback if HashtagManager yielded no tags
+        # Fallback if HashtagManager yielded no tags (CO-025 / F-08 — configurable via YAML)
         if not tags_to_add:
-            fallback_tags = [
+            fallback_tags_from_config: List[str] = []
+            if hasattr(self, "_config_path_cache"):
+                _cfg_path = getattr(self, "_config_path_cache", "")
+                if _cfg_path and os.path.exists(_cfg_path):
+                    try:
+                        with open(_cfg_path, "r", encoding="utf-8") as _cf:
+                            _user_conf = yaml.safe_load(_cf) or {}
+                            _raw_tags = _user_conf.get("upload-fallback-hashtags", [])
+                            if isinstance(_raw_tags, list):
+                                fallback_tags_from_config = [
+                                    f"#{t.strip().lstrip('#')}" for t in _raw_tags if isinstance(t, str) and t.strip()
+                                ]
+                    except Exception as _cfg_err:
+                        logger.debug(f"Could not read upload-fallback-hashtags from config: {_cfg_err}")
+
+            fallback_tags = fallback_tags_from_config or [
                 "#jackrussell",
                 "#jackrussellterrier",
                 "#perthdogs",
@@ -355,6 +390,11 @@ class UploadPostsPlugin(Plugin):
         config_path: str = ""
         if hasattr(configs, "args") and hasattr(configs.args, "config"):
             config_path = str(configs.args.config)
+        # Cache config path for use in _enrich_hashtags_if_needed (CO-025)
+        self._config_path_cache = config_path
+
+        # Flag: post hashtags in first comment instead of caption (CO-020 / F-02)
+        hashtags_in_comment = getattr(configs.args, "upload_hashtags_in_comment", False) is True
 
         # Check for custom queue directory via CLI args or YAML config
         custom_queue_dir = None
@@ -435,14 +475,37 @@ class UploadPostsPlugin(Plugin):
                 pending_dir, media_file, config_path, username=username
             )
 
+            # Separate hashtags from narrative text when first-comment mode is active (CO-020)
+            hashtag_block_for_comment = ""
+            caption_for_composer = caption
+            if hashtags_in_comment:
+                # Split caption: text lines vs. hashtag lines
+                lines = caption.split("\n")
+                text_lines = []
+                tag_lines = []
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped and all(
+                        part.startswith("#") for part in stripped.split() if part
+                    ):
+                        tag_lines.append(stripped)
+                    else:
+                        text_lines.append(line)
+                caption_for_composer = "\n".join(text_lines).strip()
+                hashtag_block_for_comment = " ".join(tag_lines).strip()
+                if hashtag_block_for_comment:
+                    logger.info(
+                        f"First-comment mode: separated {len(tag_lines)} hashtag line(s) from caption."
+                    )
+
             caption_snippet = (
-                (caption[:40] + "...") if len(caption) > 40 else caption
+                (caption_for_composer[:40] + "...") if len(caption_for_composer) > 40 else caption_for_composer
             )
             logger.info(
                 f"Uploading {media_file} with caption: {caption_snippet!r}"
             )
             try:
-                success = self._upload_to_ig(device, media_path, caption)
+                success = self._upload_to_ig(device, media_path, caption_for_composer)
             except Exception as e:
                 logger.error(
                     f"Unexpected exception during Instagram upload of {media_file}: {e}",
@@ -518,14 +581,18 @@ class UploadPostsPlugin(Plugin):
                         }
                     )
 
-                # Send Telegram notification if configured
+                # Post hashtags as first comment if flag is set (CO-020 / F-02)
+                if hashtags_in_comment and hashtag_block_for_comment:
+                    self._post_first_comment(device, hashtag_block_for_comment)
+
+                # Send Telegram notification if configured (pass local path for visual thumbnail)
                 try:
                     from InstaAddict.plugins.telegram import (
                         telegram_notify_upload_success,
                     )
 
                     telegram_notify_upload_success(
-                        username, media_file, caption
+                        username, media_file, caption, local_media_path=media_path
                     )
                 except Exception as tg_err:
                     logger.debug(
@@ -580,6 +647,66 @@ class UploadPostsPlugin(Plugin):
 
             # Process exactly one post per plugin invocation
             break
+
+    def _post_first_comment(self, device: Any, hashtag_text: str) -> None:
+        """Post hashtags as the first comment on the just-published post (CO-020 / F-02).
+
+        Navigates to the Home feed, opens the comment box on the first visible post
+        (which is the one just uploaded), types the hashtag block, and submits.
+        All exceptions are swallowed — a comment failure must never crash an upload.
+        """
+        if not hashtag_text or not hashtag_text.strip():
+            return
+        try:
+            d = device.deviceV2
+            logger.info("First-comment mode: navigating to Home to post hashtag comment...")
+            random_sleep(3, 5)
+
+            # Navigate to Home tab
+            home_btn = d(descriptionMatches="(?i).*Home.*")
+            if home_btn.exists(timeout=5):
+                home_btn.click()
+                random_sleep(2, 3)
+            else:
+                logger.debug("_post_first_comment: Home tab not found — skipping first comment.")
+                return
+
+            # Find comment button on the first visible post
+            comment_btn = d(descriptionMatches="(?i).*[Cc]omment.*")
+            if not comment_btn.exists(timeout=5):
+                logger.debug("_post_first_comment: Comment button not found — skipping.")
+                return
+            comment_btn.click()
+            random_sleep(1, 2)
+
+            # Type hashtags into the comment input box
+            comment_input = d(focused=True)
+            if not comment_input.exists(timeout=3):
+                # Fallback: try common comment edittext resource IDs
+                from InstaAddict.core.resources import ResourceID
+                resource_id = ResourceID()
+                comment_input = d(resourceId=resource_id.LAYOUT_COMMENT_THREAD_EDITTEXT)
+            if not comment_input.exists(timeout=3):
+                logger.debug("_post_first_comment: Comment input not found — skipping.")
+                return
+
+            comment_input.click()
+            comment_input.set_text(hashtag_text.strip())
+            random_sleep(1, 2)
+
+            # Submit the comment
+            send_btn = d(descriptionMatches="(?i).*(send|post).*")
+            if not send_btn.exists(timeout=3):
+                send_btn = d(resourceId="com.instagram.android:id/layout_comment_thread_post_button_click_area")
+            if send_btn.exists(timeout=3):
+                send_btn.click()
+                logger.info(f"First comment posted: {hashtag_text[:60]}...")
+            else:
+                logger.debug("_post_first_comment: Send button not found — comment not submitted.")
+
+        except Exception as e:
+            logger.debug(f"_post_first_comment: Non-fatal exception during first comment attempt: {e}")
+
 
     def _execute_adb(
         self, serial: str, command_args: List[str], timeout: int = 60
@@ -873,31 +1000,43 @@ class UploadPostsPlugin(Plugin):
             logger.info("Tapping Share button to publish post...")
             share_btn.click()
             logger.info(
-                "Share clicked. Waiting for upload completion state..."
+                "Share clicked. Polling for upload completion (max 30s)..."
             )
-            random_sleep(8, 12)
 
-            # Verification: Check return to Home feed or MainTabActivity
-            home_btn = d(descriptionMatches="(?i).*Home.*")
-            if home_btn.exists(timeout=5):
-                logger.info("Post uploaded successfully (Home feed visible).")
-                self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
-                return True
+            # Active verification loop — poll every 3s for up to 30s (CO-022 / F-04)
+            _IG_MAIN_ACTIVITIES = {
+                ".activity.MainTabActivity",
+                "com.instagram.mainactivity.MainActivity",
+                "com.instagram.mainactivity.LauncherActivity",
+            }
+            upload_confirmed = False
+            for _tick in range(10):
+                time.sleep(3)
+                try:
+                    # Check 1: Home tab visible
+                    if d(descriptionMatches="(?i).*Home.*").exists(timeout=1):
+                        upload_confirmed = True
+                        break
+                    # Check 2: Returned to main IG activity
+                    cur_app = d.app_current()
+                    if cur_app and cur_app.get("activity") in _IG_MAIN_ACTIVITIES:
+                        upload_confirmed = True
+                        break
+                    # Check 3: Progress bar / finalizing overlay gone
+                    if not d(resourceIdMatches=".*progress.*").exists(timeout=0):
+                        # No progress bar found — may have already completed
+                        if d(descriptionMatches="(?i).*Home.*").exists(timeout=1):
+                            upload_confirmed = True
+                            break
+                except Exception as tick_err:
+                    logger.debug(f"Upload poll tick {_tick + 1} error: {tick_err}")
 
-            try:
-                cur_app = d.app_current()
-                if cur_app and cur_app.get("activity") in [
-                    ".activity.MainTabActivity",
-                    "com.instagram.mainactivity.MainActivity",
-                    "com.instagram.mainactivity.LauncherActivity",
-                ]:
-                    logger.info("Post uploaded successfully (Returned to MainTabActivity).")
-                    self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
-                    return True
-            except Exception as act_err:
-                logger.debug(f"Could not verify app activity after share: {act_err}")
-
-            logger.info("Post upload completed.")
+            if upload_confirmed:
+                logger.info("Post uploaded successfully (confirmed).")
+            else:
+                logger.info(
+                    "Upload completion could not be confirmed within 30s — post likely published."
+                )
             self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
             return True
         else:

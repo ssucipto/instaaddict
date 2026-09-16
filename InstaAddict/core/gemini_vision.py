@@ -2,11 +2,13 @@ import os
 import re
 import io
 import time
+import random
 import logging
 import json
 import sys
 import yaml
 import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
 from PIL import Image
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -214,11 +216,31 @@ def get_vision_caption(
                     "Blend the user's intent smoothly into your persona's authentic voice."
                 )
 
+            # Randomized engagement hook — one of 3 styles (CO-026 / F-10)
+            _hook_style = random.randint(1, 3)
+            if _hook_style == 1:
+                hook_instruction = (
+                    "End your caption with a short, open-ended question about the subject "
+                    "that invites followers to share their thoughts or experiences."
+                )
+            elif _hook_style == 2:
+                hook_instruction = (
+                    "End your caption with a warm community invitation "
+                    "(e.g. 'who else loves this?', 'drop your faves below 🐾') "
+                    "that makes followers want to comment."
+                )
+            else:
+                hook_instruction = (
+                    "End your caption by calling out one specific detail from the scene "
+                    "and add one fitting emoji reaction prompt to spark comments."
+                )
+
             system_prompt = (
                 f"You are managing an Instagram account. Your Persona: '{active_persona}'. "
                 "Look at this media payload."
                 f"{context_clause} "
                 "Write a concise, highly organic caption (1-2 short sentences). "
+                f"{hook_instruction} "
                 "Then, add exactly 3-5 highly relevant hashtags. "
                 "UNDER ABSOLUTELY NO CIRCUMSTANCES CAN YOU USE THE '@' SYMBOL OR TAG ANY USERS! "
                 "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text)."
@@ -228,7 +250,8 @@ def get_vision_caption(
                 model_name='gemini-3.6-flash',
                 system_instruction=system_prompt,
                 generation_config=genai.GenerationConfig(
-                    temperature=0.9
+                    temperature=0.9,
+                    max_output_tokens=300,  # Cap prevents Instagram 2200-char overflow (CO-026 / F-15)
                 )
             )
             

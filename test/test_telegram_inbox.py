@@ -201,6 +201,7 @@ def test_upload_posts_sends_telegram_notification(temp_account_dir):
     mock_storage = MagicMock()
 
     with patch.object(plugin, "_upload_to_ig", return_value=True), \
+         patch("InstaAddict.plugins.upload_posts.get_vision_caption", return_value="") as mock_vision, \
          patch("InstaAddict.plugins.telegram.telegram_bot_send_text") as mock_send_tg:
         plugin.run(
             device=mock_device,
