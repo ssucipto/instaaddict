@@ -121,6 +121,10 @@ _commands = [
 
 
 def main() -> None:
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] not in ("init", "run", "dump", "-h", "--help", "-v", "--version"):
+        sys.argv.insert(1, "run")
+
     parser = argparse.ArgumentParser(
         prog="InstaAddict",
         description="free human-like Instagram bot",
@@ -148,7 +152,7 @@ def main() -> None:
             kwargs.pop("run", None)
             sp.add_argument(*args, **kwargs)
 
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     if args.subparser:
         actions[args.subparser](args)

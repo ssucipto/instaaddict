@@ -209,6 +209,41 @@ class TabBarView:
             if not button.exists():
                 button = self._get_new_profile_position()
 
+        if button is None or not button.exists(Timeout.MEDIUM):
+            # Attempt popup dismissal and retry before failing (CO-032 / F-05)
+            if UniversalActions.dismiss_dialog(self.device):
+                logger.info(f"Dismissed popup during navigation to {tab_name}. Retrying tab lookup...")
+            if tab == TabBarTabs.PROFILE:
+                button = self.device.find(resourceIdMatches=ResourceID.PROFILE_TAB)
+                if not button.exists():
+                    button = self.device.find(
+                        classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                        descriptionMatches=case_insensitive_re(TabBarText.PROFILE_CONTENT_DESC),
+                    )
+                if not button.exists():
+                    button = self._get_new_profile_position()
+            elif tab == TabBarTabs.HOME:
+                button = self.device.find(resourceIdMatches=ResourceID.FEED_TAB)
+                if not button.exists():
+                    button = self.device.find(
+                        classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                        descriptionMatches=case_insensitive_re(TabBarText.HOME_CONTENT_DESC),
+                    )
+            elif tab == TabBarTabs.SEARCH:
+                button = self.device.find(resourceIdMatches=ResourceID.SEARCH_TAB)
+                if not button.exists():
+                    button = self.device.find(
+                        classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                        descriptionMatches=case_insensitive_re(TabBarText.SEARCH_CONTENT_DESC),
+                    )
+            elif tab == TabBarTabs.REELS:
+                button = self.device.find(resourceIdMatches=ResourceID.CLIPS_TAB)
+                if not button.exists():
+                    button = self.device.find(
+                        classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                        descriptionMatches=case_insensitive_re(TabBarText.REELS_CONTENT_DESC),
+                    )
+
         if button is not None and button.exists(Timeout.MEDIUM):
             # Two clicks to reset tab content
             button.click(sleep=SleepTime.SHORT)
@@ -2274,6 +2309,11 @@ class PostsGridView:
                 return opened_post_view, media_type, obj_count
             if attempt == 0:
                 logger.debug("Post didn't open, trying one more click...")
+                # Re-resolve both row_view and post_view — the recycler may have
+                # re-bound the previous child reference after a layout pass.
+                row_view = post_list_view.child(index=row + OFFSET)
+                if not row_view.exists():
+                    break
                 post_view = row_view.child(index=col)
                 if not post_view.exists():
                     break
@@ -3136,6 +3176,202 @@ class UniversalActions:
             logger.debug(f"escape_in_app_browser check encountered error: {e}")
 
         return escaped
+
+    @staticmethod
+    def dismiss_dialog(device, max_sweeps: int = 3) -> bool:
+        """
+        Detects and dismisses modal dialogs, popups, and intrusive system/app overlays
+        such as 'Rate Instagram', notification requests, Google autofill, sync prompts, etc.
+        Sweeps up to max_sweeps times to handle stacked dialogs.
+        Returns True if any dialog was dismissed, False otherwise.
+        """
+        dismissed_any = False
+        d = getattr(device, "deviceV2", None)
+        app_id = getattr(device, "app_id", "com.instagram.android")
+
+        def _find_elem(text_regex, fallback_list=None):
+            if d is not None:
+                try:
+                    btn = d(textMatches=text_regex)
+                    if btn.exists(timeout=1):
+                        return btn
+                except Exception:
+                    pass
+            elif hasattr(device, "find"):
+                try:
+                    query = case_insensitive_re(fallback_list or text_regex)
+                    view = device.find(textMatches=query)
+                    if view.exists():
+                        return view
+                except Exception:
+                    pass
+            return None
+
+        for sweep in range(max_sweeps):
+            dismissed_this_pass = False
+            try:
+                # 1. High-Priority Special Case: "Rate Instagram" / "Enjoying Instagram?"
+                # Specifically click "No, thanks" or "Remind me later". STRICTLY avoid "Rate Instagram".
+                rate_no_thanks = _find_elem(r"(?i)^(No,\s*thanks|No\s+thanks)$", ["No, thanks", "No thanks"])
+                if rate_no_thanks is not None:
+                    logger.info("Dismissing 'Rate Instagram' dialog by clicking 'No, thanks'...")
+                    rate_no_thanks.click()
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(1, 2, modulable=False)
+                    continue
+
+                rate_remind_later = _find_elem(r"(?i)^Remind\s+me\s+later$", "Remind me later")
+                if rate_remind_later is not None:
+                    logger.info("Dismissing 'Rate Instagram' dialog by clicking 'Remind me later'...")
+                    rate_remind_later.click()
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(1, 2, modulable=False)
+                    continue
+
+                # 2. Standard Negative/Dismiss Options (Notifications, Sync, FB Link, Promo, etc.)
+                neg_options = [
+                    "Not now",
+                    "Cancel",
+                    "Skip",
+                    "Maybe later",
+                    "Don't allow",
+                    "Never",
+                    "No",
+                    "Close",
+                ]
+                neg_regex = r"(?i)^(Not now|Cancel|Skip|Maybe later|Don't allow|Never|No|Close)$"
+                neg_btn = _find_elem(neg_regex, neg_options)
+                if neg_btn is not None:
+                    txt = None
+                    if hasattr(neg_btn, "get_text"):
+                        txt = neg_btn.get_text()
+                    elif hasattr(neg_btn, "info") and isinstance(neg_btn.info, dict):
+                        txt = neg_btn.info.get("text", "")
+                    logger.info(f"Dismissing modal popup with negative action: '{txt or 'dismiss'}'...")
+                    neg_btn.click()
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(1, 2, modulable=False)
+                    continue
+
+                # 3. Informational/Consent OK Options
+                info_options = ["OK", "Got it", "Continue", "I agree", "Dismiss", "Done"]
+                info_regex = r"(?i)^(OK|Got it|Continue|I agree|Dismiss|Done)$"
+                info_btn = _find_elem(info_regex, info_options)
+                if info_btn is not None:
+                    txt = None
+                    if hasattr(info_btn, "get_text"):
+                        txt = info_btn.get_text()
+                    elif hasattr(info_btn, "info") and isinstance(info_btn.info, dict):
+                        txt = info_btn.info.get("text", "")
+                    logger.info(f"Dismissing informational modal dialog with action: '{txt or 'OK'}'...")
+                    info_btn.click()
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(1, 2, modulable=False)
+                    continue
+
+                # 4. Resource ID fallbacks (NEGATIVE_BUTTON, FIND_PEOPLE_DISMISS_BUTTON, etc.)
+                res_attr = getattr(device, "ResourceID", None)
+                if res_attr is not None and not isinstance(res_attr, type):
+                    res_neg = getattr(res_attr, "NEGATIVE_BUTTON", f"{app_id}:id/negative_button")
+                else:
+                    res_neg = f"{app_id}:id/negative_button"
+
+                try:
+                    neg_res_btn = None
+                    if d is not None:
+                        btn = d(resourceIdMatches=res_neg)
+                        if btn.exists(timeout=1):
+                            neg_res_btn = btn
+                    elif hasattr(device, "find"):
+                        btn = device.find(resourceIdMatches=res_neg)
+                        if btn.exists():
+                            neg_res_btn = btn
+
+                    if neg_res_btn is not None:
+                        logger.info("Dismissing modal dialog via ResourceID.NEGATIVE_BUTTON...")
+                        neg_res_btn.click()
+                        dismissed_this_pass = True
+                        dismissed_any = True
+                        random_sleep(1, 2, modulable=False)
+                        continue
+                except Exception:
+                    pass
+
+                # System ANR Dialog ("Instagram isn't responding" -> "Wait")
+                anr_btn = _find_elem(r"(?i)^Wait$", "Wait")
+                if anr_btn is not None:
+                    logger.warning("System ANR detected ('Wait'). Tapping Wait...")
+                    anr_btn.click()
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(1, 2, modulable=False)
+                    continue
+
+            except Exception as ex:
+                logger.debug(f"dismiss_dialog check encountered error on pass {sweep + 1}: {ex}")
+
+            if not dismissed_this_pass:
+                break
+
+        return dismissed_any
+
+    @staticmethod
+    def recover_stuck_screen(device, app_id: Optional[str] = None) -> bool:
+        """
+        Escalated self-healing recovery when the bot is stuck or unable to navigate.
+        Stage 1: Dismiss any dialogs
+        Stage 2: Press back up to 2 times
+        Stage 3: Attempt Home tab tap
+        Stage 4: Clean app relaunch (app_stop -> app_start) to reset app state
+        """
+        target_app = app_id or getattr(device, "app_id", "com.instagram.android")
+        logger.warning(
+            "Executing escalated stuck-screen recovery protocol...",
+            extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+        )
+        # Stage 1: Dialog dismissal
+        if UniversalActions.dismiss_dialog(device):
+            logger.info("Stuck screen recovery: dialog dismissed.")
+            random_sleep(1, 2, modulable=False)
+
+        # Stage 2: Back keys
+        logger.info("Stuck screen recovery: issuing back keys...")
+        device.back()
+        random_sleep(1, 2, modulable=False)
+        UniversalActions.dismiss_dialog(device)
+
+        # Stage 3: Check if tab bar or home is available now
+        d = getattr(device, "deviceV2", None)
+        if d is not None:
+            try:
+                home_desc = d(descriptionMatches=r"(?i).*Home.*")
+                if home_desc.exists(timeout=2):
+                    logger.info("Stuck screen recovery: Home tab reached.")
+                    return True
+            except Exception:
+                pass
+
+        # Stage 4: Nuclear / Clean App Relaunch
+        logger.warning(
+            f"Stuck screen recovery escalating to Stage 4: Clean restart of {target_app}...",
+            extra={"color": f"{Style.BRIGHT}{Fore.RED}"},
+        )
+        try:
+            if d is not None:
+                d.app_stop(target_app)
+                random_sleep(2, 3, modulable=False)
+                d.app_start(target_app)
+                random_sleep(5, 7, modulable=False)
+                UniversalActions.dismiss_dialog(device)
+                return True
+        except Exception as restart_err:
+            logger.error(f"Failed to relaunch app during stuck-screen recovery: {restart_err}")
+
+        return False
 
     @staticmethod
     def detect_block(device) -> bool:

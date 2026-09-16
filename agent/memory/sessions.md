@@ -2,6 +2,44 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-16
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-056, audit-057, review-041]
+  done:
+    - audited-instagram-modal-dialog-and-stuck-screen-deadlock
+    - implemented-universal-actions-dismiss-dialog-with-multi-tier-matching
+    - enforced-safe-rate-instagram-handling-strictly-clicking-no-thanks
+    - added-post-upload-dialog-sweeping-in-upload-posts-plugin
+    - replaced-flawed-tab-bar-visible-check-in-inter-job-bot-flow-recovery
+    - built-universal-actions-recover-stuck-screen-with-escalated-clean-app-restart
+    - integrated-dialog-dismissal-fallback-in-tab-bar-view-navigate-to
+    - added-10-unit-tests-in-test-dialog-dismissal-and-stuck-recovery
+    - verified-68-of-68-tests-passing-100-percent-green-with-zero-regressions
+    - resolved-all-carryovers-co-019-through-co-033-as-fixed
+  deferred: []
+  key_fact: "Instagram modal popups (such as 'Rate Instagram') retain active window focus while background accessibility view hierarchies remain visible, causing is_tab_bar_visible() to report True and breaking subsequent tab clicks. Sweeping dismissive options ('No, thanks', 'Remind me later', 'Not now', 'Cancel') before navigation and falling back to clean app restart (app_stop + app_start) guarantees session continuation without dropping scheduled tasks."
+
+- date: 2026-09-15
+  executor: Antigravity
+  branch: master
+  tasks_completed: [route-046, audit-052, audit-053, review-040]
+  done:
+    - implemented-option-b-on-demand-telegram-posting-commands
+    - built-post-and-post-force-with-12h-cooldown-evaluation-and-bypass
+    - built-preview-delivering-photo-and-caption-directly-to-telegram
+    - integrated-adb-device-connection-state-into-status-command
+    - built-cooldown-query-command-calculating-remaining-wait-window
+    - resolved-cli-subparser-error-by-auto-injecting-run-subparser
+    - enabled-auto-config-discovery-from-username-flag
+    - implemented-only-upload-and-upload-now-modes-bypassing-interaction-loops
+    - built-automated-adb-daemon-recovery-on-emulator-offline-transport-drops
+    - silenced-deprecated-google-generativeai-package-futurewarning-banner
+    - added-10-unit-tests-in-test-telegram-commands-reaching-127-tests-100-percent-green
+    - passed-all-6-local-acp-ci-fast-gates
+  deferred: []
+  key_fact: "Google Android emulator ADB transport drop (emulator-5554 offline) occurs over extended TCP idle sockets without the VM shutting down; cycling ADB daemon (adb kill-server && adb start-server) instantly restores connection. InstaAddict CLI subparser 'run' can be transparently injected when direct user flags are supplied. In-memory locks prevent duplicate on-demand upload subprocesses from colliding on device resources."
+
 - date: 2026-09-15
   executor: Antigravity
   branch: master

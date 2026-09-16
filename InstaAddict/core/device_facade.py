@@ -202,6 +202,7 @@ class DeviceFacade:
         self.device_id = device_id
         self.app_id = app_id
         _apply_uiautomator2_compatibility_patches()
+        self._ensure_adb_healthy(device_id)
         try:
             if device_id is None or "." not in device_id:
                 self.deviceV2 = uiautomator2.connect(
@@ -211,7 +212,52 @@ class DeviceFacade:
                 self.deviceV2 = uiautomator2.connect_adb_wifi(f"{device_id}")
         except ImportError:
             raise ImportError("Please install uiautomator2: pip3 install uiautomator2")
+        except Exception as e:
+            logger.warning(
+                f"Initial connection to device {device_id} failed ({e}). Attempting ADB recovery..."
+            )
+            self._recover_adb()
+            if device_id is None or "." not in device_id:
+                self.deviceV2 = uiautomator2.connect(
+                    "" if device_id is None else device_id
+                )
+            else:
+                self.deviceV2 = uiautomator2.connect_adb_wifi(f"{device_id}")
         self.ensure_uiautomator_alive()
+
+    @staticmethod
+    def _recover_adb():
+        """Recovers stale or offline ADB transport connections by restarting the ADB server daemon."""
+        import subprocess
+
+        try:
+            logger.info("Executing 'adb kill-server && adb start-server' to refresh transport...")
+            subprocess.run(["adb", "kill-server"], capture_output=True, timeout=10)
+            sleep(1)
+            subprocess.run(["adb", "start-server"], capture_output=True, timeout=15)
+            sleep(2)
+        except Exception as err:
+            logger.warning(f"ADB server recovery encountered an error: {err}")
+
+    def _ensure_adb_healthy(self, device_id: Optional[str]):
+        """Checks if ADB reports the target device as offline, and auto-recovers if so."""
+        if not device_id or "." in device_id:
+            return
+        import subprocess
+
+        try:
+            res = subprocess.run(
+                ["adb", "devices"], capture_output=True, text=True, timeout=10
+            )
+            for line in res.stdout.splitlines():
+                if device_id in line and "offline" in line:
+                    logger.warning(
+                        f"Device {device_id} detected as 'offline' in ADB. Automatically refreshing ADB daemon..."
+                    )
+                    self._recover_adb()
+                    break
+        except Exception:
+            pass
 
     def ensure_uiautomator_alive(self) -> bool:
         """Verify that uiautomator2's accessibility service / UiAutomation is connected and responsive."""

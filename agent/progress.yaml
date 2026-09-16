@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.2.0
+  version: 1.2.1
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -300,12 +300,22 @@ tasks:
     actual_hours: 2.5
     route_file: agent/routing/tasks/route-045-two-way-telegram-content-ingestion.md
     notes: Implemented getUpdates polling with persistent last_update_id tracking, photo download to content_queue/pending/, caption extraction to .txt sidecar, whitelist security, interactive /queue, /status, /help commands, upload notifications, and responsive sleep polling. 93/93 tests passing.
+  - id: task-38
+    name: Option B On-Demand Telegram Posting, Subparser CLI Dispatching, and ADB Auto-Recovery
+    priority: 1
+    status: completed
+    started: 2026-09-15
+    completed_date: '2026-09-15'
+    estimated_hours: 3
+    actual_hours: 2.5
+    route_file: agent/routing/tasks/route-046-on-demand-telegram-posting-and-adb-resilience.md
+    notes: Implemented Option B on-demand posting via /post, /post_force, /preview, /cooldown, ADB connection state in /status, CLI subparser routing in __main__.py, isolated single-upload execution with --only-upload and --upload-force, automated ADB daemon restart recovery, and 100% passing tests (127/127).
 documentation:
   design_documents: 1
   milestone_documents: 5
-  pattern_documents: 0
+  pattern_documents: 1
   task_documents: 0
-  last_updated: '2026-09-14'
+  last_updated: '2026-09-16'
 progress:
   planning: 100
   implementation: 100
@@ -313,6 +323,30 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-16
+  description: 'Implemented Universal Dialog Dismissal Engine, Post-Upload Popup Sweeper, Resilient Inter-Job Recovery, and Escalated Stuck-Screen Self-Healing.'
+  items:
+  - "✓ Built UniversalActions.dismiss_dialog: handles Rate Instagram (clicks No, thanks, strictly avoids Rate Instagram), notifications, sync, and system popups"
+  - "✓ Added post-upload 3-iteration dialog sweep in UploadPostsPlugin._upload_to_ig to clear blocking popups before returning"
+  - "✓ Hardened bot_flow inter-job recovery loop: replaced premature tab bar check with 4-tier escalated recovery and clean app restart"
+  - "✓ Added popup dismissal fallback to TabBarView._navigateTo when tab buttons are obscured"
+  - "✓ Implemented UniversalActions.recover_stuck_screen: clean app relaunch (app_stop + app_start) resets app state when stuck"
+  - "✓ Created 10-case unit test suite (test_dialog_dismissal_and_stuck_recovery.py) with 100% pass rate"
+  - "✓ Verified all 68 tests passing across test suite with zero regressions"
+- date: 2026-09-15
+  description: 'Implemented Option B: On-Demand Telegram Posting, Subparser CLI Auto-Routing, and ADB Auto-Recovery (Route-046).'
+  items:
+  - "✓ Implemented /post on-demand posting with 12h cooldown protection and remaining time estimates"
+  - "✓ Added /post_force and /post now to override publication cooldown on demand"
+  - "✓ Built /preview to inspect next queued photo and caption directly in Telegram chat"
+  - "✓ Added /cooldown to query remaining time before next scheduled posting window"
+  - "✓ Integrated live Android ADB device status reporting (online/offline) into /status"
+  - "✓ Fixed CLI subparser error: auto-injected 'run' subparser when direct arguments (--username) are passed"
+  - "✓ Added --only-upload, --upload-now, and --upload-force flags to run isolated ~45s single-post cycles"
+  - "✓ Built automatic ADB server recovery ('adb kill-server && adb start-server') when emulator transport drops"
+  - "✓ Silenced deprecated google.generativeai package FutureWarning on import"
+  - "✓ Added 10-test suite in test_telegram_commands.py (127/127 total tests passing)"
+  - "✓ Authored audit-052, audit-053, route-046, and review-040; passed 6/6 local CI fast gates"
 - date: 2026-09-14
   description: 'Completed Milestone 9: Two-Way Telegram Content Ingestion, Remote Media Queueing & Mobile Bot Command Engine (Route-045).'
   items:

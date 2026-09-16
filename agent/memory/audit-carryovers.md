@@ -226,3 +226,192 @@ carryovers:
       - InstaAddict/plugins/upload_posts.py
       - test/test_upload_posts.py
 
+  - id: CO-017
+    audit_report: agent/reports/audit-054-profile-bot-infinite-photo-loop.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: null
+    summary: "F-01: Add device.back() after photo/carousel like in interact_with_user to mirror VIDEO branch and prevent infinite same-photo loop."
+    affected_files:
+      - InstaAddict/core/interaction.py
+
+  - id: CO-018
+    audit_report: agent/reports/audit-054-profile-bot-infinite-photo-loop.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: null
+    summary: "F-04: Re-resolve row_view (not just post_view) on retry in navigateToPost to prevent stale RecyclerView child reference clicking same cell."
+    affected_files:
+      - InstaAddict/core/views.py
+
+  - id: CO-019
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-01: Missing `import time` in upload_posts.py — `time.sleep(1)` on line 217 causes NameError at runtime when HashtagManager retry fires."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-020
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-02: --upload-hashtags-in-comment argument declared but never consumed — implement first-comment hashtag posting after upload success."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-021
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-03: telegram_bot_send_text (lines 774,781) and telegram_bot_send_photo (line 832) have no HTTP timeout — can hang indefinitely, freezing the Telegram bot thread."
+    affected_files:
+      - InstaAddict/plugins/telegram.py
+
+  - id: CO-022
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-04: Upload success verification uses only 8-12s fixed sleep + single Home tab check — replace with active polling loop (30s max, 3s intervals)."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-023
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-05: Gemini model name 'gemini-3.6-flash' verified valid for 2026 API catalog."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+
+  - id: CO-024
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-06/F-11: /preview sends text-only for video; upload success notification sends text only — implement sendVideo for preview and photo thumbnail in success notification."
+    affected_files:
+      - InstaAddict/plugins/telegram.py
+
+  - id: CO-025
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-08/F-14: Hard-coded fallback hashtags (jackrussell/perthdogs) should be configurable via YAML; /queue sort order should match mtime posting order."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - InstaAddict/plugins/telegram.py
+
+  - id: CO-026
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-10/F-15: Caption AI prompt lacks engagement hooks (questions/CTAs); no max_output_tokens cap (risk of 2200-char Instagram limit violation)."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+
+  - id: CO-027
+    audit_report: agent/reports/audit-055-photo-upload-engagement-optimization.md
+    date_raised: 2026-09-16
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'self-verification'
+    summary: "F-09/F-13: MEDIA_SCANNER_SCAN_FILE broadcast deprecated on Android 10+; trigger_on_demand_upload subprocess ignores custom --upload-queue-dir."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - InstaAddict/plugins/telegram.py
+
+  - id: CO-028
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-01: Universal dialog dismissal engine in UniversalActions (Rate Instagram 'No, thanks', notifications 'Not now', stacked popups)."
+    affected_files:
+      - InstaAddict/core/views.py
+
+  - id: CO-029
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-02: Post-upload dialog sweep in upload_posts.py to clear post-upload dialogs before returning."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-030
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-03: Hardened inter-job recovery loop in bot_flow.py to avoid spurious recovered=True when dialog overlays tab bar."
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-031
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-04: Multi-attempt retry before skipping jobs in bot_flow.py."
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-032
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-05: TabBarView._navigateTo fallback to dialog dismissal and back press on missing tab button."
+    affected_files:
+      - InstaAddict/core/views.py
+
+  - id: CO-033
+    audit_report: agent/reports/audit-056-instagram-popups-and-stuck-screen-resilience.md
+    date_raised: 2026-09-16
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-16'
+    verified_in_audit: 'audit-057'
+    summary: "F-06/F-07: Escalated stuck-screen recovery with clean app relaunch (app_stop + app_start) in UniversalActions and bot_flow.py."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/bot_flow.py

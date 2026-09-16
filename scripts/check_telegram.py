@@ -74,10 +74,12 @@ def check_telegram(username: str):
         f"👤 Account: `{username}`\n\n"
         "✨ *Features Ready:*\n"
         "• 📷 Send photos/videos to queue them for upload\n"
-        "• 📝 Send companion notes right after photos to guide captions\n"
-        "• 🔮 Use `/elaborate` to generate AI captions & hashtags\n"
-        "• 📊 Use `/status` or `/queue` to inspect uploads\n"
-        "• 🚀 Instant upload confirmations & session summaries"
+        "• 🚀 `/post` - Upload next queued post now (respects 12h cooldown)\n"
+        "• ⚡ `/post_force` - Force immediate upload (bypasses cooldown)\n"
+        "• 👀 `/preview` - Inspect next post photo and caption\n"
+        "• 🔮 `/elaborate` - Generate AI captions & hashtags via Gemini Vision\n"
+        "• 📊 `/status` or `/queue` - Inspect uploads & Android emulator\n"
+        "• 🕒 `/cooldown` - Check posting rate-limit window"
     )
     try:
         send_res = requests.get(
@@ -129,8 +131,12 @@ def listen_inbox(username: str):
     print("📲 You can now open Telegram and send:")
     print("   • A photo or video (queues for Instagram upload)")
     print("   • A companion note (attaches context to the photo)")
+    print("   • /post (upload next queued post now)")
+    print("   • /post_force or /post now (bypass cooldown and upload immediately)")
+    print("   • /preview (view next queued post photo & caption)")
+    print("   • /cooldown (check remaining time before next post)")
     print("   • /elaborate (triggers Gemini Vision AI to generate caption + hashtags)")
-    print("   • /status or /queue (view pending queue)")
+    print("   • /status or /queue (view pending queue & device status)")
     print("   • /help (see all commands)")
     print("\nPress Ctrl+C to exit.\n" + "-" * 50)
 

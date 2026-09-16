@@ -1037,6 +1037,18 @@ class UploadPostsPlugin(Plugin):
                 logger.info(
                     "Upload completion could not be confirmed within 30s — post likely published."
                 )
+
+            # Post-upload popup sweep (CO-029 / F-02):
+            # Instagram frequently presents "Rate Instagram", "Turn on notifications", or "Share to Facebook"
+            # immediately after publishing. Clear them so subsequent jobs can interact cleanly.
+            try:
+                from InstaAddict.core.views import UniversalActions
+                UniversalActions.dismiss_dialog(device, max_sweeps=3)
+                random_sleep(1, 2)
+                UniversalActions.dismiss_dialog(device, max_sweeps=2)
+            except Exception as dismiss_err:
+                logger.debug(f"Post-upload dialog sweep encountered error: {dismiss_err}")
+
             self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
             return True
         else:

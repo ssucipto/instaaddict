@@ -262,22 +262,34 @@ def start_bot(**kwargs):
                 extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
             )
             sleep(3)
-        if configs.args.shuffle_jobs:
+        only_upload_requested = bool(
+            getattr(configs.args, "only_upload", False)
+            or getattr(configs.args, "upload_now", False)
+        )
+        if only_upload_requested:
+            logger.info(
+                "On-demand upload mode requested (--only-upload). Restricting session solely to upload-posts.",
+                extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+            )
+            jobs_list = ["upload-posts"]
+            total_sessions = 1
+        elif configs.args.shuffle_jobs:
             jobs_list = random.sample(configs.enabled, len(configs.enabled))
         else:
             jobs_list = configs.enabled
 
-        if "analytics" in jobs_list:
-            jobs_list.remove("analytics")
-            if configs.args.analytics:
-                analytics_at_end = True
-        if "telegram-reports" in jobs_list:
-            jobs_list.remove("telegram-reports")
-            if configs.args.telegram_reports:
-                telegram_reports_at_end = True
-        if "upload-posts" in jobs_list:
-            jobs_list.remove("upload-posts")
-            jobs_list.insert(0, "upload-posts")
+        if not only_upload_requested:
+            if "analytics" in jobs_list:
+                jobs_list.remove("analytics")
+                if configs.args.analytics:
+                    analytics_at_end = True
+            if "telegram-reports" in jobs_list:
+                jobs_list.remove("telegram-reports")
+                if configs.args.telegram_reports:
+                    telegram_reports_at_end = True
+            if "upload-posts" in jobs_list:
+                jobs_list.remove("upload-posts")
+                jobs_list.insert(0, "upload-posts")
         print_limits = True
         unfollow_jobs = [x for x in jobs_list if "unfollow" in x]
         logger.info(
@@ -286,7 +298,7 @@ def start_bot(**kwargs):
         storage = Storage(session_state.my_username)
         filters = Filter(storage)
         show_ending_conditions()
-        if not configs.args.debug:
+        if not configs.args.debug and not only_upload_requested:
             countdown(10, "Bot will start in: ")
         for plugin in jobs_list:
             inside_working_hours, time_left = SessionState.inside_working_hours(
@@ -312,33 +324,75 @@ def start_bot(**kwargs):
                 )
                 break
             if profile_view.getUsername(error=False) != session_state.my_username:
-                logger.debug("Not in your main profile.")
-                recovered = False
-                for _ in range(5):
-                    if tab_bar_view.is_tab_bar_visible():
-                        recovered = True
-                        break
-                    back_btn = device.find(
-                        resourceIdMatches=ResourceID.ACTION_BAR_BUTTON_BACK
-                    )
-                    if back_btn.exists():
-                        logger.debug("Tapping action_bar_button_back to exit search.")
-                        back_btn.click()
-                    else:
-                        logger.debug("Tab bar not visible, go back.")
-                        device.back()
-                    random_sleep(1, 2, modulable=False)
-                if recovered:
-                    tab_bar_view.navigateToProfile()
-                    if profile_view.getUsername() != session_state.my_username:
-                        logger.warning(
-                            f"Navigated to profile but still not on {session_state.my_username}'s "
-                            "profile. Skipping this job to avoid running it on the wrong screen."
-                        )
-                        continue
+                logger.debug("Not in your main profile. Initiating recovery...")
+                # Immediate pre-recovery popup sweep (CO-028 / CO-030)
+                UniversalActions.dismiss_dialog(device)
+
+                resource_id = getattr(device, "ResourceID", None)
+                if resource_id is None or isinstance(resource_id, type):
+                    action_bar_back = f"{configs.args.app_id}:id/action_bar_button_back"
                 else:
+                    action_bar_back = getattr(
+                        resource_id,
+                        "ACTION_BAR_BUTTON_BACK",
+                        f"{configs.args.app_id}:id/action_bar_button_back",
+                    )
+
+                on_profile = False
+                for attempt in range(4):
+                    # Sweep any blocking dialogs before tab navigation
+                    UniversalActions.dismiss_dialog(device)
+
+                    # Back up to 3 times if tab bar is not visible
+                    for _ in range(3):
+                        if tab_bar_view.is_tab_bar_visible():
+                            break
+                        back_btn = device.find(resourceIdMatches=action_bar_back)
+                        if back_btn.exists():
+                            logger.debug("Tapping action_bar_button_back to exit search/subscreen.")
+                            back_btn.click()
+                        else:
+                            logger.debug("Tab bar not visible, go back.")
+                            device.back()
+                        random_sleep(1, 2, modulable=False)
+                        UniversalActions.dismiss_dialog(device)
+
+                    tab_bar_view.navigateToProfile()
+                    if profile_view.getUsername(error=False) == session_state.my_username:
+                        on_profile = True
+                        break
+
+                    logger.debug(f"Profile recovery attempt {attempt + 1}/4 did not reach profile.")
+
+                    # Escalated recovery tiers (CO-031 / CO-033)
+                    if attempt == 0:
+                        device.back()
+                        random_sleep(1, 2, modulable=False)
+                        UniversalActions.dismiss_dialog(device)
+                    elif attempt == 1:
+                        # Try navigating to Home first, then Profile
+                        tab_bar_view.navigateToHome()
+                        random_sleep(1, 2, modulable=False)
+                        UniversalActions.dismiss_dialog(device)
+                        tab_bar_view.navigateToProfile()
+                        if profile_view.getUsername(error=False) == session_state.my_username:
+                            on_profile = True
+                            break
+                    elif attempt == 2:
+                        # Nuclear / Self-healing recovery: Clean restart of Instagram!
+                        logger.warning(
+                            "Persistent navigation deadlock detected. Executing self-healing app restart...",
+                            extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                        )
+                        UniversalActions.recover_stuck_screen(device, configs.args.app_id)
+                        tab_bar_view.navigateToProfile()
+                        if profile_view.getUsername(error=False) == session_state.my_username:
+                            on_profile = True
+                            break
+
+                if not on_profile:
                     logger.warning(
-                        "Could not recover a visible tab bar after 5 attempts. "
+                        f"Could not reach {session_state.my_username}'s profile after 4 recovery attempts. "
                         "Skipping this job to avoid running it on the wrong screen."
                     )
                     continue
@@ -432,7 +486,11 @@ def start_bot(**kwargs):
         )
         pre_post_script(pre=False, path=configs.args.post_script)
 
-        if configs.args.repeat and can_repeat(len(sessions), total_sessions):
+        if (
+            not only_upload_requested
+            and configs.args.repeat
+            and can_repeat(len(sessions), total_sessions)
+        ):
             print_full_report(sessions, configs.args.scrape_to_file)
             inside_working_hours, time_left = SessionState.inside_working_hours(
                 configs.args.working_hours, configs.args.time_delta_session

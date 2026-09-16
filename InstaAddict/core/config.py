@@ -44,50 +44,62 @@ class Config:
                     self.app_id = app_id
                 else:
                     self.app_id = "com.instagram.android"
-        elif "--config" in self.args:
-            try:
-                file_name = self.args[self.args.index("--config") + 1]
-                if not file_name.endswith((".yml", ".yaml")):
-                    logger.error(
-                        f"You have to specify a *.yml / *.yaml config file path (For example 'accounts/your_account_name/config.yml')! \nYou entered: {file_name}, abort."
-                    )
-                    sys.exit(1)
-                logger.warning(get_time_last_save(file_name))
-                with open(file_name, encoding="utf-8") as fin:
-                    # preserve order of yaml
-                    self.config_list = [line.strip() for line in fin]
-                    fin.seek(0)
-                    # preload config for debug and username
-                    self.config = yaml.safe_load(fin)
-            except IndexError:
-                logger.warning(
-                    "Please provide a filename with your --config argument. Example: '--config accounts/yourusername/config.yml'"
-                )
-                exit(2)
-            except FileNotFoundError:
-                logger.error(
-                    f"I can't see the file '{file_name}'! Double check the spelling or if you're calling the bot from the right folder. (You're there: '{os.getcwd()}')"
-                )
-                exit(2)
-
-            self.username = self.config.get("username", False)
-            self.debug = self.config.get("debug", False)
-            self.app_id = self.config.get("app_id", "com.instagram.android")
         else:
-            if "--debug" in self.args:
-                self.debug = True
-            if "--username" in self.args:
+            if "--config" not in self.args and "--username" in self.args:
                 try:
-                    self.username = self.args[self.args.index("--username") + 1]
+                    u_idx = self.args.index("--username")
+                    if u_idx + 1 < len(self.args):
+                        cand_user = self.args[u_idx + 1]
+                        cand_cfg = os.path.join("accounts", cand_user, "config.yml")
+                        if os.path.isfile(cand_cfg):
+                            self.args.extend(["--config", cand_cfg])
+                except Exception:
+                    pass
+
+            if "--config" in self.args:
+                try:
+                    file_name = self.args[self.args.index("--config") + 1]
+                    if not file_name.endswith((".yml", ".yaml")):
+                        logger.error(
+                            f"You have to specify a *.yml / *.yaml config file path (For example 'accounts/your_account_name/config.yml')! \nYou entered: {file_name}, abort."
+                        )
+                        sys.exit(1)
+                    logger.warning(get_time_last_save(file_name))
+                    with open(file_name, encoding="utf-8") as fin:
+                        # preserve order of yaml
+                        self.config_list = [line.strip() for line in fin]
+                        fin.seek(0)
+                        # preload config for debug and username
+                        self.config = yaml.safe_load(fin)
                 except IndexError:
                     logger.warning(
-                        "Please provide a username with your --username argument. Example: '--username yourusername'"
+                        "Please provide a filename with your --config argument. Example: '--config accounts/yourusername/config.yml'"
                     )
                     exit(2)
-            if "--app-id" in self.args:
-                self.app_id = self.args[self.args.index("--app-id") + 1]
+                except FileNotFoundError:
+                    logger.error(
+                        f"I can't see the file '{file_name}'! Double check the spelling or if you're calling the bot from the right folder. (You're there: '{os.getcwd()}')"
+                    )
+                    exit(2)
+
+                self.username = self.config.get("username", False)
+                self.debug = self.config.get("debug", False)
+                self.app_id = self.config.get("app_id", "com.instagram.android")
             else:
-                self.app_id = "com.instagram.android"
+                if "--debug" in self.args:
+                    self.debug = True
+                if "--username" in self.args:
+                    try:
+                        self.username = self.args[self.args.index("--username") + 1]
+                    except IndexError:
+                        logger.warning(
+                            "Please provide a username with your --username argument. Example: '--username yourusername'"
+                        )
+                        exit(2)
+                if "--app-id" in self.args:
+                    self.app_id = self.args[self.args.index("--app-id") + 1]
+                else:
+                    self.app_id = "com.instagram.android"
 
         # Configure ArgParse
         self.parser = configargparse.ArgumentParser(

@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.2.1 — Modal Dialog Dismissal, Rate Instagram Handling & Stuck-Screen Self-Healing
+
+Resilience patch release introducing universal non-destructive modal popup dismissal (specifically targeting "Rate Instagram", push notification requests, contact sync, and system ANR dialogs), post-upload popup sweeping, and 4-tier escalated stuck-screen recovery with clean app relaunch.
+
+### Added
+- **Universal Modal Dialog Dismissal Engine (`UniversalActions.dismiss_dialog`)**:
+  - Safe priority handling for "Rate Instagram" dialogs: strictly clicks "No, thanks" or "Remind me later" and excludes "Rate Instagram" to prevent exiting to the Google Play Store.
+  - Multi-tier matching for negative/dismissive options: `"Not now"`, `"Cancel"`, `"Skip"`, `"Maybe later"`, `"Don't allow"`, `"Never"`, `"No"`, `"Close"`.
+  - Fallbacks for informational acknowledgments (`"OK"`, `"Got it"`, `"Continue"`), resource IDs (`NEGATIVE_BUTTON`), and system ANRs (`"Wait"`).
+- **Post-Upload Dialog Sweeping (`UploadPostsPlugin._upload_to_ig`)**:
+  - 3-iteration dialog sweep immediately following confirmed post publication to neutralize popups before subsequent jobs execute.
+- **Escalated Stuck-Screen Self-Healing (`UniversalActions.recover_stuck_screen`)**:
+  - 4-tier recovery protocol: dialog dismissal -> Android back key sequences -> Home tab navigation -> clean application restart (`app_stop` + `app_start`) when persistent navigation deadlocks occur.
+- **Resilient Tab Bar Navigation & Inter-Job Recovery (`TabBarView._navigateTo`, `bot_flow.py`)**:
+  - Automatically sweeps obscuring dialogs if tab buttons are not found on first pass.
+  - Replaced flawed `is_tab_bar_visible()` breakout with profile username validation and clean-restart escalation, ensuring subsequent scheduled jobs are not abandoned.
+- **Unit Test Coverage (`test/test_dialog_dismissal_and_stuck_recovery.py`)**:
+  - 10 automated unit tests covering all dismissal tiers, rate dialog priority, back navigation fallback, and app restart triggers.
+
+### Fixed
+- Fixed inter-job navigation stall where background view hierarchy reporting `is_tab_bar_visible() == True` bypassed back presses and caused profile lookups to fail under active modal overlays.
+
+**Full diff**: `v1.2.0...v1.2.1`
+
 ## v1.2.0 — Telegram Two-Way Ingestion, AI Retry Architecture & Upload Scheduling Resilience
 
 Comprehensive release introducing two-way Telegram remote photo and caption ingestion, 5-attempt exponential backoff retry engine for Gemini Vision AI, mandatory caption elaboration and hashtag enrichment pre-upload, and upload queue prioritization at session startup.

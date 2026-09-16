@@ -19,3 +19,22 @@
   mistake: Upload-posts job was starved when placed later in shuffled jobs list and crashed before execution, and Gemini Vision failed on single transient 504 errors without retries.
   correction: Prioritize upload-posts at the head of bot session jobs_list, set 5 retries with short interval backoff on vision AI and hashtag enrichment, and enforce mandatory pre-upload caption elaboration.
   priority: high
+
+- date: 2026-09-15
+  task_type: feature-integration
+  mistake: Direct CLI flags (e.g. python -m InstaAddict --username <user>) failed with argparse subparser invalid choice, and extended TCP idle sockets caused emulator-5554 to report offline which appeared like emulator crashes.
+  correction: Auto-inject 'run' subparser when flags are passed, auto-map --username to accounts/<user>/config.yml, and implement automatic adb kill-server/start-server recovery in DeviceFacade upon offline status or connection failure.
+  priority: high
+
+- date: 2026-09-16
+  task_type: bug-investigation
+  mistake: PHOTO/CAROUSEL branch in interact_with_user did not call device.back() after like_post(), while the VIDEO branch did. This left the post view open and navigateToPost re-resolved the same RecyclerView child(index=N) on every iteration, causing an infinite same-photo loop.
+  correction: Always call device.back() after photo/carousel like in interact_with_user, matching the VIDEO branch pattern. Add a settle sleep after the back-guard so RecyclerView re-lays out before the next child(index=N) lookup. On navigateToPost retry, re-resolve both row_view and post_view, not just post_view.
+  priority: high
+
+- date: 2026-09-16
+  task_type: bugfix
+  mistake: Instagram post-upload modal popups (such as "Rate Instagram", notification prompts, or ANRs) deadlocked the bot because TabBarView checked is_tab_bar_visible() which evaluated True on background views, skipping back-keys and failing navigateToProfile(), causing all subsequent scheduled jobs to be skipped.
+  correction: Implement multi-tier UniversalActions.dismiss_dialog() prioritizing negative/dismissive responses ("No, thanks", "Remind me later", "Not now", "Cancel"), integrate dialog sweeping directly into TabBarView._navigateTo and post-upload flows, and provide a 4-tier UniversalActions.recover_stuck_screen() escalating to clean app restart (app_stop + app_start) rather than abandoning scheduled jobs.
+  priority: high
+

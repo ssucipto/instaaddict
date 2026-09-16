@@ -313,6 +313,8 @@ def interact_with_user(
                         _browse_carousel(device, obj_count)
                     opened_post_view.watch_media(media_type)
                     like_succeed = opened_post_view.like_post()
+                    logger.debug("Closing photo/carousel post...")
+                    device.back()  # mirrors VIDEO branch – prevents infinite same-photo loop
                 if like_succeed:
                     register_like(device, session_state)
                     number_of_liked += 1
@@ -355,6 +357,8 @@ def interact_with_user(
                 device.back()
             else:
                 logger.warning("Can't go back to the profile!")
+            # Allow RecyclerView grid to re-lay out before next child(index=N) lookup
+            random_sleep(0.5, 1.0, modulable=False)
 
     if pm_percentage != 0 and can_send_PM(session_state, pm_percentage):
         sent_pm = _send_PM(device, session_state, my_username, swipe_amount)
@@ -768,8 +772,6 @@ def _comment(
                             raise ActionBlockedError(
                                 "Action Blocked during comment injection."
                             )
-                            if ok_btn.exists():
-                                ok_btn.click()
                     else:
                         logger.warning(
                             "Post button not found, skipping comment submission"
