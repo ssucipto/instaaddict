@@ -17,7 +17,7 @@ if 'tasks' in data and 'milestone_5' in data['tasks']:
             t['notes'] = 'Write custom plugin to intercept comment events, screenshot UI, hit Gemini API with persona prompt, and inject contextual NLP text.'
             t['estimated_hours'] = 4
         elif t['id'] == 'task-16':
-            t['notes'] = 'Update accounts/lolatheozjack/config.yml to include gemini-api-key, comment constraints, and Reels targeting flags.'
+            t['notes'] = 'Update accounts/<your-account>/config.yml to include gemini-api-key, comment constraints, and Reels targeting flags.'
 
 with open('agent/progress.yaml', 'w') as f:
     yaml.dump(data, f, sort_keys=False)

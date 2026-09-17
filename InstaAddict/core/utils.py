@@ -71,7 +71,7 @@ def check_if_updated(crash=False):
     if new_update:
         logger.warning("NEW VERSION FOUND!")
         logger.warning(
-            f"Version {latest_version} has been released! Please update so that you can get all the latest features and bugfixes. Changelog here -> https://github.com/joeahkim/InstaAddict/blob/develop/CHANGELOG.md"
+            f"Version {latest_version} has been released! Please update so that you can get all the latest features and bugfixes. Changelog here -> https://github.com/ssucipto/instaaddict/blob/master/CHANGELOG.md"
         )
         logger.warning("HOW TO UPDATE:")
         logger.warning("If you installed with pip: pip3 install InstaAddict -U")
@@ -88,14 +88,14 @@ def check_if_updated(crash=False):
             extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
         )
         logger.info(
-            "Follow & Support: GitHub: https://github.com/joeahkim | X: https://x.com/_joeahkim | IG: https://instagram.com/_joeahkim",
+            "Follow & Support: GitHub: https://github.com/ssucipto/instaaddict | Open an issue for bugs or feature requests",
             extra={"color": f"{Style.BRIGHT}{Fore.CYAN}"},
         )
 
 
 def ask_for_a_donation():
     logger.info(
-        "InstaAddict is free and open source. If you find it useful, consider following and supporting: https://github.com/joeahkim",
+        "InstaAddict is free and open source. If you find it useful, consider starring the repo: https://github.com/ssucipto/instaaddict",
         extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
     )
 

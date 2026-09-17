@@ -37,25 +37,22 @@ BLACKLIST_PATTERNS: Set[str] = {
 RELEVANCE_KEYWORDS: Set[str] = {
     "dog",
     "terrier",
-    "jrt",
     "pup",
     "puppy",
     "pet",
-    "perth",
-    "wa",
     "beach",
     "bark",
     "tail",
     "paw",
     "fur",
-    "australia",
-    "aussie",
-    "jackrussell",
     "canine",
     "hound",
     "mutt",
     "woof",
     "pooch",
+    "nature",
+    "lifestyle",
+    "explore",
 }
 
 
@@ -125,25 +122,25 @@ class HashtagManager:
             "cooldown_sessions": 2,
             "min_seen_to_promote": 3,
             "tiers": {
-                "tier1_local_perth": {
+                "tier1_local_community": {
                     "name": "Local Community",
                     "session_sample_count": 2,
-                    "tags": ["perthdogs", "dogsofperth"],
+                    "tags": ["local", "community"],
                 },
-                "tier2_breed_jrt": {
-                    "name": "Niche & Breed",
+                "tier2_niche_topic": {
+                    "name": "Niche & Topic",
                     "session_sample_count": 2,
-                    "tags": ["jackrussell", "jrt"],
+                    "tags": ["pets", "animals"],
                 },
                 "tier3_lifestyle_adventure": {
                     "name": "Lifestyle & Activity",
                     "session_sample_count": 1,
-                    "tags": ["dogbeach", "hikingwithdogs"],
+                    "tags": ["outdoors", "adventures"],
                 },
                 "tier4_reach_and_trending": {
                     "name": "General Reach & Themes",
                     "session_sample_count": 1,
-                    "tags": ["dogsofinstagram", "puppylove"],
+                    "tags": ["photooftheday", "instadaily"],
                 },
             },
             "cooldowns": {},

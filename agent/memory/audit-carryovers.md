@@ -453,3 +453,78 @@ carryovers:
     affected_files:
       - scripts/check_telegram.py
 
+  - id: CO-037
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: critical
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-H1/H2/H3: Live Telegram bot token (8633425071:AAFm...), chat ID (-5156789010), and real Instagram usernames (_joakim.__, _joeahkim, kashbettingtip) are in public git history (commits bf191976, 15698e99, c20b98a). Token must be REVOKED and git history must be rewritten with git filter-repo."
+    affected_files:
+      - .git history (accounts/ paths in commits bf191976, 15698e99, c20b98a, 4a3059e, bf86e3d)
+
+  - id: CO-038
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-H4/H5: Entire .venv/ and gramaddict-joeahkim/.venv/ committed in git history — massive bloat and supply-chain provenance risk. Must be purged via git filter-repo."
+    affected_files:
+      - .git history (.venv/ paths in commits bf191976, 15698e99)
+
+  - id: CO-039
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-M1: Personal Perth/JRT hashtags still hardcoded in hashtag_manager.py fallback default template (perthdogs, dogsofperth, jackrussell, jrt at lines 128-136) and FALLBACK_TAGS constant (jackrussell, wa, australia at lines 45-58). Replace with generic non-identifying tags."
+    affected_files:
+      - InstaAddict/core/hashtag_manager.py
+
+  - id: CO-040
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-M2/M3: Attribution strings in utils.py (lines 74, 91, 98) and config guide URLs in __main__.py (lines 16, 23) and bot_flow.py (line 73) still reference joeahkim/InstaAddict. Update to ssucipto/instaaddict."
+    affected_files:
+      - InstaAddict/core/utils.py
+      - InstaAddict/__main__.py
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-041
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-L2/L3: ai_comment_history.json, current_screen.xml, dump_screen.xml, window.xml, out.txt, data_analytics_old.py tracked in git — session fingerprints and device dumps. Remove from tracking via git rm --cached and update .gitignore."
+    affected_files:
+      - ai_comment_history.json
+      - current_screen.xml
+      - dump_screen.xml
+      - window.xml
+      - out.txt
+      - data_analytics_old.py
+      - .gitignore
+
+  - id: CO-042
+    audit_report: agent/reports/audit-059-security-privacy-git-history-exposure.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "SEC-L1: One-time helper scripts in scripts/ contain personal hashtags (jackrussell, dogsofinstagram in revert_hashtag_yaml.py:7, patch_optimal_config.py:25, generate_docx.py:41). Sanitize or remove these scripts."
+    affected_files:
+      - scripts/revert_hashtag_yaml.py
+      - scripts/patch_optimal_config.py
+      - scripts/generate_docx.py

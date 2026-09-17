@@ -7,13 +7,13 @@ with zipfile.ZipFile(z, "r") as zip_ref:
         if f.endswith(".xml"):
             xml = zip_ref.read(f).decode("utf-8", errors="ignore")
             # find action bar related things
-            # lolatheozjack should be on the screen somewhere
-            print("Is lolatheozjack on screen?", "lolatheozjack" in xml.lower())
-            match = re.search(r'<node[^>]*text=\"lolatheozjack\"[^>]*>', xml, re.IGNORECASE)
+            # <your-account> should be on the screen somewhere
+            print("Is <your-account> on screen?", "<your-account>" in xml.lower())
+            match = re.search(r'<node[^>]*text=\"<your-account>\"[^>]*>', xml, re.IGNORECASE)
             if match:
                 print("Username node:", match.group(0))
             else:
-                match = re.search(r'<node[^>]*content-desc=\"lolatheozjack\"[^>]*>', xml, re.IGNORECASE)
+                match = re.search(r'<node[^>]*content-desc=\"<your-account>\"[^>]*>', xml, re.IGNORECASE)
                 if match:
                     print("Username node (desc):", match.group(0))
             

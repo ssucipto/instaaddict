@@ -37,7 +37,7 @@ tasks = [
         'name': 'Balance Configuration & Safety Limits', 
         'status': 'todo',
         'estimated_hours': 1,
-        'notes': 'Update accounts/lolatheozjack/config.yml to include comment constraints and Reels targeting flags.'
+        'notes': 'Update accounts/<your-account>/config.yml to include comment constraints and Reels targeting flags.'
     }
 ]
 

@@ -1,6 +1,6 @@
 import yaml
 
-with open('accounts/lolatheozjack/config.yml', 'r') as f:
+with open('accounts/<your-account>/config.yml', 'r') as f:
     config = yaml.safe_load(f)
 
 # The core loops & limits
@@ -22,9 +22,9 @@ config['unfollow-non-followers'] = '15-30'
 config['unfollow-delay'] = 3
 
 # Inject diversification
-config['hashtag-posts-recent'] = ['jackrussell', 'dogsofinstagram', 'doglife']
+config['hashtag-posts-recent'] = ['pets', 'animals', 'photography']
 
-with open('accounts/lolatheozjack/config.yml', 'w') as f:
+with open('accounts/<your-account>/config.yml', 'w') as f:
     yaml.dump(config, f, sort_keys=False)
     
-print("Successfully patched accounts/lolatheozjack/config.yml.")
+print("Successfully patched accounts/<your-account>/config.yml.")

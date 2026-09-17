@@ -25,7 +25,7 @@ p1.add_run("Always pre-crop your .jpg or .mp4 into a perfect square (1080x1080px
 # Step 2
 doc.add_heading('Step 2: Access the Payload Folder', level=2)
 doc.add_paragraph("Navigate to your account's dedicated queue directory. This is where you will drop all files you want uploaded.")
-doc.add_paragraph("Path: C:\\Project\\instaaddict\\instaaddict\\accounts\\lolatheozjack\\content_queue\\pending")
+doc.add_paragraph("Path: C:\\Project\\instaaddict\\instaaddict\\accounts\\<your-account>\\content_queue\\pending")
 
 # Step 3
 doc.add_heading('Step 3: Pair your Files', level=2)
@@ -38,7 +38,7 @@ doc.add_heading('Step 4: Format the JSON properly', level=2)
 doc.add_paragraph("Open your `.json` file in a raw text editor (Notepad, VS Code, etc) and write your caption explicitly in JSON format! If you want line breaks, you must use the '\\n' newline character instead of pressing Enter.")
 json_code = (
     '{\n'
-    '  "caption": "Had the absolute best day running around at the beach! ????? \\n\\n#jackrussell #doglife"\n'
+    '  "caption": "Had the absolute best day running around at the beach! ????? \\n\\n#pets #animals"\n'
     '}'
 )
 doc.add_paragraph(json_code)

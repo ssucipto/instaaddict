@@ -16,13 +16,18 @@ Pipfile.lock
 *.sql
 *.zip
 .venv/
+.venv*/
+
+# Virtual environments (any name)
+venv/
+env/
+gramaddict-*/
 
 # Account configs and data (sensitive)
 /accounts/
 /crashes/
 /logs/
 __pycache__/
-window.xml
 
 # ADR-28 — field-feedback file local
 docs/acp-enhanced-dev-team-feedback-consolidated.md
@@ -33,3 +38,15 @@ docs/acp-enhanced-dev-team-feedback-consolidated.md
 /run_multiple.py
 scratch/
 ui.xml
+
+# Device screen dumps (contain live device/session state)
+current_screen.xml
+dump_screen.xml
+window.xml
+*.xml
+
+# Bot session fingerprints and debug outputs
+ai_comment_history.json
+out.txt
+data_analytics_old.py
+test_swipe.py
