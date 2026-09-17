@@ -312,10 +312,10 @@ tasks:
     notes: Implemented Option B on-demand posting via /post, /post_force, /preview, /cooldown, ADB connection state in /status, CLI subparser routing in __main__.py, isolated single-upload execution with --only-upload and --upload-force, automated ADB daemon restart recovery, and 100% passing tests (127/127).
 documentation:
   design_documents: 1
-  milestone_documents: 5
+  milestone_documents: 7
   pattern_documents: 2
   task_documents: 0
-  last_updated: '2026-09-16'
+  last_updated: '2026-09-17'
 progress:
   planning: 100
   implementation: 100
@@ -323,6 +323,16 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-17
+  description: 'Complete Git History Scrubbing, Privacy Isolation, Security Hardening, and UniversalActions Bugfix.'
+  items:
+  - "✓ Rewrote git history with git-filter-repo to purge accounts/, .venv/, and legacy traces across all past commits"
+  - "✓ Force-pushed clean history to origin/master, eradicating all historical credential leaks"
+  - "✓ Fixed inverted block detection logic and added null-safe ResourceID fallbacks in UniversalActions.detect_block"
+  - "✓ Hardened network and subprocess calls in utils.py and telegram.py with explicit timeouts and process termination"
+  - "✓ Sanitized personal identifiers, test fixtures, and sample configs across all unit tests and helper scripts"
+  - "✓ Verified 148/148 automated unit tests passing with zero regressions and zero warnings"
+  - "✓ Closed audit carryovers CO-037 through CO-042 as fixed and verified clean codebase state"
 - date: 2026-09-16
   description: 'Repository Security, Privacy Decoupling, Subprocess Injection Hardening, and Universal Dialog Dismissal.'
   items:

@@ -16,6 +16,7 @@
     - sanitized-pyproject-toml-author-email-and-github-funding-yml
     - verified-148-of-148-unit-and-integration-tests-passing-with-zero-regressions
     - resolved-all-carryovers-co-037-through-co-042-as-fixed-with-clean-remediation
+    - validated-acp-documentation-and-synchronized-readme-requirements-and-progress
   deferred: []
   key_fact: "Git history scrubbing requires running git-filter-repo to completely eliminate leaked credentials and account paths across all historical commits, followed by a strict codebase audit ensuring test fixtures, helper scripts, and memory summaries also use generic placeholder data."
 

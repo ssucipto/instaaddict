@@ -1,9 +1,9 @@
 # Project Requirements: InstaAddict
 
 **Project Name**: InstaAddict  
-**Version**: 1.2.0  
+**Version**: 1.2.1  
 **Created**: 2026-09-11  
-**Last Updated**: 2026-09-15  
+**Last Updated**: 2026-09-17  
 **Status**: Active  
 
 ---
@@ -61,3 +61,12 @@ InstaAddict is an active continuation and evolution of the GramAddict project, f
 - **Windows File Lock Safety**: Explicit descriptor unlinking for RotatingFileHandlers, eliminating `[WinError 32]` collisions.
 - **Continuous Markdown History**: Non-overwritten session logs in `history.md` and timestamped session summaries in `reports/`.
 - **Dogfood Self-Learning Optimizer (`dogfood.py`)**: Automated log parsing and conversion analytics yielding dynamic parameter tuning recommendations (`tuning_suggestions.md`).
+
+### 8. Modal Dialog Dismissal, Rate Instagram Handling & Security Isolation
+- **Universal Modal Dialog Dismissal Engine (`UniversalActions.dismiss_dialog`)**: Safe non-destructive popup dismissal prioritizing negative options ("No, thanks", "Remind me later", "Not now", "Cancel", "Maybe later", "Skip", "Close"), informational fallback ("OK", "Got it", "Continue"), and Android system ANRs ("Wait").
+- **Strict "Rate Instagram" Handling**: Strictly bypasses Play Store redirection by matching and clicking "No, thanks" while rejecting "Rate Instagram".
+- **Post-Upload Sweeping**: 3-iteration dialog sweep immediately following post publication to ensure subsequent jobs are not obstructed.
+- **4-Tier Escalated Stuck-Screen Recovery (`UniversalActions.recover_stuck_screen`)**: Dialog dismissal -> Android back key sequences -> Home tab navigation -> clean application restart (`app_stop` + `app_start`).
+- **Subprocess & OS Command Hardening (OWASP A03:2021)**: Elimination of `shell=True` from all core execution paths (`utils.py`, `device_facade.py`), replaced with parameterized lists and explicit defensive timeouts.
+- **Privacy Decoupling & Secret Isolation**: Complete eradication of hardcoded personal identifiers, bot tokens, or private credentials from tracked files; generic fallback creator defaults for personas and hashtags.
+
