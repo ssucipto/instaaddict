@@ -26,8 +26,8 @@ class TestHashtagManager(unittest.TestCase):
             self.username, account_dir=os.path.join(self.test_dir, self.username)
         )
         self.assertTrue(manager.has_tiered_sources())
-        self.assertIn("tier1_local_perth", manager.master_data["tiers"])
-        self.assertIn("tier2_breed_jrt", manager.master_data["tiers"])
+        self.assertIn("tier1_local_community", manager.master_data["tiers"])
+        self.assertIn("tier2_niche_topic", manager.master_data["tiers"])
         self.assertIn("tier3_lifestyle_adventure", manager.master_data["tiers"])
         self.assertIn("tier4_reach_and_trending", manager.master_data["tiers"])
         self.assertEqual(manager.master_data.get("cooldown_sessions"), 2)
@@ -37,21 +37,21 @@ class TestHashtagManager(unittest.TestCase):
         manager = HashtagManager(
             self.username, account_dir=os.path.join(self.test_dir, self.username)
         )
-        caption = "Morning run at the beach! #perthdogs #like4like #fyp #beachpups #crypto"
-        manager.harvest_from_caption(caption, source_tag="#dogsofperth")
+        caption = "Morning run at the beach! #outdoorpets #like4like #fyp #beachpups #crypto"
+        manager.harvest_from_caption(caption, source_tag="#petstagram")
 
         # #like4like, #fyp are spam blacklisted; #crypto is irrelevant
-        # #perthdogs and #beachpups are relevant
-        self.assertIn("perthdogs", manager.discovered_tags)
+        # #outdoorpets and #beachpups are relevant
+        self.assertIn("outdoorpets", manager.discovered_tags)
         self.assertIn("beachpups", manager.discovered_tags)
         self.assertNotIn("like4like", manager.discovered_tags)
         self.assertNotIn("fyp", manager.discovered_tags)
         self.assertNotIn("crypto", manager.discovered_tags)
 
-        info = manager.discovered_tags["perthdogs"]
+        info = manager.discovered_tags["outdoorpets"]
         self.assertEqual(info["seen_count"], 1)
         self.assertEqual(info["promoted"], False)
-        self.assertEqual(info["sources"], ["#dogsofperth"])
+        self.assertEqual(info["sources"], ["#petstagram"])
 
     def test_auto_promotion(self):
         manager = HashtagManager(
@@ -59,7 +59,7 @@ class TestHashtagManager(unittest.TestCase):
         )
         manager.master_data["min_seen_to_promote"] = 3
 
-        tag = "wa_puppy_club"
+        tag = "local_community_pets"
         caption = f"Check out #{tag} today!"
 
         # Harvest 1
@@ -74,20 +74,21 @@ class TestHashtagManager(unittest.TestCase):
         manager.harvest_from_caption(caption)
         self.assertTrue(manager.discovered_tags[tag]["promoted"])
 
-        # Should be classified in tier1_local_perth due to "wa"
-        tier1_tags = manager.master_data["tiers"]["tier1_local_perth"]["tags"]
+        # Should be classified in tier1_local_community due to "local" keyword
+        tier1_tags = manager.master_data["tiers"]["tier1_local_community"]["tags"]
         self.assertIn(tag, tier1_tags)
 
     def test_breed_and_lifestyle_tier_classification(self):
         manager = HashtagManager(
             self.username, account_dir=os.path.join(self.test_dir, self.username)
         )
-        self.assertEqual(manager._classify_tag_tier("jackrussellworld"), "tier2_breed_jrt")
-        self.assertEqual(manager._classify_tag_tier("jrtofinstagram"), "tier2_breed_jrt")
-        self.assertEqual(manager._classify_tag_tier("beachdoglife"), "tier3_lifestyle_adventure")
-        self.assertEqual(manager._classify_tag_tier("hikewithdogs"), "tier3_lifestyle_adventure")
-        self.assertEqual(manager._classify_tag_tier("perthdoglovers"), "tier1_local_perth")
-        self.assertEqual(manager._classify_tag_tier("dogsoftheworld"), "tier4_reach_and_trending")
+        # Generic pet/animal niche tier
+        self.assertEqual(manager._classify_tag_tier("jackrussellworld"), "tier2_niche_topic")  # contains 'jack'
+        self.assertEqual(manager._classify_tag_tier("dogbreeds"), "tier2_niche_topic")  # contains 'dog'
+        self.assertEqual(manager._classify_tag_tier("beachadventure"), "tier3_lifestyle_adventure")  # beach, no pet keywords
+        self.assertEqual(manager._classify_tag_tier("hiketrails"), "tier3_lifestyle_adventure")  # no pet keywords
+        self.assertEqual(manager._classify_tag_tier("localcommunity"), "tier1_local_community")  # contains 'local'
+        self.assertEqual(manager._classify_tag_tier("photooftheday"), "tier4_reach_and_trending")  # none of the above
 
     def test_rotation_cooldown_and_sampling(self):
         manager = HashtagManager(
@@ -119,21 +120,21 @@ class TestHashtagManager(unittest.TestCase):
         manager = HashtagManager(
             self.username, account_dir=os.path.join(self.test_dir, self.username)
         )
-        manager.master_data["tiers"]["tier1_local_perth"]["tags"].append("broken_tag")
-        self.assertIn("broken_tag", manager.master_data["tiers"]["tier1_local_perth"]["tags"])
+        manager.master_data["tiers"]["tier1_local_community"]["tags"].append("broken_tag")
+        self.assertIn("broken_tag", manager.master_data["tiers"]["tier1_local_community"]["tags"])
 
         # Navigation failed: record dead tag
         manager.record_hashtag_result("broken_tag", posts_found=False)
 
         self.assertIn("broken_tag", manager.master_data.get("dead_tags", []))
-        self.assertNotIn("broken_tag", manager.master_data["tiers"]["tier1_local_perth"]["tags"])
+        self.assertNotIn("broken_tag", manager.master_data["tiers"]["tier1_local_community"]["tags"])
 
     def test_saturation_benching(self):
         manager = HashtagManager(
             self.username, account_dir=os.path.join(self.test_dir, self.username)
         )
         tag = "crowded_tag"
-        manager.master_data["tiers"]["tier1_local_perth"]["tags"].append(tag)
+        manager.master_data["tiers"]["tier1_local_community"]["tags"].append(tag)
 
         # First hit already liked limit -> counter = 1
         manager.record_hashtag_result(tag, posts_found=True, already_liked_exhausted=True)

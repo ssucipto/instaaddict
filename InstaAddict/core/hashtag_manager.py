@@ -250,14 +250,14 @@ class HashtagManager:
         tag_lower = tag.lower()
         if any(
             loc in tag_lower
-            for loc in ["perth", "wa", "westernaustralia", "fremantle", "aus"]
+            for loc in ["local", "community", "city", "town", "neighborhood", "regional"]
         ):
-            return "tier1_local_perth"
+            return "tier1_local_community"
         if any(
-            breed in tag_lower
-            for breed in ["jack", "jrt", "terrier", "russell"]
+            niche in tag_lower
+            for niche in ["breed", "species", "type", "pet", "animal", "dog", "cat", "bird", "terrier", "russell", "jack"]
         ):
-            return "tier2_breed_jrt"
+            return "tier2_niche_topic"
         if any(
             act in tag_lower
             for act in [
