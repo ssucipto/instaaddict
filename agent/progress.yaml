@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.2.1
+  version: 1.3.0
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -97,6 +97,16 @@ milestones:
   completed: '2026-09-14'
   notes: Implemented two-way mobile Telegram workflow for photo ingestion with caption sidecars into content_queue/pending/, strict whitelist authorization, interactive bot commands (/queue, /status, /help), responsive 20-second interval polling during session sleep, and automated upload success/failure notifications.
   file: agent/milestones/milestone-9-telegram-two-way-ingestion.md
+- id: M10
+  name: Modern Terminal User Interface (TUI) & Live Dashboard
+  status: completed
+  progress: 100
+  tasks_total: 1
+  tasks_completed: 1
+  started: '2026-09-17'
+  completed: '2026-09-17'
+  notes: Design and implement a modern terminal user interface with live session statistics, progress bars against configured safety limits, active target inspection, and a rolling log stream with graceful headless fallback.
+  file: agent/milestones/milestone-10-terminal-user-interface.md
 tasks:
   milestone_1:
   - id: task-1
@@ -310,9 +320,20 @@ tasks:
     actual_hours: 2.5
     route_file: agent/routing/tasks/route-046-on-demand-telegram-posting-and-adb-resilience.md
     notes: Implemented Option B on-demand posting via /post, /post_force, /preview, /cooldown, ADB connection state in /status, CLI subparser routing in __main__.py, isolated single-upload execution with --only-upload and --upload-force, automated ADB daemon restart recovery, and 100% passing tests (127/127).
+  milestone_10:
+  - id: task-39
+    name: Terminal User Interface & Live Dashboard Implementation
+    status: completed
+    priority: 1
+    started: 2026-09-17
+    completed_date: '2026-09-17'
+    estimated_hours: 3
+    actual_hours: 2
+    route_file: agent/routing/tasks/route-047-terminal-user-interface.md
+    notes: Implement InstaAddict/core/tui.py with DashboardState, TuiLogHandler, and DashboardManager. Integrate with bot_flow, log.py, and utils.py.
 documentation:
-  design_documents: 1
-  milestone_documents: 7
+  design_documents: 2
+  milestone_documents: 8
   pattern_documents: 2
   task_documents: 0
   last_updated: '2026-09-17'
@@ -323,6 +344,17 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-17
+  description: 'Completed Milestone 10: Modern Terminal User Interface (TUI) & Live Dashboard (Route-047) and Audit-060 Remediation.'
+  items:
+  - "✓ Designed and implemented InstaAddict/core/tui.py using rich library with Live layout"
+  - "✓ Built thread-safe DashboardState storing metrics, safety limits, account details, and rolling log ring buffer"
+  - "✓ Created custom TuiLogHandler with ANSI escape stripping, multiline record splitting, and color-coded severity levels"
+  - "✓ Integrated live progress bars for Likes, Follows, Unfollows, Comments, Watched, Total Actions, and Crashes"
+  - "✓ Remediated Audit #060 & Review #042 findings (CO-043 to CO-048) with safe glyphs, atexit restoration, safe limits, and responsive layout"
+  - "✓ Hooked DashboardManager lifecycle into bot_flow.py, utils.py, log.py, and session_state.py"
+  - "✓ Added --tui and --no-tui CLI flags with automatic isatty interactive terminal detection and headless fallback"
+  - "✓ Expanded test_tui_dashboard.py to 18 unit tests; 166/166 total unit tests passing with zero regressions"
 - date: 2026-09-17
   description: 'Complete Git History Scrubbing, Privacy Isolation, Security Hardening, and UniversalActions Bugfix.'
   items:

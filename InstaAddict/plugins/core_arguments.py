@@ -417,4 +417,16 @@ class CoreArguments(Plugin):
                 "help": "don't ask the user to press enter to continue with an untested IG version",
                 "action": "store_true",
             },
+            {
+                "arg": "--tui",
+                "help": "enable interactive terminal user interface dashboard with live stats and logs",
+                "action": "store_true",
+                "default": None,
+            },
+            {
+                "arg": "--no-tui",
+                "help": "disable terminal user interface dashboard and use standard console output",
+                "action": "store_true",
+                "default": False,
+            },
         ]

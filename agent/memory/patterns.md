@@ -20,4 +20,8 @@
   context: "ADB automation, OS interaction, and LLM multimodal bot configurations requiring public git safety and OWASP A03 injection defense."
   solution: "Enforce shell=False with explicit timeout across subprocess.run/Popen; decouple core module fallbacks to generic creator roles; load private personas and tokens dynamically from local accounts/<user>/ and .env."
 
-
+- date: 2026-09-17
+  name: cross-platform-rich-tui-with-safe-glyph-fallbacks
+  description: "Live terminal user interface with thread-safe state synchronization, safe console glyph fallbacks for legacy Windows codepages, and atexit cursor restoration."
+  context: "Long-running CLI automation tools requiring live statistics, progress tracking against safety limits, and rolling log streams without clobbering stdout across UTF-8 and non-UTF-8 consoles."
+  solution: "Implement safe_glyph() checking sys.stdout.encoding with ASCII fallbacks; use rich.live.Live with safe_box=True; register atexit.register(self.stop) for clean cursor restoration; swap logging handlers to route log records to a bounded deque ring buffer during execution."

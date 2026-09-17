@@ -532,3 +532,70 @@ carryovers:
       - scripts/set_correct_persona.py
       - scripts/quote_yaml.py
       - scripts/patch_universal_persona.py
+
+  - id: CO-043
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Windows CP1252/CP437 UnicodeEncodeError on raw emoji glyphs in rich Console. Added safe_glyph() and safe_box=True."
+    affected_files:
+      - InstaAddict/core/tui.py
+
+  - id: CO-044
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Missing atexit and signal terminal restoration guards. Registered atexit.register(self.stop) and countdown try-finally."
+    affected_files:
+      - InstaAddict/core/tui.py
+      - InstaAddict/core/utils.py
+
+  - id: CO-045
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Nullable limits in SessionState throwing TypeError in int() aborting remaining limits. Added _safe_int() helper."
+    affected_files:
+      - InstaAddict/core/tui.py
+
+  - id: CO-046
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Multiline log records and long lines distorting TUI panel formatting. Added splitlines() and line length cap."
+    affected_files:
+      - InstaAddict/core/tui.py
+
+  - id: CO-047
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Narrow terminal width (< 85 cols) squishing dual-column layout. Added responsive single-column layout fallback."
+    affected_files:
+      - InstaAddict/core/tui.py
+
+  - id: CO-048
+    audit_report: agent/reports/audit-060-tui-implementation-gaps-and-code-quality.md
+    date_raised: 2026-09-17
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "agent/progress.yaml project status not reset to completed post-M10. Set project.status to completed and current_milestone to null."
+    affected_files:
+      - agent/progress.yaml

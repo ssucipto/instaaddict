@@ -79,6 +79,14 @@ class SessionState:
                 self.totalScraped[source] += 1
                 self.successfulInteractions[source] += 1
 
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if DashboardManager.is_active():
+                DashboardManager.get_instance().state.update_from_session_state(self)
+        except Exception:
+            pass
+
     def set_limits_session(
         self,
     ):

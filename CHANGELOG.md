@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.3.0 — Modern Terminal User Interface (TUI) & Live Dashboard
+
+Feature release introducing a modern, high-performance terminal user interface and live dashboard powered by `rich`, featuring real-time visual progress bars against safety limits, active target and cooldown context, and a live rolling log stream with automated headless fallback and legacy console encoding resilience.
+
+### Added
+- **Terminal User Interface Engine (`InstaAddict/core/tui.py`)**:
+  - Thread-safe `DashboardState` with reentrant locks (`RLock`) synchronizing metrics (likes, follows, unfollows, comments, watches, uploads, crashes, total interactions) and configured limits against bot execution threads.
+  - Multi-tier `rich` layout with live 4 Hz refresh rate: Header banner with account and device telemetry, progress bars with color-coded safety thresholds, active job and target context, and rolling log panel with severity color coding.
+  - Responsive terminal layout adaptation: dynamically transitions between dual-column view (width >= 85) and single-column stacked view (width < 85).
+- **Log Stream Redirection Bridge (`InstaAddict/core/log.py`)**:
+  - `TuiLogHandler` capturing logging records, stripping ANSI escape sequences, splitting multiline records, enforcing 120-character line bounds, and piping entries into a bounded ring buffer (`maxlen=30`).
+  - Seamless stdout handler decoupling during live execution and clean restoration before summary report printing.
+- **CLI Flags & Auto-Detection (`InstaAddict/plugins/core_arguments.py`)**:
+  - Added `--tui` and `--no-tui` flags with automatic `isatty()` interactive console detection and headless/CI fallback.
+- **Cross-Platform Console & Encoding Hardening**:
+  - Implemented `safe_glyph(glyph, fallback)` detecting `sys.stdout.encoding` capabilities and falling back to clean ASCII equivalents on non-UTF-8 Windows consoles (`cp1252`/`cp437`) to eliminate `UnicodeEncodeError`.
+  - Configured `Console(safe_box=True)` to prevent box-drawing character corruption on legacy command prompts.
+  - Registered `atexit.register(self.stop)` in `DashboardManager` and `try...finally:` in `countdown()` to guarantee terminal restoration and cursor visibility upon exit or interrupt.
+- **Unit Test Coverage (`test/test_tui_dashboard.py`)**:
+  - 18 comprehensive automated unit tests covering helpers, state synchronization, log handling, responsive layout adaptation, argument parsing, and lifecycle management.
+
+**Full diff**: `v1.2.1...v1.3.0`
+
 ## v1.2.1 — Modal Dialog Dismissal, Rate Instagram Handling & Stuck-Screen Self-Healing
 
 Resilience patch release introducing universal non-destructive modal popup dismissal (specifically targeting "Rate Instagram", push notification requests, contact sync, and system ANR dialogs), post-upload popup sweeping, and 4-tier escalated stuck-screen recovery with clean app relaunch.

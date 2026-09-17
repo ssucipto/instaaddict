@@ -1,7 +1,7 @@
 # Project Requirements: InstaAddict
 
 **Project Name**: InstaAddict  
-**Version**: 1.2.1  
+**Version**: 1.3.0  
 **Created**: 2026-09-11  
 **Last Updated**: 2026-09-17  
 **Status**: Active  

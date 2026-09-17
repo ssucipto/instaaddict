@@ -12,3 +12,4 @@ packaging~=26.2
 standard-pkg-resources>=1.0.0
 imageio[ffmpeg]
 websocket-client
+rich>=13.0.0

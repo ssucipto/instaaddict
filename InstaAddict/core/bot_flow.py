@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 import sys
 from datetime import datetime, timedelta
@@ -14,10 +15,13 @@ from InstaAddict.core.filter import load_config as load_filter
 from InstaAddict.core.interaction import load_config as load_interaction
 from InstaAddict.core.log import (
     configure_logger,
+    disable_tui_logging,
+    enable_tui_logging,
     is_log_file_updated,
     update_log_file_name,
 )
 from InstaAddict.core.navigation import check_if_english
+from InstaAddict.core.tui import DashboardManager
 from InstaAddict.core.persistent_list import PersistentList
 from InstaAddict.core.report import print_full_report
 from InstaAddict.core.session_state import SessionState, SessionStateEncoder
@@ -120,7 +124,23 @@ def start_bot(**kwargs):
     followers_now = None
     following_now = None
 
+    # Determine whether TUI is enabled
+    use_tui = (
+        not getattr(configs.args, "no_tui", False)
+        and (getattr(configs.args, "tui", False) or sys.stdout.isatty())
+        and os.environ.get("INSTAADDICT_NO_TUI", "0") != "1"
+    )
+    dashboard_manager = DashboardManager.get_instance()
+    if use_tui:
+        dashboard_manager.state.device_id = configs.device_id
+        dashboard_manager.state.total_sessions = total_sessions
+        dashboard_manager.start()
+        enable_tui_logging(dashboard_manager)
+
     while True:
+        if use_tui and not dashboard_manager.is_active():
+            dashboard_manager.start()
+            enable_tui_logging(dashboard_manager)
         set_time_delta(configs.args)
         inside_working_hours, time_left = SessionState.inside_working_hours(
             configs.args.working_hours, configs.args.time_delta_session
@@ -143,6 +163,11 @@ def start_bot(**kwargs):
         session_state = SessionState(configs)
         session_state.set_limits_session()
         sessions.append(session_state)
+        if dashboard_manager.is_active():
+            dashboard_manager.bind_session_state(session_state)
+            dashboard_manager.state.session_index = len(sessions)
+            dashboard_manager.state.status_message = "RUNNING"
+            dashboard_manager.update_render()
         check_screen_timeout()
         device.wake_up()
         head_up_notifications(enabled=False)
@@ -185,6 +210,10 @@ def start_bot(**kwargs):
                         logger.warning(
                             "If you want to avoid pressing ENTER next run, add allow-untested-ig-version: true in your config.yml file. (read the docs for more info)"
                         )
+                        was_tui = dashboard_manager.is_active()
+                        if was_tui:
+                            dashboard_manager.stop()
+                            disable_tui_logging()
                         try:
                             input()
                         except KeyboardInterrupt:
@@ -194,6 +223,10 @@ def start_bot(**kwargs):
                             logger.info(
                                 "Proceeding with untested IG version (non-interactive session detected)."
                             )
+                        finally:
+                            if was_tui:
+                                dashboard_manager.start()
+                                enable_tui_logging(dashboard_manager)
                     else:
                         logger.info(
                             "Proceeding with untested IG version (allow-untested-ig-version is enabled)."
@@ -227,6 +260,12 @@ def start_bot(**kwargs):
                 session_state.my_followers_count,
                 session_state.my_following_count,
             ) = profile_view.getProfileInfo()
+            if dashboard_manager.is_active():
+                dashboard_manager.state.username = session_state.my_username
+                dashboard_manager.state.followers_count = str(session_state.my_followers_count or 0)
+                dashboard_manager.state.following_count = str(session_state.my_following_count or 0)
+                dashboard_manager.state.posts_count = str(session_state.my_posts_count or 0)
+                dashboard_manager.update_render()
         except Exception as e:
             logger.error(f"Exception: {e}")
             save_crash(device)
@@ -437,6 +476,10 @@ def start_bot(**kwargs):
                     f"Current active-job: {plugin}",
                     extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
                 )
+                if dashboard_manager.is_active():
+                    dashboard_manager.state.current_job = plugin
+                    dashboard_manager.state.current_action = f"Running {plugin}..."
+                    dashboard_manager.update_render()
                 if configs.args.scrape_to_file is not None:
                     logger.warning(
                         "You're in scraping mode! That means you're only collection data without interacting!"
@@ -491,6 +534,9 @@ def start_bot(**kwargs):
             and configs.args.repeat
             and can_repeat(len(sessions), total_sessions)
         ):
+            if dashboard_manager.is_active():
+                dashboard_manager.stop()
+                disable_tui_logging()
             print_full_report(sessions, configs.args.scrape_to_file)
             inside_working_hours, time_left = SessionState.inside_working_hours(
                 configs.args.working_hours, configs.args.time_delta_session
@@ -534,6 +580,11 @@ def start_bot(**kwargs):
                 )
         else:
             break
+
+    if dashboard_manager.is_active():
+        dashboard_manager.stop()
+        disable_tui_logging()
+
     print_telegram_reports(
         configs,
         telegram_reports_at_end,

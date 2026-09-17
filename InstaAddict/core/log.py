@@ -22,6 +22,8 @@ g_log_file_name = None
 g_logs_dir = "logs"
 g_file_handler = None
 g_error_file_handler = None
+g_console_handler = None
+g_tui_handler = None
 g_log_file_updated = False
 
 
@@ -91,6 +93,7 @@ def configure_logger(debug, username):
     global g_logs_dir
     global g_file_handler
     global g_error_file_handler
+    global g_console_handler
     global g_log_file_updated
 
     console_level = logging.DEBUG if debug else logging.INFO
@@ -120,6 +123,7 @@ def configure_logger(debug, username):
     )
     console_handler.addFilter(LoggerFilterInstaAddictOnly())
     root_logger.addHandler(console_handler)
+    g_console_handler = console_handler
 
     # File logger (full raw log)
     if not os.path.exists(g_logs_dir):
@@ -257,3 +261,38 @@ def update_log_file_name(username: str):
     g_file_handler = named_file_handler
     g_error_file_handler = named_error_file_handler
     g_log_file_updated = True
+
+
+def enable_tui_logging(dashboard_manager=None):
+    """Route logs through TuiLogHandler and detach raw console StreamHandler."""
+    global g_console_handler, g_tui_handler
+    root_logger = logging.getLogger()
+
+    if g_console_handler and g_console_handler in root_logger.handlers:
+        root_logger.removeHandler(g_console_handler)
+
+    if g_tui_handler is None:
+        from InstaAddict.core.tui import DashboardManager, TuiLogHandler
+
+        mgr = dashboard_manager or DashboardManager.get_instance()
+        g_tui_handler = TuiLogHandler(mgr.state)
+        level = g_console_handler.level if g_console_handler else logging.INFO
+        g_tui_handler.setLevel(level)
+        g_tui_handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        g_tui_handler.addFilter(LoggerFilterInstaAddictOnly())
+
+    if g_tui_handler not in root_logger.handlers:
+        root_logger.addHandler(g_tui_handler)
+
+
+def disable_tui_logging():
+    """Detach TuiLogHandler and reattach standard console StreamHandler."""
+    global g_console_handler, g_tui_handler
+    root_logger = logging.getLogger()
+
+    if g_tui_handler and g_tui_handler in root_logger.handlers:
+        root_logger.removeHandler(g_tui_handler)
+
+    if g_console_handler and g_console_handler not in root_logger.handlers:
+        root_logger.addHandler(g_console_handler)
+

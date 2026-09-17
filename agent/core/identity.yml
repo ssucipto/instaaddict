@@ -1,5 +1,5 @@
 project: InstaAddict
-version: 1.2.1
+version: 1.3.0
 type: cli-tool
 description: 'Human-like Instagram automation bot powered by ADB and UIAutomator2,
   automating interactions (following, liking, commenting, watching stories) directly
@@ -29,4 +29,5 @@ capabilities:
 - Autonomous Local Queue Post & Reel Uploader (UploadPostsPlugin)
 - Native 200ms ADB Flick Gestures & Fluid Single-Swipe Feed Navigation
 - Self-Learning Parameter Tuning Engine (DogfoodOptimizer) & Resilient Crash Telemetry
+- Modern Terminal User Interface (TUI) & Live Dashboard with Rich Live Layouts
 

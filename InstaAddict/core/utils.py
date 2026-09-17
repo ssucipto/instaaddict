@@ -431,6 +431,21 @@ def show_ending_conditions():
 
 
 def countdown(seconds: int = 10, waiting_message: str = "") -> None:
+    from InstaAddict.core.tui import DashboardManager
+
+    if DashboardManager.is_active():
+        mgr = DashboardManager.get_instance()
+        try:
+            while seconds:
+                mgr.state.update_countdown(seconds, waiting_message)
+                mgr.update_render()
+                time.sleep(1)
+                seconds -= 1
+        finally:
+            mgr.state.update_countdown(None, "")
+            mgr.update_render()
+        return
+
     while seconds:
         print(waiting_message, f"{seconds:02d}", end="\r")
         time.sleep(1)
@@ -619,6 +634,13 @@ def trim_txt(source: str, target: str) -> None:
 
 
 def stop_bot(device, sessions, session_state, was_sleeping=False):
+    from InstaAddict.core.log import disable_tui_logging
+    from InstaAddict.core.tui import DashboardManager
+
+    if DashboardManager.is_active():
+        DashboardManager.get_instance().stop()
+        disable_tui_logging()
+
     close_instagram(device)
     if args.kill_atx_agent:
         kill_atx_agent(device)
