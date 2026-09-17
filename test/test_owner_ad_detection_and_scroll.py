@@ -189,7 +189,7 @@ class TestOwnerAdDetectionAndScroll(unittest.TestCase):
 
         clips_caption = MagicMock()
         clips_caption.exists.return_value = True
-        clips_caption.get_desc.return_value = "Me and my best part #perthdogs #puppy"
+        clips_caption.get_desc.return_value = "Me and my best part #doglife #puppy"
         clips_caption.get_text.return_value = ""
 
         not_found = MagicMock(exists=MagicMock(return_value=False))

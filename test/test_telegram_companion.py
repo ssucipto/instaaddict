@@ -1,13 +1,11 @@
 import json
 import os
-import shutil
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from InstaAddict.plugins.telegram import (
     check_telegram_inbox,
     telegram_notify_upload_success,
-    _get_pending_media,
 )
 
 
@@ -65,7 +63,7 @@ class TestTelegramCompanionComments:
                 "update_id": 101,
                 "message": {
                     "chat": {"id": "999888777"},
-                    "text": "Lola running through the waves at sunset!",
+                    "text": "Running through the waves at sunset! #beachvibes",
                 },
             }
         ]
@@ -78,7 +76,7 @@ class TestTelegramCompanionComments:
         assert os.path.exists(sidecar_path)
         with open(sidecar_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
-        assert content == "Lola running through the waves at sunset!"
+        assert content == "Running through the waves at sunset! #beachvibes"
 
         # Verify confirmation was sent to Telegram
         mock_send.assert_called()
@@ -133,7 +131,7 @@ class TestTelegramCompanionComments:
         with open(media_file, "wb") as f:
             f.write(b"fake image data")
 
-        mock_vision_caption.return_value = "Golden hour walks with Lola! #perthdogs #jrt #doglife"
+        mock_vision_caption.return_value = "Golden hour walks in the sunshine! #nature #sunshine #adventure"
 
         mock_updates.return_value = [
             {
@@ -151,7 +149,7 @@ class TestTelegramCompanionComments:
         assert os.path.exists(sidecar_path)
         with open(sidecar_path, "r", encoding="utf-8") as f:
             content = f.read().strip()
-        assert content == "Golden hour walks with Lola! #perthdogs #jrt #doglife"
+        assert content == "Golden hour walks in the sunshine! #nature #sunshine #adventure"
 
     @patch("InstaAddict.plugins.telegram.telegram_bot_send_text")
     def test_telegram_notify_upload_success(self, mock_send, temp_telegram_env):

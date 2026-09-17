@@ -137,7 +137,7 @@ class TestUploadPostsPlugin(unittest.TestCase):
     @patch("InstaAddict.plugins.upload_posts.get_vision_caption")
     def test_extract_caption_txt_feeds_vision_ai_guidance(self, mock_vision):
         """Verifies that .txt sidecar is passed into Gemini Vision AI as contextual guidance and extended."""
-        mock_vision.return_value = "Extended: Lola enjoying the sunny beach #jackrussell #perth"
+        mock_vision.return_value = "Extended: Enjoying the sunny beach #coastal #sunshine"
         pending_dir = os.path.join(self.test_dir, "pending")
         os.makedirs(pending_dir, exist_ok=True)
 
@@ -153,7 +153,7 @@ class TestUploadPostsPlugin(unittest.TestCase):
         mock_vision.assert_called_once_with(
             media_path, "casual Instagram user", user_context="Caption from TXT sidecar #dogs"
         )
-        self.assertEqual(caption, "Extended: Lola enjoying the sunny beach #jackrussell #perth")
+        self.assertEqual(caption, "Extended: Enjoying the sunny beach #coastal #sunshine")
 
     @patch("InstaAddict.plugins.upload_posts.get_vision_caption")
     def test_extract_caption_txt_fallback_on_ai_failure(self, mock_vision):
@@ -238,7 +238,7 @@ class TestUploadPostsPlugin(unittest.TestCase):
         with open(os.path.join(pending_dir, media_file), "w") as f:
             f.write("fake image data")
         with open(os.path.join(pending_dir, "DSCF2934.txt"), "w", encoding="utf-8") as f:
-            f.write("Lola enjoying the sun! #jackrussell")
+            f.write("Enjoying the beautiful sun! #sunshine")
         with open(os.path.join(pending_dir, "DSCF2934.json"), "w", encoding="utf-8") as f:
             json.dump({"caption": "fallback json"}, f)
 
@@ -452,19 +452,19 @@ class TestUploadPostsPlugin(unittest.TestCase):
     def test_hashtag_enrichment_from_manager(self):
         """Verifies that captions with fewer than 3 hashtags are enriched from HashtagManager."""
         with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_post_hashtags") as mock_tags:
-            mock_tags.return_value = ["perthdogs", "jrt", "beachvibes"]
+            mock_tags.return_value = ["naturevibes", "adventure", "beachvibes"]
             raw_caption = "Sunny day out with the pup!"
             enriched = self.plugin._enrich_hashtags_if_needed(raw_caption, "test_user")
-            self.assertIn("#perthdogs", enriched)
-            self.assertIn("#jrt", enriched)
+            self.assertIn("#naturevibes", enriched)
+            self.assertIn("#adventure", enriched)
             self.assertIn("#beachvibes", enriched)
             self.assertTrue(enriched.startswith(raw_caption))
 
     def test_hashtag_enrichment_not_needed_if_already_tagged(self):
         """Verifies that captions with 3 or more hashtags are not bloated with duplicate tags."""
         with patch("InstaAddict.core.hashtag_manager.HashtagManager.get_post_hashtags") as mock_tags:
-            mock_tags.return_value = ["perthdogs", "jrt"]
-            tagged_caption = "Awesome sunset #sunset #beach #vibes #wa"
+            mock_tags.return_value = ["naturevibes", "adventure"]
+            tagged_caption = "Awesome sunset #sunset #beach #vibes #nature"
             result = self.plugin._enrich_hashtags_if_needed(tagged_caption, "test_user")
             self.assertEqual(result, tagged_caption)
             mock_tags.assert_not_called()
@@ -535,7 +535,6 @@ class TestUploadPostsPlugin(unittest.TestCase):
         # Mixed line should stay in caption, not be moved to first comment
         self.assertIn("What a great day #sunshine and fun", "\n".join(text_lines))
         self.assertEqual("".join(tag_lines), "")
-
 
     def test_post_first_comment_no_op_on_empty(self):
         """CO-020/F-02: _post_first_comment does nothing when hashtag_text is empty."""

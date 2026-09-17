@@ -5,8 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "InstaAddict"
 authors = [
-    { name = "ssucipto" },
-    { name = "Joeahkim", email = "joeahkim@gmail.com" }
+    { name = "ssucipto" }
 ]
 readme = "README.md"
 classifiers = [

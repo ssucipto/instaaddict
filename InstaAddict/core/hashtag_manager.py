@@ -255,7 +255,10 @@ class HashtagManager:
             return "tier1_local_community"
         if any(
             niche in tag_lower
-            for niche in ["breed", "species", "type", "pet", "animal", "dog", "cat", "bird", "terrier", "russell", "jack"]
+            for niche in [
+                "breed", "species", "type", "pet", "animal",
+                "dog", "cat", "bird", "terrier", "russell", "jack",
+            ]
         ):
             return "tier2_niche_topic"
         if any(

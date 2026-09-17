@@ -52,16 +52,20 @@ def load_config(config: Config):
 
 
 def update_available():
-    response = requests.get("https://pypi.python.org/pypi/InstaAddict/json")
-    if response.ok:
-        latest_version = response.json()["info"]["version"]
-
-        current_version = parse_version(__version__)
-        latest_version = parse_version(latest_version)
-
-        return current_version < latest_version, latest_version
-    else:
-        return False, None
+    try:
+        response = requests.get(
+            "https://pypi.python.org/pypi/InstaAddict/json", timeout=10
+        )
+        if response.ok:
+            data = response.json()
+            latest_version = data.get("info", {}).get("version")
+            if latest_version:
+                current_version = parse_version(__version__)
+                latest_version_parsed = parse_version(latest_version)
+                return current_version < latest_version_parsed, latest_version
+    except Exception as e:
+        logger.debug(f"Update check failed or timed out: {e}")
+    return False, None
 
 
 def check_if_updated(crash=False):
@@ -448,6 +452,12 @@ def pre_post_script(path: str, pre: bool = True):
             logger.info(f"Running '{path}' as {'pre' if pre else 'post'} script.")
             try:
                 p1 = subprocess.Popen(path)
+                p1.wait(timeout=300)
+            except subprocess.TimeoutExpired:
+                logger.error(
+                    f"{'Pre' if pre else 'Post'} script '{path}' timed out after 300s. Terminating process..."
+                )
+                p1.kill()
                 p1.wait()
             except Exception as ex:
                 logger.error(f"This exception has occurred: {ex}")

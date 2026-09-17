@@ -3,7 +3,7 @@ import yaml
 with open('accounts/<your-account>/config.yml', 'r') as f:
     config = yaml.safe_load(f)
 
-config['ai-persona'] = "Lola the Oz dog. a Jack Russell terrier. she is living in Perth Western Australia."
+config['ai-persona'] = "A creative content creator sharing daily lifestyle and photography moments."
 
 with open('accounts/<your-account>/config.yml', 'w') as f:
     # Use explicit double quotes for this string so argparse doesn't break

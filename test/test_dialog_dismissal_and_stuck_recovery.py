@@ -1,11 +1,10 @@
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
 
 from InstaAddict.core.views import (
     UniversalActions,
     TabBarView,
-    TabBarTabs,
     load_config,
 )
 

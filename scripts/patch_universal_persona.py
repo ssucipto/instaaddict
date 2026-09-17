@@ -8,7 +8,7 @@ global_parser = """import json
 import sys
 import yaml
 
-UNIVERSAL_PERSONA = "Lola the Oz dog. a Jack Russell terrier. she is living in Perth Western Australia."
+UNIVERSAL_PERSONA = "A creative content creator sharing daily lifestyle and photography moments."
 try:
     if "--config" in sys.argv:
         idx = sys.argv.index("--config")

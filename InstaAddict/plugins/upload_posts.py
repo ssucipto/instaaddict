@@ -707,7 +707,6 @@ class UploadPostsPlugin(Plugin):
         except Exception as e:
             logger.debug(f"_post_first_comment: Non-fatal exception during first comment attempt: {e}")
 
-
     def _execute_adb(
         self, serial: str, command_args: List[str], timeout: int = 60
     ) -> bool:

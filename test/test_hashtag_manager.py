@@ -3,7 +3,6 @@ import os
 import shutil
 import tempfile
 import unittest
-from datetime import datetime, timedelta
 
 import yaml
 
@@ -13,7 +12,7 @@ from InstaAddict.core.hashtag_manager import HashtagManager
 class TestHashtagManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.username = "test_lola"
+        self.username = "test_user"
         # Reset singleton cache before each test
         HashtagManager._instances.clear()
 
@@ -85,10 +84,11 @@ class TestHashtagManager(unittest.TestCase):
         # Generic pet/animal niche tier
         self.assertEqual(manager._classify_tag_tier("jackrussellworld"), "tier2_niche_topic")  # contains 'jack'
         self.assertEqual(manager._classify_tag_tier("dogbreeds"), "tier2_niche_topic")  # contains 'dog'
-        self.assertEqual(manager._classify_tag_tier("beachadventure"), "tier3_lifestyle_adventure")  # beach, no pet keywords
+        # Lifestyle/adventure tier (beach, no pet keywords)
+        self.assertEqual(manager._classify_tag_tier("beachadventure"), "tier3_lifestyle_adventure")
         self.assertEqual(manager._classify_tag_tier("hiketrails"), "tier3_lifestyle_adventure")  # no pet keywords
         self.assertEqual(manager._classify_tag_tier("localcommunity"), "tier1_local_community")  # contains 'local'
-        self.assertEqual(manager._classify_tag_tier("photooftheday"), "tier4_reach_and_trending")  # none of the above
+        self.assertEqual(manager._classify_tag_tier("photooftheday"), "tier4_reach_and_trending")  # default reach
 
     def test_rotation_cooldown_and_sampling(self):
         manager = HashtagManager(

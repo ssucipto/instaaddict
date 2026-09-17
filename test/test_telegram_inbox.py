@@ -1,6 +1,4 @@
-import json
 import os
-import shutil
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,11 +7,6 @@ from InstaAddict.plugins.telegram import (
     _load_telegram_state,
     _save_telegram_state,
     check_telegram_inbox,
-    load_telegram_config,
-    telegram_bot_download_file,
-    telegram_bot_get_file_path,
-    telegram_bot_get_updates,
-    telegram_bot_send_text,
 )
 
 
@@ -92,7 +85,7 @@ def test_telegram_inbox_photo_download_and_caption_sidecar(temp_account_dir):
                     {"file_id": "thumb_id", "file_size": 100},
                     {"file_id": "full_photo_id", "file_size": 5000},
                 ],
-                "caption": "Enjoying the morning sunshine! #dogsofinstagram #jackrussell",
+                "caption": "Enjoying the morning sunshine! #photography #nature",
             },
         }
     ]
@@ -120,7 +113,7 @@ def test_telegram_inbox_photo_download_and_caption_sidecar(temp_account_dir):
         # Check caption content
         txt_path = os.path.join(pending_dir, txt_files[0])
         with open(txt_path, "r", encoding="utf-8") as f:
-            assert f.read() == "Enjoying the morning sunshine! #dogsofinstagram #jackrussell"
+            assert f.read() == "Enjoying the morning sunshine! #photography #nature"
 
         # Check receipt message sent
         assert mock_send_text.call_count == 1
@@ -201,7 +194,7 @@ def test_upload_posts_sends_telegram_notification(temp_account_dir):
     mock_storage = MagicMock()
 
     with patch.object(plugin, "_upload_to_ig", return_value=True), \
-         patch("InstaAddict.plugins.upload_posts.get_vision_caption", return_value="") as mock_vision, \
+         patch("InstaAddict.plugins.upload_posts.get_vision_caption", return_value=""), \
          patch("InstaAddict.plugins.telegram.telegram_bot_send_text") as mock_send_tg:
         plugin.run(
             device=mock_device,

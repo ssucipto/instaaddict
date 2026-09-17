@@ -54,7 +54,7 @@
     - implemented-mandatory-caption-elaboration-and-hashtag-enrichment-pre-upload
     - prioritized-upload-posts-at-head-of-jobs-list-preventing-job-starvation
     - built-and-verified-check-telegram-diagnostic-and-listener-utility
-    - verified-live-photo-ingestion-and-ai-elaboration-for-lolatheozjack
+    - verified-live-photo-ingestion-and-ai-elaboration-for-user-account
     - resolved-acp-01-casing-header-in-acp-proceed-command
     - executed-audit-051-and-review-039-with-zero-regressions
     - verified-acp-ci-fast-tier-all-6-gates-passing
@@ -195,7 +195,7 @@
   tasks_completed: [tiered-hashtag-engine]
   done:
     - audited-hashtag-recent-and-hashtag-expansion-strategies-audit-033-034-035
-    - created-60-plus-curated-tiered-masterlist-in-accounts-lolatheozjack-hashtags-yml
+    - created-60-plus-curated-tiered-masterlist-in-accounts-user-account-hashtags-yml
     - implemented-hashtag-manager-singleton-core-subsystem
     - implemented-strategy-1-gemini-ai-persona-expansion
     - implemented-strategy-2-in-app-caption-harvester-with-zero-overhead

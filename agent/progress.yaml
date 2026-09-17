@@ -436,7 +436,7 @@ recent_work:
 - date: 2026-09-13
   description: 'Implemented Tiered Masterlist Pool and Dynamic Hashtag Discovery & Rotation Engine.'
   items:
-  - "✓ Created curated 60+ hashtag masterlist in accounts/lolatheozjack/hashtags.yml across 4 tiers (local, breed, lifestyle, reach)"
+  - "✓ Created curated 60+ hashtag masterlist across 4 tiers (local, breed, lifestyle, reach)"
   - "✓ Built HashtagManager core singleton subsystem with atomicwrites for YAML and JSON"
   - "✓ Implemented Strategy 1 (AI Gemini persona expansion) and Strategy 2 (zero-overhead caption harvester)"
   - "✓ Enforced deterministic addition rules R-ADD-1 to R-ADD-4 with anti-spam blacklist and semantic relevance checks"
@@ -449,7 +449,7 @@ recent_work:
 - date: 2026-09-15
   description: 'Telegram Two-Way Ingestion, AI Retry Architecture & Upload Scheduling Resilience.'
   items:
-  - "✓ Configured and verified Telegram Bot integration for accounts/lolatheozjack with telegram-inbox and telegram-reports"
+  - "✓ Configured and verified Telegram Bot integration with telegram-inbox and telegram-reports"
   - "✓ Built diagnostic and interactive long-polling listener scripts/check_telegram.py with Windows UTF-8 console support"
   - "✓ Implemented companion comment attachment to queued photos and interactive /elaborate and /caption commands"
   - "✓ Migrated Google Gemini Vision API calls from gemini-3.7-flash to recommended gemini-3.6-flash"

@@ -112,7 +112,6 @@ def trigger_on_demand_upload(
     using '--only-upload' (and optionally '--upload-force').
     Prevents duplicate concurrent upload runs via an in-memory lock set.
     """
-    global _ACTIVE_UPLOADS
     with _UPLOAD_LOCK:
         if username in _ACTIVE_UPLOADS:
             if token and auth_chat_id:
@@ -145,7 +144,21 @@ def trigger_on_demand_upload(
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            stdout, stderr = proc.communicate()
+            try:
+                stdout, stderr = proc.communicate(timeout=600)
+            except subprocess.TimeoutExpired:
+                logger.error(
+                    "On-demand upload subprocess timed out after 600s. Terminating..."
+                )
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                if token and auth_chat_id:
+                    telegram_bot_send_text(
+                        token,
+                        auth_chat_id,
+                        "⏱️ *On-Demand Upload Error*: Process timed out after 10 minutes and was terminated.",
+                    )
+                return
             if proc.returncode != 0:
                 logger.error(
                     f"On-demand upload subprocess exited with code {proc.returncode}: {stderr}"
@@ -776,7 +789,7 @@ def load_telegram_config(username) -> Optional[dict]:
         ) as stream:
             return yaml.safe_load(stream)
     except FileNotFoundError as e:
-        logger.error(f"Configuration file not found: {e}")
+        logger.debug(f"Optional telegram configuration not found for '{username}': {e}")
         return None
 
 

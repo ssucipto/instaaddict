@@ -4,7 +4,7 @@ import re
 import platform
 import xml.etree.ElementTree as ET
 from enum import Enum, auto
-from random import choice, randint, uniform
+from random import randint, uniform
 from time import sleep
 from typing import Optional, Tuple
 
@@ -24,7 +24,6 @@ from InstaAddict.core.resources import ResourceID as resources
 from InstaAddict.core.resources import TabBarText
 from InstaAddict.core.utils import (
     ActionBlockedError,
-    Square,
     get_value,
     random_sleep,
     save_crash,
@@ -551,7 +550,6 @@ class PostsViewList:
         displayHeight = self.device.get_info()["displayHeight"]
         containers_content = ResourceID.MEDIA_CONTAINER
         containers_gap = ResourceID.GAP_VIEW_AND_FOOTER_SPACE
-        suggested_users = ResourceID.NETEGO_CAROUSEL_HEADER
 
         # move type: half photo
         if swipe == SwipeTo.HALF_PHOTO:
@@ -1439,9 +1437,6 @@ class PostsViewList:
         # Fallback for IG >= v446 where contentDesc comes from its child
         if content_desc is None and media.exists():
             try:
-                # Iterate actual device UI children of the media frame
-                # A common hack: if the media group has no desc, one of its photo/video children does
-                info = media.ui_info()
                 # Find desc across immediate children via uiautomator lookup
                 child = media.child(className="android.widget.FrameLayout")
                 if child.exists():
@@ -3376,11 +3371,16 @@ class UniversalActions:
     @staticmethod
     def detect_block(device) -> bool:
         UniversalActions.escape_in_app_browser(device)
-        if not args.disable_block_detection:
+        if getattr(args, "disable_block_detection", False):
             return False
         logger.debug("Checking for block...")
-        if "blocked" in device.deviceV2.toast.get_message(1.0, 2.0, default=""):
-            logger.warning("Toast detected!")
+        if hasattr(device, "deviceV2") and hasattr(device.deviceV2, "toast"):
+            try:
+                toast_msg = device.deviceV2.toast.get_message(1.0, 2.0, default="")
+                if isinstance(toast_msg, str) and "blocked" in toast_msg.lower():
+                    logger.warning("Toast detected!")
+            except Exception:
+                pass
         serius_block = device.find(
             className=ClassName.IMAGE,
             textMatches=case_insensitive_re("Force reset password icon"),
@@ -3388,22 +3388,24 @@ class UniversalActions:
         if serius_block.exists():
             raise ActionBlockedError("Serius block detected :(")
         block_dialog = device.find(
-            resourceIdMatches=ResourceID.BLOCK_POPUP,
+            resourceIdMatches=ResourceID.BLOCK_POPUP if ResourceID else None,
         )
         popup_body = device.find(
-            resourceIdMatches=ResourceID.IGDS_HEADLINE_BODY,
+            resourceIdMatches=ResourceID.IGDS_HEADLINE_BODY if ResourceID else None,
         )
-        popup_appears = block_dialog.exists()
+        popup_appears = block_dialog.exists() if block_dialog else False
         if popup_appears:
-            if popup_body.exists():
+            if popup_body and popup_body.exists():
                 regex = r".+deleted"
                 is_post_deleted = re.match(regex, popup_body.get_text(), re.IGNORECASE)
                 if is_post_deleted:
                     logger.info(f"{is_post_deleted.group()}")
                     logger.debug("Click on OK button.")
-                    device.find(
-                        resourceIdMatches=ResourceID.NEGATIVE_BUTTON,
-                    ).click()
+                    neg_btn = device.find(
+                        resourceIdMatches=ResourceID.NEGATIVE_BUTTON if ResourceID else None,
+                    )
+                    if neg_btn:
+                        neg_btn.click()
                     is_blocked = False
                 else:
                     is_blocked = True
