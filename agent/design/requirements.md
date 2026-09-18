@@ -3,7 +3,7 @@
 **Project Name**: InstaAddict  
 **Version**: 1.3.0  
 **Created**: 2026-09-11  
-**Last Updated**: 2026-09-17  
+**Last Updated**: 2026-09-18  
 **Status**: Active  
 
 ---
@@ -69,4 +69,24 @@ InstaAddict is an active continuation and evolution of the GramAddict project, f
 - **4-Tier Escalated Stuck-Screen Recovery (`UniversalActions.recover_stuck_screen`)**: Dialog dismissal -> Android back key sequences -> Home tab navigation -> clean application restart (`app_stop` + `app_start`).
 - **Subprocess & OS Command Hardening (OWASP A03:2021)**: Elimination of `shell=True` from all core execution paths (`utils.py`, `device_facade.py`), replaced with parameterized lists and explicit defensive timeouts.
 - **Privacy Decoupling & Secret Isolation**: Complete eradication of hardcoded personal identifiers, bot tokens, or private credentials from tracked files; generic fallback creator defaults for personas and hashtags.
+
+### 9. Modern Terminal User Interface (TUI) & Live Dashboard
+- **Rich-Powered Live Terminal UI (`InstaAddict/core/tui.py`)**: Thread-safe `DashboardState` driving live progress bars against configured safety limits (Likes, Follows, Unfollows, Comments, Watched, Total Actions, and Crashes).
+- **TuiLogHandler with ANSI Stripping**: Real-time scrolling log pane with severity color-coding, multi-line record preservation, and ring-buffer bounded memory.
+- **Cross-Platform Console Resilience**: `safe_glyph` and `safe_box` fallbacks for legacy Windows CP1252/CP437 encodings; automated `--tui` / `--no-tui` CLI flag support with non-TTY headless detection.
+- **Operational Effort Counters**: Real-time tracking of posts scanned, profiles checked/skipped, dynamic filter pass rate %, dialogs dismissed, and ads bypassed.
+- **Content Queue Discovery Telemetry**: Live inspection of `accounts/<username>/content_queue/` reporting pending photos, published total, and rate-limit cooldown timers.
+
+### 10. Interactive Task Skip Shortcut & IPC Signal Watcher
+- **Interactive Console Shortcuts (`[S]` / `[N]`)**: Non-blocking `KeyboardListenerThread` capturing `[S]` (Skip) and `[N]` (Next) keystrokes in interactive terminals to immediately abort the currently active job and advance cleanly to the next scheduled task.
+- **Headless IPC Signal File Watcher (`accounts/<username>/.skip_task`)**: File-based signal allowing background daemons, external orchestrators, or Telegram handlers to trigger safe job skipping.
+- **Instant Countdown Breakout**: Immediate exit from `utils.countdown()` wait loops upon skip signal detection.
+- **Hot Path Skip Checks**: Integrated `is_skip_task_requested()` guards across `handle_posts`, `handle_likers`, `handle_blogger`, `interact_reels`, `action_unfollow_followers`, and `interact_with_user`.
+
+### 11. Peek Preview Direct Liking & Reels Telemetry Synchronization
+- **Instagram Grid Peek Preview Engine (`like_in_peek`, `dismiss_peek`)**: Detection and handling of 3D Touch / long-press preview modals; executes like action directly from preview context menu and dismisses modal immediately to avoid element timeout cascades.
+- **Fast Coordinate Tap**: Element center coordinate tapping in `navigateToPost` to stay under Android's ~400ms `OnLongClickListener` threshold.
+- **Reels Viewport Likers Bypass**: Signals undefined likers count `(False, -1)` on full-screen Reels viewports to downstream filters, preventing 100% of organic posts from being skipped when `min_likers > 0`.
+- **Synchronized Reels Telemetry**: Accurate `totalWatched`, `totalLikes`, and `add_interaction` recording across double-tap reel interactions and dynamic `current_user` comment verification.
+
 

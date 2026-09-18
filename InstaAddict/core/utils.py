@@ -437,6 +437,9 @@ def countdown(seconds: int = 10, waiting_message: str = "") -> None:
         mgr = DashboardManager.get_instance()
         try:
             while seconds:
+                if mgr.state.consume_skip_task_request():
+                    logger.info("[TUI] Countdown skipped by user shortcut ([S]/[N]).")
+                    break
                 mgr.state.update_countdown(seconds, waiting_message)
                 mgr.update_render()
                 time.sleep(1)

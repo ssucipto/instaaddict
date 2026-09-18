@@ -1,7 +1,7 @@
 """InstaAddict - Human-like Instagram bot powered by UIAutomator2"""
 
 __version__ = "1.3.0"
-__tested_ig_version__ = "446.0.0.0.0"
+__tested_ig_version__ = "447.0.0.55.81"
 
 from InstaAddict.core.bot_flow import start_bot
 

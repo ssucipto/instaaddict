@@ -4,10 +4,11 @@ import os
 import re
 import sys
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Deque, Optional, Tuple
+from typing import Any, Deque, Optional, Tuple
 
 from rich.align import Align
 from rich.console import Console, Group
@@ -24,6 +25,8 @@ from InstaAddict import __version__
 def safe_glyph(glyph: str, fallback: str) -> str:
     """Return emoji glyph if current stdout encoding supports it, else return safe ascii fallback."""
     encoding = getattr(sys.stdout, "encoding", "utf-8") or "utf-8"
+    if "utf" not in encoding.lower():
+        return fallback
     try:
         glyph.encode(encoding, errors="strict")
         return glyph
@@ -94,12 +97,173 @@ class DashboardState:
         default_factory=lambda: deque(maxlen=30)
     )
 
+    # Pipeline & Effort counters (Live non-KPI operational metrics)
+    posts_checked: int = 0
+    profiles_checked: int = 0
+    profiles_skipped: int = 0
+    ads_bypassed: int = 0
+    dialogs_dismissed: int = 0
+    reels_evaluated: int = 0
+
+    # Content queue & upload telemetry
+    queue_pending: int = 0
+    queue_published: int = 0
+    last_upload_time_str: str = "Never"
+    upload_cooldown_str: str = "Ready"
+    upload_requested: bool = False
+    skip_task_requested: bool = False
+
     # Concurrency guard
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     def elapsed_duration_str(self) -> str:
         delta = datetime.now() - self.start_time
         return str(timedelta(seconds=int(delta.total_seconds())))
+
+    def consume_upload_request(self) -> bool:
+        """Atomically consume any pending manual upload request triggered via hotkey [U]."""
+        with self.lock:
+            if self.upload_requested:
+                self.upload_requested = False
+                return True
+            return False
+
+    def trigger_upload(self):
+        """Flag manual upload requested."""
+        with self.lock:
+            self.upload_requested = True
+
+    def consume_skip_task_request(self) -> bool:
+        """Atomically consume any pending skip task request triggered via hotkey [S]/[N] or IPC file."""
+        with self.lock:
+            signal_file = None
+            if self.username:
+                signal_file = os.path.join("accounts", self.username, ".skip_task")
+            if signal_file and os.path.isfile(signal_file):
+                try:
+                    os.remove(signal_file)
+                    self.skip_task_requested = False
+                    return True
+                except Exception:
+                    pass
+
+            if self.skip_task_requested:
+                self.skip_task_requested = False
+                return True
+            return False
+
+    def trigger_skip_task(self):
+        """Flag task skip requested."""
+        with self.lock:
+            self.skip_task_requested = True
+
+    def is_skip_task_requested(self) -> bool:
+        """Non-destructively check if skip task is requested."""
+        with self.lock:
+            if self.skip_task_requested:
+                return True
+            if self.username:
+                signal_file = os.path.join("accounts", self.username, ".skip_task")
+                if os.path.isfile(signal_file):
+                    return True
+            return False
+
+    def refresh_queue_status(self, username: Optional[str] = None):
+        """Scan content queue directory on disk and update queue telemetry."""
+        with self.lock:
+            user = username or self.username
+            if not isinstance(user, str) or not user.strip():
+                user = None
+
+            pending_candidates = []
+            if user:
+                pending_candidates.extend([
+                    os.path.join("accounts", user, "content_queue", "pending"),
+                    os.path.join("accounts", user, "upload_queue", "pending"),
+                ])
+            else:
+                # Fallback scan of any accounts directory or global upload_queue
+                if os.path.isdir("accounts"):
+                    try:
+                        for d in os.listdir("accounts"):
+                            p = os.path.join("accounts", d, "content_queue", "pending")
+                            if os.path.isdir(p) and p not in pending_candidates:
+                                pending_candidates.append(p)
+                    except Exception:
+                        pass
+                pending_candidates.append("upload_queue/pending")
+
+            allowed_exts = (".jpg", ".jpeg", ".png", ".mp4")
+            pending_count = 0
+            found_pending_dir = None
+            for pdir in pending_candidates:
+                if os.path.isdir(pdir):
+                    found_pending_dir = pdir
+                    try:
+                        files = [f for f in os.listdir(pdir) if f.lower().endswith(allowed_exts)]
+                        pending_count = len(files)
+                        break
+                    except Exception:
+                        pass
+
+            self.queue_pending = pending_count
+
+            # Check published directory
+            published_candidates = []
+            if found_pending_dir:
+                published_candidates.append(os.path.join(os.path.dirname(found_pending_dir), "published"))
+            if user:
+                published_candidates.append(os.path.join("accounts", user, "content_queue", "published"))
+                published_candidates.append(os.path.join("accounts", user, "upload_queue", "published"))
+
+            published_count = 0
+            latest_mtime = None
+            for pdir in published_candidates:
+                if os.path.isdir(pdir):
+                    try:
+                        for root, _, files in os.walk(pdir):
+                            for f in files:
+                                if f.lower().endswith(allowed_exts):
+                                    published_count += 1
+                                    try:
+                                        mt = datetime.fromtimestamp(os.path.getmtime(os.path.join(root, f)))
+                                        if latest_mtime is None or mt > latest_mtime:
+                                            latest_mtime = mt
+                                    except Exception:
+                                        pass
+                        if published_count > 0:
+                            break
+                    except Exception:
+                        pass
+
+            self.queue_published = published_count
+
+            # Determine last upload time string and cooldown
+            if latest_mtime:
+                delta = datetime.now() - latest_mtime
+                secs = int(delta.total_seconds())
+                if secs < 60:
+                    self.last_upload_time_str = "Just now"
+                elif secs < 3600:
+                    self.last_upload_time_str = f"{secs // 60}m ago"
+                elif secs < 86400:
+                    self.last_upload_time_str = f"{secs // 3600}h {(secs % 3600) // 60}m ago"
+                else:
+                    self.last_upload_time_str = f"{secs // 86400}d ago"
+
+                # Standard rate limit is 12 hours
+                rate_limit_secs = 12 * 3600
+                if secs < rate_limit_secs:
+                    rem_secs = rate_limit_secs - secs
+                    rem_h = rem_secs // 3600
+                    rem_m = (rem_secs % 3600) // 60
+                    self.upload_cooldown_str = f"{rem_h}h {rem_m}m"
+                else:
+                    self.upload_cooldown_str = "Ready"
+            elif self.last_upload_time_str != "Never":
+                self.upload_cooldown_str = "Ready"
+            else:
+                self.upload_cooldown_str = "Ready"
 
     def update_account(
         self,
@@ -170,6 +334,36 @@ class DashboardState:
                 getattr(session, "totalInteractions", {}).values()
             )
 
+            # Live effort counters
+            self.posts_checked = getattr(session, "totalPostsChecked", 0)
+            self.profiles_checked = getattr(session, "totalProfilesChecked", 0)
+            self.profiles_skipped = getattr(session, "totalProfilesSkipped", 0)
+            self.ads_bypassed = getattr(session, "totalAdsBypassed", 0)
+            self.dialogs_dismissed = getattr(session, "totalDialogsDismissed", 0)
+            self.reels_evaluated = getattr(session, "totalReelsEvaluated", 0)
+
+            # Check upload history from session if available
+            upload_hist = getattr(session, "uploadHistory", [])
+            if upload_hist:
+                last_entry = upload_hist[-1]
+                ts = last_entry.get("timestamp")
+                if ts:
+                    try:
+                        dt = datetime.fromisoformat(ts)
+                        delta = datetime.now() - dt
+                        secs = int(delta.total_seconds())
+                        if secs < 60:
+                            self.last_upload_time_str = "Just now"
+                        elif secs < 3600:
+                            self.last_upload_time_str = f"{secs // 60}m ago"
+                        else:
+                            self.last_upload_time_str = f"{secs // 3600}h {(secs % 3600) // 60}m ago"
+                    except Exception:
+                        pass
+
+            u_name = getattr(session, "my_username", None)
+            self.refresh_queue_status(u_name if isinstance(u_name, str) else self.username)
+
             args = getattr(session, "args", None)
             if args:
                 self.likes_limit = _safe_int(
@@ -232,19 +426,89 @@ class TuiLogHandler(logging.Handler):
             self.handleError(record)
 
 
+class KeyboardListenerThread(threading.Thread):
+    """
+    Background daemon thread listening for terminal keystrokes:
+    - [U] / [u]: Trigger immediate queue upload
+    - [D] / [d]: Force immediate TUI re-render / debug toggle
+    """
+
+    def __init__(self, manager: "DashboardManager"):
+        super().__init__(daemon=True, name="TUI-KeyboardListener")
+        self.manager = manager
+        self._running = True
+
+    def stop(self):
+        self._running = False
+
+    def run(self):
+        try:
+            if not sys.stdin or not hasattr(sys.stdin, "isatty") or not sys.stdin.isatty():
+                return
+        except Exception:
+            return
+
+        is_win = sys.platform.startswith("win")
+        if is_win:
+            try:
+                import msvcrt
+            except ImportError:
+                return
+
+            while self._running and self.manager.is_active():
+                try:
+                    if msvcrt.kbhit():
+                        ch = msvcrt.getch()
+                        if ch in (b"\x00", b"\xe0"):
+                            msvcrt.getch()
+                            continue
+                        key = ch.decode("utf-8", errors="ignore").lower()
+                        self._handle_key(key)
+                    time.sleep(0.1)
+                except Exception:
+                    time.sleep(0.2)
+        else:
+            import select
+
+            while self._running and self.manager.is_active():
+                try:
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.2)
+                    if rlist:
+                        key = sys.stdin.read(1).lower()
+                        self._handle_key(key)
+                except Exception:
+                    time.sleep(0.2)
+
+    def _handle_key(self, key: str):
+        if key == "u":
+            self.manager.trigger_upload_request()
+        elif key in ("s", "n"):
+            self.manager.trigger_skip_task()
+        elif key == "d":
+            self.manager.trigger_debug_toggle()
+
+
 class DashboardManager:
     """Manages Rich Live layout, refresh rate, and terminal restoration."""
 
     _instance: Optional["DashboardManager"] = None
 
-    def __init__(self, console: Optional[Console] = None, refresh_rate: float = 4.0):
+    def __init__(
+        self,
+        console: Optional[Console] = None,
+        refresh_rate: float = 1.5,
+        screen: bool = True,
+    ):
         self.console = console or Console(force_terminal=True, safe_box=True)
         self.state = DashboardState()
         self.refresh_rate = refresh_rate
+        self.screen = screen
         self.live: Optional[Live] = None
         self._active = False
         self._lock = threading.Lock()
+        self._last_render_time = 0.0
         self.bound_session_state = None
+        self.keyboard_thread: Optional[KeyboardListenerThread] = None
         try:
             atexit.register(self.stop)
         except Exception:
@@ -269,6 +533,44 @@ class DashboardManager:
             return False
         return cls._instance._active
 
+    def trigger_upload_request(self):
+        """Handle on-demand upload hotkey [U]."""
+        with self._lock:
+            self.state.upload_requested = True
+            self.state.update_activity(
+                action="[U] Manual upload requested from pending queue...",
+            )
+            self.state.add_log(
+                "INFO",
+                datetime.now().strftime("%H:%M:%S"),
+                "User pressed [U]: Immediate queue photo upload requested!",
+            )
+            self.update_render(force=True)
+
+    def trigger_skip_task(self):
+        """Handle skip task hotkey [S] / [N]."""
+        with self._lock:
+            self.state.skip_task_requested = True
+            self.state.update_activity(
+                action="[S] Task skip requested! Advancing to next task...",
+            )
+            self.state.add_log(
+                "WARNING",
+                datetime.now().strftime("%H:%M:%S"),
+                "User pressed [S]/[N]: Skipping current task and advancing to next scheduled task...",
+            )
+            self.update_render(force=True)
+
+    def trigger_debug_toggle(self):
+        """Handle debug / refresh hotkey [D]."""
+        with self._lock:
+            self.state.add_log(
+                "INFO",
+                datetime.now().strftime("%H:%M:%S"),
+                "User pressed [D]: Forcing telemetry sync and full TUI re-render.",
+            )
+            self.update_render(force=True)
+
     def start(self):
         with self._lock:
             if self._active:
@@ -277,18 +579,32 @@ class DashboardManager:
             self.live = Live(
                 layout,
                 console=self.console,
+                screen=self.screen,
                 refresh_per_second=self.refresh_rate,
-                screen=False,
-                transient=False,
+                vertical_overflow="crop",
+                transient=True if self.screen else False,
                 auto_refresh=True,
             )
             self.live.start()
             self._active = True
 
+            # Start background keyboard listener thread
+            self.keyboard_thread = KeyboardListenerThread(self)
+            try:
+                self.keyboard_thread.start()
+            except Exception:
+                pass
+
     def stop(self):
         with self._lock:
             if not self._active:
                 return
+            if hasattr(self, "keyboard_thread") and self.keyboard_thread:
+                try:
+                    self.keyboard_thread.stop()
+                except Exception:
+                    pass
+                self.keyboard_thread = None
             if self.live:
                 try:
                     self.live.stop()
@@ -304,12 +620,17 @@ class DashboardManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
-    def update_render(self):
-        if self.live and self._active:
-            try:
-                self.live.update(self.generate_layout())
-            except Exception:
-                pass
+    def update_render(self, force: bool = False):
+        with self._lock:
+            if self.live and self._active:
+                now = time.time()
+                # Rate-limit manual updates to 2 Hz (0.5s interval) to prevent thread rendering collisions
+                if force or (now - self._last_render_time >= 0.5):
+                    self._last_render_time = now
+                    try:
+                        self.live.update(self.generate_layout())
+                    except Exception:
+                        pass
 
     def _render_header(self) -> Panel:
         s = self.state
@@ -325,14 +646,15 @@ class DashboardManager:
         icon_bot = safe_glyph("🤖", "[*]")
         icon_dev = safe_glyph("📱", "[Dev]")
         icon_time = safe_glyph("⏱️", "[Time]")
+        sep = safe_glyph("│", "|")
 
         header_text = Text()
         header_text.append(f"{icon_bot} InstaAddict AI ", style="bold bright_cyan")
-        header_text.append(f"v{__version__}  │  ", style="dim cyan")
+        header_text.append(f"v{__version__}  {sep}  ", style="dim cyan")
         header_text.append(f"{user_str} ", style="bold white")
-        header_text.append(f"{stats_str}  │  ", style="dim white")
+        header_text.append(f"{stats_str}  {sep}  ", style="dim white")
         header_text.append(f"{icon_dev} Device: ", style="bold yellow")
-        header_text.append(f"{device_str}  │  ", style="yellow")
+        header_text.append(f"{device_str}  {sep}  ", style="yellow")
         header_text.append(f"{icon_time} Elapsed: ", style="bold green")
         header_text.append(f"{duration_str} (Session #{s.session_index})", style="green")
 
@@ -342,12 +664,15 @@ class DashboardManager:
             padding=(0, 1),
         )
 
-    def _render_stats_table(self) -> Table:
+    def _render_stats_table(self) -> Any:
         s = self.state
+        is_short = self.console.height < 28
+
+        # 1. Main Conversion & Limits Table
         table = Table(
             expand=True,
             box=None,
-            padding=(0, 1),
+            padding=(0, 0) if is_short else (0, 1),
             header_style="bold bright_cyan",
         )
         table.add_column("Metric", style="bold white", width=14)
@@ -398,36 +723,79 @@ class DashboardManager:
                 f"[{pct_style}]{pct}%[/{pct_style}]",
             )
 
-        # Uploads summary row
-        uploads_total = s.uploads_ok + s.uploads_fail
-        uploads_bar = ProgressBar(
-            total=max(uploads_total, 1),
-            completed=s.uploads_ok,
-            width=None,
-            complete_style="bright_green",
-            finished_style="bright_green",
+        # 2. Pipeline Effort & Discovery (Live operational metrics)
+        icon_effort = safe_glyph("⚡", "[~]")
+        icon_queue = safe_glyph("📦", "[Q]")
+        pass_count = max(0, s.profiles_checked - s.profiles_skipped)
+        pass_pct = (pass_count / max(s.profiles_checked, 1)) * 100 if s.profiles_checked > 0 else 100.0
+        pass_style = "bold green" if pass_pct >= 20 else "yellow"
+
+        if is_short:
+            effort_text = Text.from_markup(
+                f"[bold cyan]{icon_effort} Effort:[/] Posts: [bold white]{s.posts_checked}[/] │ "
+                f"Profiles: [bold white]{s.profiles_checked}[/] ([dim]{s.profiles_skipped} skp[/]) │ "
+                f"Ads: [yellow]{s.ads_bypassed}[/] │ Dialogs: [green]{s.dialogs_dismissed}[/] │ Reels: [magenta]{s.reels_evaluated}[/]"
+            )
+            queue_text = Text.from_markup(
+                f"[bold magenta]{icon_queue} Queue:[/] [bold green]{s.queue_pending} media[/] │ "
+                f"Sent: [white]{s.queue_published}[/] │ Last: [yellow]{s.last_upload_time_str}[/] │ "
+                f"Slot: [cyan]{s.upload_cooldown_str}[/] │ [bold bright_magenta]\\[U] Upload Now[/]"
+            )
+            return Group(table, effort_text, queue_text)
+
+        effort_header = Text.from_markup(f"\n[bold bright_cyan]{icon_effort} Real-Time Operational Effort[/] [dim](live activity counters)[/]")
+        effort_table = Table(box=None, expand=True, padding=(0, 1), show_header=False)
+        effort_table.add_column("C1", ratio=1)
+        effort_table.add_column("C2", ratio=1)
+        effort_table.add_column("C3", ratio=1)
+
+        effort_table.add_row(
+            f"[bold white]Posts Scanned:[/] [bright_cyan]{s.posts_checked}[/]",
+            f"[bold white]Profiles Checked:[/] [bright_cyan]{s.profiles_checked}[/] [dim]({s.profiles_skipped} skipped)[/]",
+            f"[bold white]Ads Bypassed:[/] [yellow]{s.ads_bypassed}[/]",
         )
-        table.add_row(
-            "Uploads (Q)",
-            uploads_bar,
-            f"{s.uploads_ok} OK / {s.uploads_fail} Fail",
-            f"[green]{s.uploads_ok}[/green]",
+        effort_table.add_row(
+            f"[bold white]Reels Evaluated:[/] [magenta]{s.reels_evaluated}[/]",
+            f"[bold white]Dialogs Cleared:[/] [green]{s.dialogs_dismissed}[/]",
+            f"[bold white]Filter Pass Rate:[/] [{pass_style}]{pass_pct:.1f}%[/]",
         )
 
-        return table
+        queue_header = Text.from_markup(f"[bold bright_magenta]{icon_queue} Content Queue & Publishing[/] [dim](hotkey: \\[U] to upload now)[/]")
+        queue_table = Table(box=None, expand=True, padding=(0, 1), show_header=False)
+        queue_table.add_column("Q1", ratio=1)
+        queue_table.add_column("Q2", ratio=1)
+        queue_table.add_column("Q3", ratio=1)
+
+        cooldown_color = "bright_green" if s.upload_cooldown_str == "Ready" else "yellow"
+        queue_table.add_row(
+            f"[bold white]Pending Queue:[/] [bold green]{s.queue_pending} media[/]",
+            f"[bold white]Published Total:[/] [green]{s.queue_published} posts[/]",
+            f"[bold white]Last Upload:[/] [yellow]{s.last_upload_time_str}[/]",
+        )
+        queue_table.add_row(
+            f"[bold white]Cooldown Status:[/] [{cooldown_color}]{s.upload_cooldown_str}[/]",
+            f"[bold white]Uploads Session:[/] [green]{s.uploads_ok} OK[/] / [red]{s.uploads_fail} Fail[/]",
+            "[bold bright_magenta]Shortcuts:[/] [bold white]\\[S] Skip  \\[U] Upload[/]",
+        )
+
+        return Group(table, effort_header, effort_table, queue_header, queue_table)
 
     def _render_activity_panel(self) -> Panel:
         s = self.state
         content = Text()
+        bullet = safe_glyph("•", "-")
 
-        content.append("• Active Job:   ", style="bold yellow")
+        content.append(f"{bullet} Active Job:   ", style="bold yellow")
         content.append(f"{s.current_job}\n", style="bright_white")
 
-        content.append("• Current Step: ", style="bold cyan")
+        content.append(f"{bullet} Current Step: ", style="bold cyan")
         content.append(f"{s.current_action}\n", style="white")
 
+        if s.skip_task_requested:
+            content.append("⚡ Task Skip Pending: Advancing to next task...\n", style="bold bright_yellow")
+
         if s.target_user:
-            content.append("• Target Post:  ", style="bold magenta")
+            content.append(f"{bullet} Target Post:  ", style="bold magenta")
             content.append(f"@{s.target_user}", style="bright_magenta")
             if s.target_source:
                 content.append(f" (source: {s.target_source})", style="dim magenta")
@@ -435,11 +803,11 @@ class DashboardManager:
 
         icon_cooldown = safe_glyph("⏳", "[..]")
         if s.countdown_seconds is not None and s.countdown_seconds > 0:
-            content.append("• Cooldown:     ", style="bold bright_red")
+            content.append(f"{bullet} Cooldown:     ", style="bold bright_red")
             msg = s.countdown_message or "Next interaction in"
             content.append(f"{icon_cooldown} {msg} {s.countdown_seconds:02d}s\n", style="bold bright_yellow")
         else:
-            content.append("• Status:       ", style="bold green")
+            content.append(f"{bullet} Status:       ", style="bold green")
             content.append(f"{s.status_message} (Working Hours: {s.working_hours_status})\n", style="bright_green")
 
         icon_act = safe_glyph("🎯", "[*]")
@@ -457,10 +825,23 @@ class DashboardManager:
         with s.lock:
             entries = list(s.logs_buffer)
 
-        if not entries:
+        # Dynamically limit visible entries based on available console height to prevent vertical overflow
+        is_narrow = self.console.width < 85
+        if is_narrow:
+            # In 3-tier vertical stack, body is shared between stats, activity, logs
+            max_visible = max(3, int(self.console.height * 0.3) - 2)
+        else:
+            # In dual-column, logs panel occupies the entire right column height minus header and footer
+            max_visible = max(3, self.console.height - 8)
+
+        visible_entries = (
+            entries[-max_visible:] if len(entries) > max_visible else entries
+        )
+
+        if not visible_entries:
             log_text.append("Waiting for runtime logs...", style="dim")
         else:
-            for level, timestamp, message in entries:
+            for level, timestamp, message in visible_entries:
                 color = TuiLogHandler.LEVEL_COLORS.get(level, "white")
                 log_text.append(f"[{timestamp}] ", style="dim")
                 log_text.append(f"[{level[:4]:<4}] ", style=color)
@@ -475,15 +856,24 @@ class DashboardManager:
         )
 
     def _render_footer(self) -> Panel:
+        sep = safe_glyph("│", "|")
         footer_text = Text()
         footer_text.append(" [Ctrl+C] ", style="bold bright_red")
-        footer_text.append("Graceful Stop  │ ", style="dim white")
+        footer_text.append(f"Stop  {sep} ", style="dim white")
+        footer_text.append(" [S] ", style="bold bright_yellow")
+        footer_text.append(f"Skip Task  {sep} ", style="bright_white")
+        footer_text.append(" [U] ", style="bold bright_magenta")
+        footer_text.append(f"Upload Queued Photo  {sep} ", style="bright_white")
         footer_text.append(" [D] ", style="bold bright_yellow")
-        footer_text.append("Debug Verbose  │ ", style="dim white")
+        footer_text.append(f"Debug  {sep} ", style="dim white")
         footer_text.append(" Mode: ", style="bold cyan")
-        footer_text.append("Automated Human Simulation  │ ", style="cyan")
-        footer_text.append(" Safety: ", style="bold green")
-        footer_text.append("Rate-Limit Guard Active", style="green")
+        footer_text.append(f"Live (Human Sim)  {sep} ", style="bold green")
+        footer_text.append(" Queue: ", style="bold green")
+        cooldown_style = "bright_green" if self.state.upload_cooldown_str == "Ready" else "yellow"
+        footer_text.append(
+            f"{self.state.queue_pending} pending ({self.state.upload_cooldown_str})",
+            style=cooldown_style,
+        )
 
         return Panel(
             Align.center(footer_text),
@@ -508,7 +898,7 @@ class DashboardManager:
         icon_stats = safe_glyph("📊", "[#]")
         stats_panel = Panel(
             self._render_stats_table(),
-            title=f"[bold bright_green]{icon_stats} Session Statistics & Limits[/bold bright_green]",
+            title=f"[bold bright_green]{icon_stats} Session Statistics, Effort & Queue[/bold bright_green]",
             border_style="green",
             padding=(0, 1),
         )

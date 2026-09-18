@@ -54,7 +54,6 @@ from InstaAddict.core.utils import (
     stop_bot,
     wait_for_next_session,
 )
-from InstaAddict.core.resources import ResourceID
 from InstaAddict.core.views import (
     AccountView,
     ProfileView,
@@ -435,6 +434,51 @@ def start_bot(**kwargs):
                         "Skipping this job to avoid running it on the wrong screen."
                     )
                     continue
+
+            # Check for user-triggered task skip request via TUI hotkey [S]/[N]
+            if (
+                dashboard_manager.is_active()
+                and dashboard_manager.state.consume_skip_task_request()
+            ):
+                logger.warning(
+                    f"[TUI] Skipping job '{plugin}' triggered by user shortcut ([S]/[N]). Advancing to next task...",
+                    extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                )
+                continue
+
+            # Check for user-triggered on-demand upload request via TUI hotkey [U]
+            if (
+                dashboard_manager.is_active()
+                and dashboard_manager.state.consume_upload_request()
+            ):
+                logger.info(
+                    "[TUI] Executing on-demand queue photo upload triggered by user hotkey [U]...",
+                    extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
+                )
+                try:
+                    from InstaAddict.plugins.upload_posts import UploadPostsPlugin
+
+                    uploader = (
+                        configs.actions.get("upload-posts")
+                        or UploadPostsPlugin()
+                    )
+                    orig_force = getattr(configs.args, "upload_force", False)
+                    configs.args.upload_force = True
+                    dashboard_manager.state.update_activity(
+                        action="Uploading queued photo now...",
+                    )
+                    dashboard_manager.update_render(force=True)
+                    try:
+                        uploader.run(
+                            device, configs, storage, sessions, filters, "upload-posts"
+                        )
+                    finally:
+                        configs.args.upload_force = orig_force
+                    dashboard_manager.state.refresh_queue_status(session_state.my_username)
+                    dashboard_manager.update_render(force=True)
+                except Exception as e:
+                    logger.error(f"[TUI] Failed executing on-demand upload: {e}")
+
             if plugin in unfollow_jobs:
                 if configs.args.scrape_to_file is not None:
                     logger.warning(
@@ -454,6 +498,8 @@ def start_bot(**kwargs):
                 configs.actions[plugin].run(
                     device, configs, storage, sessions, filters, plugin
                 )
+                if dashboard_manager.is_active():
+                    dashboard_manager.state.consume_skip_task_request()
                 unfollow_jobs.remove(plugin)
                 print_limits = True
             else:
@@ -487,6 +533,8 @@ def start_bot(**kwargs):
                 configs.actions[plugin].run(
                     device, configs, storage, sessions, filters, plugin
                 )
+                if dashboard_manager.is_active():
+                    dashboard_manager.state.consume_skip_task_request()
                 print_limits = True
 
         # save the session in sessions.json

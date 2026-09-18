@@ -25,3 +25,9 @@
   description: "Live terminal user interface with thread-safe state synchronization, safe console glyph fallbacks for legacy Windows codepages, and atexit cursor restoration."
   context: "Long-running CLI automation tools requiring live statistics, progress tracking against safety limits, and rolling log streams without clobbering stdout across UTF-8 and non-UTF-8 consoles."
   solution: "Implement safe_glyph() checking sys.stdout.encoding with ASCII fallbacks; use rich.live.Live with safe_box=True; register atexit.register(self.stop) for clean cursor restoration; swap logging handlers to route log records to a bounded deque ring buffer during execution."
+
+- date: 2026-09-18
+  name: peek-preview-action-ingestion-and-circuit-breaker
+  description: "Detect floating Peek Preview (long-press/3D Touch) modals, ingest actions directly from the preview context menu to avoid wasted navigation effort, dismiss immediately, and enforce consecutive failure circuit breakers with verified exit loops."
+  context: "Mobile app automation (Instagram, etc.) where touch sensitivity or RPC latency triggers long-press context modals instead of opening views, resulting in trapped navigation and zero-action timeout cascades."
+  solution: "Check for preview context buttons ('Like', 'Comment') on post open; execute like directly on the preview menu and register telemetry if present; calculate explicit element center coordinates for instantaneous tap events; enforce a 2-consecutive failure circuit breaker on un-openable profiles; and verify exit with a multi-iteration loop checking _is_still_on_profile() before proceeding."

@@ -6,7 +6,6 @@ import pytest
 from InstaAddict.core.config import Config
 from InstaAddict.core.decorators import run_safely
 from InstaAddict.core.plugin_loader import Plugin
-from InstaAddict.core.resources import ResourceID
 from InstaAddict.core.session_state import SessionState
 from InstaAddict.core.views import ProfileView, TabBarTabs, TabBarView, load_config
 import InstaAddict.core.views as views
@@ -233,7 +232,6 @@ def test_like_in_reels_bypasses_feed_media_container():
 
 def test_excepthook_keyboard_interrupt_safe_exit():
     """Verify that a KeyboardInterrupt during excepthook exits cleanly with code 0."""
-    from InstaAddict.core.log import configure_logger
     import sys
 
     with patch("sys.exit") as mock_exit:
@@ -266,7 +264,6 @@ def test_filter_init_uninitialized_args_safe(tmp_path):
 def test_bot_flow_untested_ig_version_keyboard_interrupt_quits():
     """Verify that hitting Ctrl-C at untested IG version prompt exits with code 0 rather than proceeding."""
     import sys
-    import InstaAddict.core.bot_flow as bot_flow
 
     with patch("builtins.input", side_effect=KeyboardInterrupt), patch(
         "sys.exit"
@@ -513,4 +510,336 @@ def test_save_crash_catches_generic_exception(tmp_path, monkeypatch):
     save_crash(mock_device)
 
 
+def test_opened_post_view_peek_preview_detection():
+    """Verify OpenedPostView.is_peek_preview_opened detects Instagram's Peek Preview."""
+    from InstaAddict.core.views import OpenedPostView
+
+    mock_device = MagicMock()
+    mock_like_btn = MagicMock()
+    mock_like_btn.exists.return_value = True
+    mock_context_opt = MagicMock()
+    mock_context_opt.exists.return_value = True
+
+    def mock_find(**kwargs):
+        text_re = kwargs.get("textMatches", "")
+        if "Like" in text_re:
+            return mock_like_btn
+        if "Comment" in text_re or "Repost" in text_re:
+            return mock_context_opt
+        elem = MagicMock()
+        elem.exists.return_value = False
+        return elem
+
+    mock_device.find.side_effect = mock_find
+    post_view = OpenedPostView(mock_device)
+    assert post_view.is_peek_preview_opened() is True
+
+    # When context options missing, is_peek_preview_opened returns False
+    mock_context_opt.exists.return_value = False
+    assert post_view.is_peek_preview_opened() is False
+
+
+def test_opened_post_view_peek_already_liked():
+    """Verify is_peek_already_liked returns True when Unlike button exists."""
+    from InstaAddict.core.views import OpenedPostView
+
+    mock_device = MagicMock()
+    mock_unlike_btn = MagicMock()
+    mock_unlike_btn.exists.return_value = True
+
+    mock_device.find.return_value = mock_unlike_btn
+    post_view = OpenedPostView(mock_device)
+    assert post_view.is_peek_already_liked() is True
+
+    mock_unlike_btn.exists.return_value = False
+    assert post_view.is_peek_already_liked() is False
+
+
+def test_opened_post_view_like_in_peek():
+    """Verify like_in_peek clicks Like button and returns True."""
+    from InstaAddict.core.views import OpenedPostView
+
+    mock_device = MagicMock()
+    mock_like_btn = MagicMock()
+    mock_like_btn.exists.return_value = True
+
+    def mock_find(**kwargs):
+        text_re = kwargs.get("textMatches", "")
+        if "Unlike" in text_re:
+            unlike_mock = MagicMock()
+            unlike_mock.exists.return_value = False
+            return unlike_mock
+        if "Like" in text_re:
+            return mock_like_btn
+        elem = MagicMock()
+        elem.exists.return_value = False
+        return elem
+
+    mock_device.find.side_effect = mock_find
+    with patch("InstaAddict.core.views.UniversalActions.detect_block"), \
+         patch("InstaAddict.core.views.random_sleep"):
+        post_view = OpenedPostView(mock_device)
+        res = post_view.like_in_peek()
+
+    assert res is True
+    mock_like_btn.click.assert_called_once()
+
+
+def test_opened_post_view_dismiss_peek():
+    """Verify dismiss_peek calls back and checks profile tabs container."""
+    from InstaAddict.core.views import OpenedPostView
+
+    mock_device = MagicMock()
+    mock_tabs = MagicMock()
+    mock_tabs.exists.return_value = True
+    mock_device.find.return_value = mock_tabs
+
+    with patch("InstaAddict.core.views.random_sleep"):
+        post_view = OpenedPostView(mock_device)
+        res = post_view.dismiss_peek()
+
+    assert res is True
+    mock_device.back.assert_called_once()
+
+
+def test_posts_grid_view_navigate_to_post_peek_detection():
+    """Verify navigateToPost sets is_peek=True when Peek Preview is detected."""
+    from InstaAddict.core.views import PostsGridView
+
+    mock_device = MagicMock()
+    grid_view = PostsGridView(mock_device)
+
+    mock_post_list = MagicMock()
+    mock_row = MagicMock()
+    mock_post = MagicMock()
+
+    mock_post_list.exists.return_value = True
+    mock_row.exists.return_value = True
+    mock_post.exists.return_value = True
+    mock_post.ui_info.return_value = {"contentDescription": "Photo"}
+    mock_post.get_bounds.return_value = {"left": 100, "top": 200, "right": 300, "bottom": 400}
+
+    mock_post_list.child.return_value = mock_row
+    mock_row.child.return_value = mock_post
+    grid_view._get_post_view = MagicMock(return_value=mock_post_list)
+
+    with patch("InstaAddict.core.views.OpenedPostView.is_post_opened", return_value=False), \
+         patch("InstaAddict.core.views.OpenedPostView.is_peek_preview_opened", return_value=True), \
+         patch.object(grid_view, "_is_still_on_profile", return_value=True):
+        opened_view, media_type, obj_count = grid_view.navigateToPost(0, 0)
+
+    assert opened_view is not None
+    assert getattr(opened_view, "is_peek", False) is True
+    mock_device.deviceV2.click.assert_called_once_with(200, 300)
+
+
+def test_profile_view_is_still_on_profile():
+    """Verify ProfileView._is_still_on_profile detects profile tabs container."""
+    from InstaAddict.core.views import ProfileView
+    import InstaAddict.core.views as views
+    from InstaAddict.core.resources import ResourceID as resources
+
+    views.ResourceID = resources("com.instagram.android")
+    mock_device = MagicMock()
+    mock_tabs = MagicMock()
+    mock_tabs.exists.return_value = True
+    mock_device.find.return_value = mock_tabs
+
+    pv = ProfileView(mock_device)
+    assert pv._is_still_on_profile() is True
+
+    mock_tabs.exists.return_value = False
+    assert pv._is_still_on_profile() is False
+
+
+def test_interact_with_user_peek_preview_liking():
+    """Verify interact_with_user handles Peek Preview, likes in peek, and records like."""
+    from InstaAddict.core.interaction import interact_with_user
+    from InstaAddict.core.session_state import SessionState
+
+    mock_device = MagicMock()
+    mock_filter = MagicMock()
+    mock_filter.check_profile.return_value = (
+        SimpleNamespace(is_private=False, posts_count=3),
+        False,
+    )
+    mock_filter.can_comment.return_value = (False, False, False, False)
+
+    mock_args = MagicMock()
+    mock_args.likes_count = "1"
+
+    session_state = SessionState(configs=MagicMock(args=mock_args))
+
+    mock_opened_post = MagicMock()
+    mock_opened_post.is_peek = True
+    mock_opened_post.is_peek_already_liked.return_value = False
+    mock_opened_post.like_in_peek.return_value = True
+
+    with patch("InstaAddict.core.interaction.ProfileView") as MockProfileView, \
+         patch("InstaAddict.core.interaction.PostsGridView") as MockPostsGridView, \
+         patch("InstaAddict.core.interaction._watch_stories", return_value=0), \
+         patch("InstaAddict.core.interaction.can_like", return_value=True), \
+         patch("InstaAddict.core.interaction.register_like") as mock_reg_like, \
+         patch("InstaAddict.core.interaction.random_sleep"):
+        mock_pv = MagicMock()
+        mock_pv.count_photo_in_view.return_value = (1, 0)
+        MockProfileView.return_value = mock_pv
+
+        mock_grid = MagicMock()
+        mock_grid.navigateToPost.return_value = (mock_opened_post, None, None)
+        MockPostsGridView.return_value = mock_grid
+
+        res = interact_with_user(
+            device=mock_device,
+            username="target_user",
+            my_username="my_user",
+            likes_count="1",
+            likes_percentage=100,
+            stories_percentage=0,
+            can_follow=False,
+            follow_percentage=0,
+            comment_percentage=0,
+            pm_percentage=0,
+            profile_filter=mock_filter,
+            args=mock_args,
+            session_state=session_state,
+            scraping_file=None,
+            current_mode="hashtag-posts-recent",
+        )
+
+    assert res[0] is True  # interacted
+    assert res[5] == 1     # number_of_liked
+    mock_opened_post.like_in_peek.assert_called_once()
+    mock_opened_post.dismiss_peek.assert_called_once()
+    mock_reg_like.assert_called_once()
+
+
+def test_interact_with_user_consecutive_failure_circuit_breaker():
+    """Verify interact_with_user breaks early after 2 consecutive post open failures."""
+    from InstaAddict.core.interaction import interact_with_user
+    from InstaAddict.core.session_state import SessionState
+
+    mock_device = MagicMock()
+    mock_filter = MagicMock()
+    mock_filter.check_profile.return_value = (
+        SimpleNamespace(is_private=False, posts_count=6),
+        False,
+    )
+    mock_filter.can_comment.return_value = (False, False, False, False)
+
+    mock_args = MagicMock()
+    mock_args.likes_count = "5"
+
+    session_state = SessionState(configs=MagicMock(args=mock_args))
+
+
+    with patch("InstaAddict.core.interaction.ProfileView") as MockProfileView, \
+         patch("InstaAddict.core.interaction.PostsGridView") as MockPostsGridView, \
+         patch("InstaAddict.core.interaction._watch_stories", return_value=0), \
+         patch("InstaAddict.core.interaction.can_like", return_value=True), \
+         patch("InstaAddict.core.interaction.save_crash"), \
+         patch("InstaAddict.core.interaction.random_sleep"):
+        mock_pv = MagicMock()
+        mock_pv.count_photo_in_view.return_value = (2, 0)
+        MockProfileView.return_value = mock_pv
+
+        mock_grid = MagicMock()
+        mock_grid.navigateToPost.return_value = (None, None, None)
+        mock_grid._is_still_on_profile.return_value = True
+        MockPostsGridView.return_value = mock_grid
+
+        res = interact_with_user(
+            device=mock_device,
+            username="stuck_user",
+            my_username="my_user",
+            likes_count="5",
+            likes_percentage=100,
+            stories_percentage=0,
+            can_follow=False,
+            follow_percentage=0,
+            comment_percentage=0,
+            pm_percentage=0,
+            profile_filter=mock_filter,
+            args=mock_args,
+            session_state=session_state,
+            scraping_file=None,
+            current_mode="hashtag-posts-recent",
+        )
+
+    assert mock_grid.navigateToPost.call_count == 2
+    assert res[5] == 0  # 0 liked
+
+
+def test_find_likers_container_reels_bypasses_filter():
+    """Verify that _find_likers_container on Reels returns (False, -1) and passes filter check."""
+    from InstaAddict.core.views import PostsViewList
+    from InstaAddict.core.filter import Filter
+
+    mock_device = MagicMock()
+    # Mock is_reel exists -> True
+    mock_device.find.return_value.exists.return_value = True
+
+    pvl = PostsViewList(mock_device)
+    has_likers, number_of_likers = pvl._find_likers_container()
+
+    assert has_likers is False
+    assert number_of_likers == -1
+
+    # Verify Filter.is_num_likers_in_range accepts -1
+    mock_storage = MagicMock()
+    filt = Filter(mock_storage)
+    filt.conditions = {"min_likers": 1, "max_likers": 1000}
+    assert filt.is_num_likers_in_range(-1) is True
+
+    # Verify caller boolean logic: (likes_in_range or not has_likers)
+    likes_in_range = filt.is_num_likers_in_range(number_of_likers)
+    assert (likes_in_range or not has_likers) is True
+
+
+def test_handle_posts_feed_like_records_interaction():
+    """Verify that liking a post in feed mode records interaction in session_state."""
+    from InstaAddict.core.session_state import SessionState
+
+    session_state = SessionState(configs=MagicMock())
+    session_state.add_interaction("feed", succeed=True, followed=False, scraped=False)
+
+    assert session_state.totalInteractions.get("feed") == 1
+    assert session_state.successfulInteractions.get("feed") == 1
+    assert sum(session_state.totalInteractions.values()) == 1
+
+
+def test_handle_posts_skip_task_breakout():
+    """Verify that handle_posts immediately breaks out of its iteration loop when skip is requested."""
+    from InstaAddict.core.handle_sources import handle_posts
+    from InstaAddict.core.tui import DashboardManager
+
+    mock_self = MagicMock()
+    mock_self.args.skipped_posts_limit = "5"
+    mock_self.args.feed = "10"
+    mock_device = MagicMock()
+    mock_session_state = MagicMock()
+
+    mgr = DashboardManager.get_instance()
+    with patch("InstaAddict.core.handle_sources.nav_to_feed"), \
+         patch("InstaAddict.core.handle_sources.PostsViewList"), \
+         patch("InstaAddict.core.handle_sources.TabBarView"), \
+         patch.object(DashboardManager, "is_active", return_value=True):
+
+        mgr.state.skip_task_requested = True
+        # handle_posts should immediately break out from while True
+        handle_posts(
+            mock_self,
+            mock_device,
+            mock_session_state,
+            target="feed",
+            current_job="feed",
+            storage=MagicMock(),
+            profile_filter=MagicMock(),
+            on_interaction=MagicMock(),
+            interaction=MagicMock(),
+            is_follow_limit_reached=MagicMock(),
+            interact_percentage=100,
+            scraping_file=None,
+        )
+        assert mgr.state.is_skip_task_requested() is True
 

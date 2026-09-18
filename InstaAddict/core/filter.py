@@ -17,7 +17,7 @@ from langdetect import detect
 from InstaAddict.core.config import get_time_last_save
 from InstaAddict.core.device_facade import Timeout
 from InstaAddict.core.resources import ResourceID as resources
-from InstaAddict.core.utils import random_sleep
+from InstaAddict.core.utils import random_sleep  # noqa: F401
 from InstaAddict.core.views import FollowStatus, ProfileView
 
 logger = logging.getLogger(__name__)
@@ -213,6 +213,33 @@ class Filter:
     def return_check_profile(self, username, profile_data, skip_reason=None) -> bool:
         if self.storage is not None:
             self.storage.add_filter_user(username, profile_data, skip_reason)
+
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                if dm.bound_session_state:
+                    dm.bound_session_state.increment_profiles_checked()
+                    if skip_reason is not None:
+                        dm.bound_session_state.increment_profiles_skipped()
+                else:
+                    dm.state.profiles_checked += 1
+                    if skip_reason is not None:
+                        dm.state.profiles_skipped += 1
+
+                reason_str = (
+                    f" [Skip: {skip_reason.name}]"
+                    if skip_reason and hasattr(skip_reason, "name")
+                    else (" [Skip]" if skip_reason else " [Qualified]")
+                )
+                dm.state.update_activity(
+                    action=f"Filtered @{username}{reason_str}",
+                    target=username,
+                )
+                dm.update_render()
+        except Exception:
+            pass
 
         return skip_reason is not None
 

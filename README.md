@@ -375,10 +375,10 @@ accounts/<your_username>/
 # Common Setup Issues & Troubleshooting
 
 ### 1. `Can't find the owner name, skip.` or Posts Skipped as Ads
-- **Resolution**: Update to InstaAddict v1.1.0+. Modern full-screen Reels viewer locators (`CLIPS_AUTHOR_USERNAME`, `CLIPS_AUTHOR_PROFILE_PIC`) are natively handled, and missing owner lookup is decoupled from ad detection.
+- **Resolution**: Update to InstaAddict v1.3.0+. Modern full-screen Reels viewer locators (`CLIPS_AUTHOR_USERNAME`, `CLIPS_AUTHOR_PROFILE_PIC`) are natively handled, and missing owner lookup is decoupled from ad detection.
 
 ### 2. Jerky Scrolling or Multiple Swipes Per Post
-- **Resolution**: InstaAddict v1.1.0 uses calibrated 200ms native ADB swipe gestures and single-swipe Reels navigation. Ensure `speed-multiplier: 1` in `config.yml`.
+- **Resolution**: InstaAddict v1.3.0 uses calibrated 200ms native ADB swipe gestures and single-swipe Reels navigation. Ensure `speed-multiplier: 1` in `config.yml`.
 
 ### 3. Stuck in In-App Browser Ad Overlay
 - **Resolution**: InstaAddict includes an automated browser escape watchdog (`escape_in_app_browser`) that detects `BrowserLiteInMainProcessIGActivity` and dismisses ad overlays automatically.

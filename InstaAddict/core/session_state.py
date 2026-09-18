@@ -27,6 +27,12 @@ class SessionState:
     removedMassFollowers = []
     totalScraped = 0
     totalCrashes = 0
+    totalPostsChecked = 0
+    totalProfilesChecked = 0
+    totalProfilesSkipped = 0
+    totalAdsBypassed = 0
+    totalDialogsDismissed = 0
+    totalReelsEvaluated = 0
     startTime = None
     finishTime = None
 
@@ -48,37 +54,19 @@ class SessionState:
         self.removedMassFollowers = []
         self.totalScraped = {}
         self.totalCrashes = 0
+        self.totalPostsChecked = 0
+        self.totalProfilesChecked = 0
+        self.totalProfilesSkipped = 0
+        self.totalAdsBypassed = 0
+        self.totalDialogsDismissed = 0
+        self.totalReelsEvaluated = 0
         self.totalUploadsSuccess = 0
         self.totalUploadsFailed = 0
         self.uploadHistory = []
         self.startTime = datetime.now()
         self.finishTime = None
 
-    def add_interaction(self, source, succeed, followed, scraped):
-        if self.totalInteractions.get(source) is None:
-            self.totalInteractions[source] = 1
-        else:
-            self.totalInteractions[source] += 1
-
-        if self.successfulInteractions.get(source) is None:
-            self.successfulInteractions[source] = 1 if succeed else 0
-        else:
-            if succeed:
-                self.successfulInteractions[source] += 1
-
-        if self.totalFollowed.get(source) is None:
-            self.totalFollowed[source] = 1 if followed else 0
-        else:
-            if followed:
-                self.totalFollowed[source] += 1
-        if self.totalScraped.get(source) is None:
-            self.totalScraped[source] = 1 if scraped else 0
-            self.successfulInteractions[source] = 1 if scraped else 0
-        else:
-            if scraped:
-                self.totalScraped[source] += 1
-                self.successfulInteractions[source] += 1
-
+    def _sync_tui(self):
         try:
             from InstaAddict.core.tui import DashboardManager
 
@@ -86,6 +74,57 @@ class SessionState:
                 DashboardManager.get_instance().state.update_from_session_state(self)
         except Exception:
             pass
+
+    def increment_posts_checked(self, count: int = 1):
+        self.totalPostsChecked = getattr(self, "totalPostsChecked", 0) + count
+        self._sync_tui()
+
+    def increment_profiles_checked(self, count: int = 1):
+        self.totalProfilesChecked = getattr(self, "totalProfilesChecked", 0) + count
+        self._sync_tui()
+
+    def increment_profiles_skipped(self, count: int = 1):
+        self.totalProfilesSkipped = getattr(self, "totalProfilesSkipped", 0) + count
+        self._sync_tui()
+
+    def increment_ads_bypassed(self, count: int = 1):
+        self.totalAdsBypassed = getattr(self, "totalAdsBypassed", 0) + count
+        self._sync_tui()
+
+    def increment_dialogs_dismissed(self, count: int = 1):
+        self.totalDialogsDismissed = getattr(self, "totalDialogsDismissed", 0) + count
+        self._sync_tui()
+
+    def increment_reels_evaluated(self, count: int = 1):
+        self.totalReelsEvaluated = getattr(self, "totalReelsEvaluated", 0) + count
+        self._sync_tui()
+
+    def add_interaction(self, source, succeed, followed, scraped):
+        if self.totalInteractions.get(source) is None:
+            self.totalInteractions[source] = 1
+        else:
+            self.totalInteractions[source] += 1
+
+        is_success = bool(succeed or scraped)
+        if self.successfulInteractions.get(source) is None:
+            self.successfulInteractions[source] = 1 if is_success else 0
+        else:
+            if is_success:
+                self.successfulInteractions[source] += 1
+
+        if self.totalFollowed.get(source) is None:
+            self.totalFollowed[source] = 1 if followed else 0
+        else:
+            if followed:
+                self.totalFollowed[source] += 1
+
+        if self.totalScraped.get(source) is None:
+            self.totalScraped[source] = 1 if scraped else 0
+        else:
+            if scraped:
+                self.totalScraped[source] += 1
+
+        self._sync_tui()
 
     def set_limits_session(
         self,
@@ -324,6 +363,12 @@ class SessionStateEncoder(JSONEncoder):
             "total_unfollowed": session_state.totalUnfollowed,
             "total_scraped": session_state.totalScraped,
             "total_crashes": getattr(session_state, "totalCrashes", 0),
+            "total_posts_checked": getattr(session_state, "totalPostsChecked", 0),
+            "total_profiles_checked": getattr(session_state, "totalProfilesChecked", 0),
+            "total_profiles_skipped": getattr(session_state, "totalProfilesSkipped", 0),
+            "total_ads_bypassed": getattr(session_state, "totalAdsBypassed", 0),
+            "total_dialogs_dismissed": getattr(session_state, "totalDialogsDismissed", 0),
+            "total_reels_evaluated": getattr(session_state, "totalReelsEvaluated", 0),
             "total_uploads_success": getattr(session_state, "totalUploadsSuccess", 0),
             "total_uploads_failed": getattr(session_state, "totalUploadsFailed", 0),
             "upload_history": getattr(session_state, "uploadHistory", []),

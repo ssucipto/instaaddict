@@ -4,7 +4,6 @@ import io
 import time
 import random
 import logging
-import json
 import sys
 import yaml
 import warnings

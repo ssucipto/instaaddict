@@ -332,6 +332,21 @@ class ActionUnfollowFollowers(Plugin):
         posts_end_detector.notify_new_page()
         prev_screen_iterated_followings = []
         while True:
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if (
+                    DashboardManager.is_active()
+                    and DashboardManager.get_instance().state.is_skip_task_requested()
+                ):
+                    logger.warning(
+                        "[TUI] Task skip requested by user ([S]/[N]). Breaking out of unfollow early...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+            except Exception:
+                pass
+
             screen_iterated_followings = []
             logger.info("Iterate over visible followings.")
             user_list = device.find(

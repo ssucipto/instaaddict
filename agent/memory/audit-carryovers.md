@@ -599,3 +599,103 @@ carryovers:
     summary: "agent/progress.yaml project status not reset to completed post-M10. Set project.status to completed and current_milestone to null."
     affected_files:
       - agent/progress.yaml
+
+  - id: CO-049
+    audit_report: agent/reports/audit-061-tui-flickering-root-cause-analysis-and-fix.md
+    date_raised: 2026-09-17
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-17'
+    verified_in_audit: 'self-verification'
+    summary: "Terminal interface flickering eliminated by implementing screen=True alternate buffer, vertical_overflow=crop, safe_glyph CP1252/CP437 sanitization, bounded logs slicing, and 1.5 Hz rate-limited rendering."
+    affected_files:
+      - InstaAddict/core/tui.py
+      - test/test_tui_dashboard.py
+
+  - id: CO-050
+    audit_report: agent/reports/audit-063-codebase-gaps-bare-excepts-and-quality-hardening.md
+    date_raised: 2026-09-18
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-064-post-implementation-verification-and-remediation.md
+    summary: "Remediated 10 audit findings across core and tests: replaced bare except: blocks in interaction.py and download_from_github.py, added explicit timeout=5 and module-level import for subprocess in interaction.py, removed unused imports across bot_flow.py, gemini_vision.py, tui.py, test_tui_dashboard.py, test_runtime_hardening.py, and test_unicode_sanitizer.py, and preserved random_sleep test-mock compatibility in filter.py."
+    affected_files:
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/download_from_github.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/filter.py
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/core/tui.py
+      - test/test_tui_dashboard.py
+      - test/test_runtime_hardening.py
+      - test/test_unicode_sanitizer.py
+
+  - id: CO-051
+    audit_report: agent/reports/audit-065-tui-live-effort-counters-and-queue-management.md
+    date_raised: 2026-09-18
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-066-terminal-interface-effort-counters-and-queue-management.md
+    summary: "TUI static stats illusion resolved by implementing real-time operational effort counters (posts scanned, profiles checked/skipped with pass rate %, ads bypassed, dialogs dismissed, reels evaluated), live execution context hook-up in hot paths, content queue telemetry engine, and cross-platform non-blocking keyboard listener for [U] on-demand queue photo upload."
+    affected_files:
+      - InstaAddict/core/session_state.py
+      - InstaAddict/core/tui.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/core/filter.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/bot_flow.py
+      - test/test_tui_dashboard.py
+
+  - id: CO-052
+    audit_report: agent/reports/audit-067-peek-preview-interaction-and-profile-navigation-hang.md
+    date_raised: 2026-09-18
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-068-peek-preview-and-profile-navigation-verification.md
+    summary: "Eliminated Peek Preview stagnation and single-profile navigation hang by implementing in-preview like action execution (effort not wasted), fast coordinate tapping to evade long-press listeners, a 2-failure circuit breaker to abort stuck profiles, and a verified profile exit loop in handle_sources.py."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/handle_sources.py
+      - test/test_runtime_hardening.py
+
+  - id: CO-053
+    audit_report: agent/reports/audit-069-zero-metrics-likers-container-and-engagement-starvation.md
+    date_raised: 2026-09-18
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-070-engagement-metrics-and-reels-deadlock-verification.md
+    summary: "Eliminated 0% session metrics starvation and Reels rejection deadlock by replacing (True, 0) likers container return with (False, -1) in PostsViewList._find_likers_container, synchronizing totalWatched, totalLikes, and add_interaction in interact_reels.py, injecting dynamic current_user for comment verification, recording feed interactions in handle_sources.py, and fixing SessionState add_interaction successfulInteractions overwrite bug."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/core/session_state.py
+      - test/test_runtime_hardening.py
+      - test/test_interact_reels.py
+
+  - id: CO-054
+    audit_report: agent/reports/audit-071-task-skip-shortcut-and-navigation.md
+    date_raised: 2026-09-18
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-071-task-skip-shortcut-and-navigation.md
+    summary: "Implemented interactive Task Skip Shortcut ([S]/[N]) and IPC signal file (.skip_task) allowing operators to immediately skip the currently executing task/job/source and advance cleanly to the next scheduled task. Hooked into countdown(), bot_flow.py, handle_sources.py (handle_posts, handle_likers, handle_blogger), interact_reels.py, and action_unfollow_followers.py with visual TUI status feedback."
+    affected_files:
+      - InstaAddict/core/tui.py
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/plugins/action_unfollow_followers.py
+      - InstaAddict/core/interaction.py
+      - test/test_tui_dashboard.py
+      - test/test_runtime_hardening.py
+
+

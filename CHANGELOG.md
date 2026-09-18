@@ -5,6 +5,42 @@
 Feature release introducing a modern, high-performance terminal user interface and live dashboard powered by `rich`, featuring real-time visual progress bars against safety limits, active target and cooldown context, and a live rolling log stream with automated headless fallback and legacy console encoding resilience.
 
 ### Added
+- **Task Skip Shortcut & Fast Next-Task Navigation Engine (`InstaAddict/core/tui.py`, `core/utils.py`, `core/bot_flow.py`, `core/handle_sources.py`, `plugins/interact_reels.py`, `plugins/action_unfollow_followers.py`)**:
+  - Implemented interactive keyboard shortcuts `[S]` (Skip) and `[N]` (Next) in `KeyboardListenerThread` to immediately abort the currently active job/source and advance to the next scheduled task in the queue.
+  - Implemented file-based IPC signal watcher (`accounts/<username>/.skip_task`) enabling external scripts, Telegram commands, or background sessions to skip tasks without direct console keystrokes.
+  - Added instant countdown termination in `InstaAddict/core/utils.py:countdown()` when a skip is requested.
+  - Hooked task skip consumption at `bot_flow.py` dispatch level and graceful loop breakouts across `handle_posts()`, `handle_likers()`, `handle_blogger()`, `interact_reels()`, `action_unfollow_followers()`, and `interact_with_user()`.
+  - Updated TUI footer, stats shortcuts summary, and active execution context panel with live skip status feedback.
+- **Reels Engagement Deadlock Elimination & Telemetry Synchronization (`InstaAddict/core/views.py`, `plugins/interact_reels.py`, `core/handle_sources.py`, `core/session_state.py`)**:
+  - Replaced `return True, 0` with `return False, -1` in `PostsViewList._find_likers_container` for full-screen Reels viewer mode, resolving the root cause of 100% skipped posts in hashtag and feed sources when `min_likers > 0`.
+  - Added `sessions[-1].totalWatched` increment per watched reel in `interact_reels.py`, syncing the Watched metric in the TUI.
+  - Added `UniversalActions.detect_block(device)`, `sessions[-1].totalLikes += 1`, and `sessions[-1].add_interaction("interact-reels", ...)` on double-tap likes in `interact_reels.py`.
+  - Passed dynamic `current_user` instead of hardcoded `"REEL_STALKER"` to `_comment` in `interact_reels.py`, enabling comment confirmation and `totalComments` incrementing.
+  - Added `session_state.add_interaction("feed", ...)` on feed likes in `handle_sources.py`.
+  - Resolved historical defect in `SessionState.add_interaction` where non-scraping interactions (`scraped=False`) reset `successfulInteractions[source]` to `0`.
+- **Instagram Grid Peek Preview Direct Liking Engine & Fast Tap (`InstaAddict/core/views.py`, `interaction.py`)**:
+  - Implemented native detection for Instagram's 3D Touch / long-press Peek Preview modal (`is_peek_preview_opened()` and `is_peek_already_liked()`).
+  - Implemented direct in-preview liking (`like_in_peek()`) so navigation effort is never wasted when the preview modal triggers, immediately registering likes in session state and telemetry.
+  - Implemented immediate modal dismissal (`dismiss_peek()`), eliminating 25–40s timeout cascades on standard feed element locators.
+  - Hardened `PostsGridView.navigateToPost` with element center coordinate tapping `(x_center, y_center)` to evade Android's ~400ms `OnLongClickListener` threshold.
+- **Consecutive Failure Circuit Breaker & Verified Profile Exit (`InstaAddict/core/interaction.py`, `handle_sources.py`)**:
+  - Added `consecutive_open_failures` circuit breaker in `interact_with_user`: dismisses lingering overlays on failure and automatically aborts stuck profiles after 2 consecutive post open failures.
+  - Replaced blind single `device.back()` in `handle_sources.py` (`handle_posts` and `handle_likers`) with a verified `ProfileView._is_still_on_profile()` loop (up to 4 iterations), guaranteeing a clean return to source feeds before subsequent swiping.
+- **Live Operational Effort & Real-Time Throughput Counters (`InstaAddict/core/tui.py`, `session_state.py`)**:
+  - Extended `SessionState` and `DashboardState` with real-time operational effort tracking: Posts Scanned, Profiles Checked, Profiles Skipped (with dynamic Filter Pass Rate %), Reels Evaluated, Ads Bypassed, and Dialogs Dismissed.
+  - Eliminated the static stats illusion where conversion KPI limits remained frozen at 0% during long filtering intervals.
+  - Wired dynamic action telemetry directly into `handle_sources.py`, `filter.py`, `interact_reels.py`, and `views.py`.
+- **Content Queue Discovery & Telemetry Engine (`InstaAddict/core/tui.py`)**:
+  - Live scanning of `accounts/<username>/content_queue/` reporting pending photos count, total published items, elapsed time since last upload, and rate-limit cooldown status.
+  - Properly handles supported media (`.jpg`, `.jpeg`, `.png`, `.mp4`) while ignoring sidecar `.txt` and `.json` metadata.
+- **Interactive Keyboard Listener & On-Demand Upload Shortcut (`[U]`)**:
+  - Cross-platform non-blocking daemon thread (`KeyboardListenerThread`) with Windows `msvcrt` and POSIX `select` implementations, guarded by `isatty()` for non-TTY environments.
+  - Pressing `[U]` queues an immediate photo upload from the pending queue, consumed by `bot_flow.py` via `UploadPostsPlugin(upload_force=True)`.
+  - Pressing `[D]` forces an immediate screen refresh.
+- **Responsive 3-Subtable TUI Dashboard Layout**:
+  - Re-architected statistics display into 3 clean side-by-side sub-tables (KPI Limits, Real-Time Effort, Content Queue & Publishing) on standard terminals (height >= 28), with an automated space-saving summary fallback on smaller console windows.
+- **Unit Test Coverage (`test/test_tui_dashboard.py`)**:
+  - Expanded test suite to 25 automated unit tests covering effort counters, queue filesystem discovery, keyboard listener dispatch, non-TTY graceful termination, and responsive layout scaling (173/173 total repo tests passing).
 - **Terminal User Interface Engine (`InstaAddict/core/tui.py`)**:
   - Thread-safe `DashboardState` with reentrant locks (`RLock`) synchronizing metrics (likes, follows, unfollows, comments, watches, uploads, crashes, total interactions) and configured limits against bot execution threads.
   - Multi-tier `rich` layout with live 4 Hz refresh rate: Header banner with account and device telemetry, progress bars with color-coded safety thresholds, active job and target context, and rolling log panel with severity color coding.
@@ -18,8 +54,10 @@ Feature release introducing a modern, high-performance terminal user interface a
   - Implemented `safe_glyph(glyph, fallback)` detecting `sys.stdout.encoding` capabilities and falling back to clean ASCII equivalents on non-UTF-8 Windows consoles (`cp1252`/`cp437`) to eliminate `UnicodeEncodeError`.
   - Configured `Console(safe_box=True)` to prevent box-drawing character corruption on legacy command prompts.
   - Registered `atexit.register(self.stop)` in `DashboardManager` and `try...finally:` in `countdown()` to guarantee terminal restoration and cursor visibility upon exit or interrupt.
-- **Unit Test Coverage (`test/test_tui_dashboard.py`)**:
-  - 18 comprehensive automated unit tests covering helpers, state synchronization, log handling, responsive layout adaptation, argument parsing, and lifecycle management.
+- **Upstream Feature & Build Compatibility Alignment (Audit #062)**:
+  - Validated full integration of all upstream bugfixes from `joeahkim/InstaAddict` PRs #10, #11, #14, #17, #24, #25, and #26.
+  - Bumped tested Instagram version target to `447.0.0.55.81` (`InstaAddict/__init__.py`).
+  - Synchronized `pyproject.toml` dependencies with `requirements.txt` (`uiautomator2~=2.16.19`, `packaging~=26.2`, `standard-pkg-resources>=1.0.0`, `imageio[ffmpeg]`, `websocket-client`, `rich>=13.0.0`).
 
 **Full diff**: `v1.2.1...v1.3.0`
 

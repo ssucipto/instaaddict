@@ -4,7 +4,7 @@ project:
   started: 2026-09-11
   status: completed
   current_milestone: null
-  description: Human-like Instagram automation bot powered by ADB and UIAutomator2. Features content queue upload pipeline and IG v446+ compatibility.
+  description: Human-like Instagram automation bot powered by ADB and UIAutomator2. Features content queue upload pipeline and IG v447+ compatibility.
 milestones:
 - id: M1
   name: Framework Foundation & Environment Setup
@@ -336,7 +336,7 @@ documentation:
   milestone_documents: 8
   pattern_documents: 2
   task_documents: 0
-  last_updated: '2026-09-17'
+  last_updated: '2026-09-18'
 progress:
   planning: 100
   implementation: 100
@@ -344,6 +344,60 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-18
+  description: 'Implemented Task Skip Shortcut ([S] / [N]) and Fast Next-Task Navigation Engine.'
+  items:
+  - "✓ Added interactive keyboard listeners [S] and [N] to skip currently active bot task"
+  - "✓ Implemented file-based IPC signal watcher (accounts/<username>/.skip_task) for headless skipping"
+  - "✓ Hooked instant countdown exit in utils.countdown() on task skip request"
+  - "✓ Hooked task skip consumption into bot_flow.py job dispatch to advance to next scheduled plugin"
+  - "✓ Hooked is_skip_task_requested() into handle_posts, handle_likers, handle_blogger, interact_reels, and action_unfollow_followers"
+  - "✓ Updated TUI footer, shortcuts summary, and activity panel with real-time skip status feedback"
+  - "✓ Added unit tests in test_tui_dashboard.py and test_runtime_hardening.py with 100% pass rate"
+- date: 2026-09-18
+  description: 'Eliminated 0% session metrics starvation and Reels rejection deadlock. Synchronized Reels and feed telemetry.'
+  items:
+  - "✓ Fixed PostsViewList._find_likers_container to return (False, -1) on Reels viewports, unblocking post likes and profile visits"
+  - "✓ Synchronized sessions[-1].totalWatched increment on each watched Reel in interact_reels.py"
+  - "✓ Added UniversalActions.detect_block, totalLikes increment, and add_interaction on double-tap Reel likes"
+  - "✓ Replaced hardcoded REEL_STALKER username with dynamic current_user for accurate comment verification"
+  - "✓ Recorded feed likes via session_state.add_interaction('feed', ...) in handle_sources.py"
+  - "✓ Fixed historical defect in SessionState.add_interaction where successfulInteractions was zeroed out when scraped was False"
+  - "✓ Added targeted unit tests across test_runtime_hardening.py and test_interact_reels.py (184/184 tests passing)"
+- date: 2026-09-18
+  description: 'Instagram Grid Peek Preview Liking Engine, Long-Press Evading Fast Tap, Stagnation Circuit Breaker & Profile Exit Loop.'
+  items:
+  - "✓ Resolved Peek Preview stagnation by implementing in-preview like action execution (like_in_peek) directly from floating context menu"
+  - "✓ Added is_peek_preview_opened and is_peek_already_liked checks in OpenedPostView with immediate modal dismissal (dismiss_peek)"
+  - "✓ Enforced fast coordinate tap in PostsGridView.navigateToPost calculating element center coordinates to evade Android OnLongClickListener threshold"
+  - "✓ Added consecutive_open_failures circuit breaker in interact_with_user: automatically clears lingering overlays and aborts stuck profiles after 2 consecutive failures"
+  - "✓ Implemented verified ProfileView._is_still_on_profile exit loop in handle_sources.py (handle_posts and handle_likers) ensuring guaranteed return to source feed"
+  - "✓ Added 4 targeted unit tests in test_runtime_hardening.py (27/27 passed, 181/181 total repo tests passing, 100% green)"
+  - "✓ Authored audit-067 (pre-impl) and audit-068 (post-impl verification) reports; 0 flake8 violations"
+- date: 2026-09-18
+  description: 'TUI Live Effort Counters, Content Queue Telemetry, Dynamic Action Hooks & On-Demand Upload Shortcut [U].'
+  items:
+  - "✓ Resolved TUI metric stagnation by introducing operational effort counters (posts scanned, profiles checked, profiles skipped, reels evaluated, ads bypassed, dialogs dismissed)"
+  - "✓ Added real-time filter pass rate % calculation and dynamic skip reason reporting"
+  - "✓ Wired dynamic action telemetry directly into handle_sources.py, filter.py, interact_reels.py, and views.py"
+  - "✓ Built content queue telemetry engine scanning accounts/<user>/content_queue/ (pending count, published total, last upload elapsed time, cooldown status)"
+  - "✓ Implemented cross-platform non-blocking KeyboardListenerThread capturing [U] for on-demand queued photo upload"
+  - "✓ Integrated consume_upload_request into bot_flow.py to trigger UploadPostsPlugin(upload_force=True)"
+  - "✓ Re-architected stats table to responsive 3-subtable layout with compact height fallback"
+  - "✓ Expanded test_tui_dashboard.py to 25 tests (173/173 total repo tests passing, 100% green)"
+  - "✓ Authored audit-065 (pre-impl) and audit-066 (verification) reports"
+- date: 2026-09-18
+  description: 'Upstream Compatibility Alignment, Code Quality Hardening, Bare Except Remediation, and CI Verification.'
+  items:
+  - "✓ Audited upstream repository joeahkim/InstaAddict against fork capabilities (Audit-062)"
+  - "✓ Bumped tested Instagram version to 447.0.0.55.81 and synchronized pyproject.toml dependencies"
+  - "✓ Audited codebase for latent gaps, inconsistencies, and shortcuts (Audit-063, CO-050)"
+  - "✓ Remediated bare except: blocks in interaction.py and download_from_github.py with specific exception hierarchies"
+  - "✓ Added explicit timeout=5 and module-level import on ghost-typing ADB keyevent 62 subprocess call"
+  - "✓ Cleaned unused imports across bot_flow.py, gemini_vision.py, tui.py, and test suites"
+  - "✓ Preserved random_sleep test-mock compatibility in filter.py"
+  - "✓ Executed verification audit (Audit-064) and CodeRabbit-style diff review (Review-043)"
+  - "✓ Verified all 168 automated tests passing (100% green) and flake8 zero violations on F401/F811/F821/E722"
 - date: 2026-09-17
   description: 'Completed Milestone 10: Modern Terminal User Interface (TUI) & Live Dashboard (Route-047) and Audit-060 Remediation.'
   items:

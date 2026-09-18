@@ -105,6 +105,21 @@ def handle_blogger(
     interaction,
     is_follow_limit_reached,
 ):
+    try:
+        from InstaAddict.core.tui import DashboardManager
+
+        if (
+            DashboardManager.is_active()
+            and DashboardManager.get_instance().state.is_skip_task_requested()
+        ):
+            logger.warning(
+                f"[TUI] Task skip requested by user ([S]/[N]). Skipping blogger @{blogger}...",
+                extra={"color": f"{Fore.YELLOW}"},
+            )
+            return
+    except Exception:
+        pass
+
     if not nav_to_blogger(device, blogger, session_state.my_username):
         return
     can_interact = False
@@ -332,7 +347,44 @@ def handle_likers(
         ) = PostsViewList(device)._check_if_last_post(
             post_description, current_job
         )
+        if hasattr(session_state, "increment_posts_checked"):
+            session_state.increment_posts_checked()
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                act_str = f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)}"
+                if username and username != "False":
+                    act_str += f" (@{username})"
+                dm.state.update_activity(
+                    job=f"{current_job} ({target})" if target else str(current_job),
+                    action=act_str,
+                    target=username if username and username != "False" else None,
+                    source=target or current_job,
+                )
+                dm.update_render()
+        except Exception:
+            pass
+
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if (
+                DashboardManager.is_active()
+                and DashboardManager.get_instance().state.is_skip_task_requested()
+            ):
+                logger.warning(
+                    f"[TUI] Task skip requested by user ([S]/[N]). Breaking out of likers for {target}...",
+                    extra={"color": f"{Fore.YELLOW}"},
+                )
+                break
+        except Exception:
+            pass
+
         if is_ad:
+            if hasattr(session_state, "increment_ads_bypassed"):
+                session_state.increment_ads_bypassed()
             logger.info(
                 "Post is an advertisement, skipping in likers.",
                 extra={"color": f"{Fore.CYAN}"},
@@ -441,7 +493,12 @@ def handle_likers(
                     if element_opened:
                         opened = True
                         logger.info("Back to likers list.")
-                        device.back()
+                        for _ in range(4):
+                            if not ProfileView(device)._is_still_on_profile():
+                                break
+                            logger.debug("Still on profile, pressing back to return to likers list...")
+                            device.back()
+                            random_sleep(0.5, 1.0, modulable=False)
 
             except IndexError:
                 logger.info(
@@ -552,6 +609,21 @@ def handle_posts(
     post_view_list = PostsViewList(device)
     opened_post_view = OpenedPostView(device)
     while True:
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if (
+                DashboardManager.is_active()
+                and DashboardManager.get_instance().state.is_skip_task_requested()
+            ):
+                logger.warning(
+                    f"[TUI] Task skip requested by user ([S]/[N]). Breaking out of {current_job} ({target})...",
+                    extra={"color": f"{Fore.YELLOW}"},
+                )
+                break
+        except Exception:
+            pass
+
         if UniversalActions.escape_in_app_browser(device):
             logger.info(
                 "Escaped in-app browser or advertisement overlay; swiping past."
@@ -569,6 +641,26 @@ def handle_posts(
             is_hashtag,
             has_tags,
         ) = post_view_list._check_if_last_post(post_description, current_job)
+        if hasattr(session_state, "increment_posts_checked"):
+            session_state.increment_posts_checked()
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                act_str = f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)}"
+                if username and username != "False":
+                    act_str += f" (@{username})"
+                dm.state.update_activity(
+                    job=f"{current_job} ({target})" if target else str(current_job),
+                    action=act_str,
+                    target=username if username and username != "False" else None,
+                    source=target or current_job,
+                )
+                dm.update_render()
+        except Exception:
+            pass
+
         has_likers, number_of_likers = post_view_list._find_likers_container()
         already_liked, _ = opened_post_view._is_post_liked()
 
@@ -589,6 +681,8 @@ def handle_posts(
                 logger.debug(f"HashtagManager harvest failed: {e}")
 
         if is_ad:
+            if hasattr(session_state, "increment_ads_bypassed"):
+                session_state.increment_ads_bypassed()
             logger.info(
                 "Post is an advertisement, skip.", extra={"color": f"{Fore.CYAN}"}
             )
@@ -707,6 +801,10 @@ def handle_posts(
                                         logger.debug(f"HashtagManager reset saturation failed: {e}")
                                 if current_job == "feed":
                                     count += 1
+                                    if hasattr(session_state, "add_interaction"):
+                                        session_state.add_interaction(
+                                            "feed", succeed=True, followed=False, scraped=False
+                                        )
                                     logger.info(
                                         f"Interacted feed bloggers: {count}/{count_feed_limit}"
                                     )
@@ -757,7 +855,13 @@ def handle_posts(
                                     )
                                 except Exception as e:
                                     logger.debug(f"HashtagManager reset saturation failed: {e}")
-                            device.back()
+                            for _ in range(4):
+                                if not ProfileView(device)._is_still_on_profile():
+                                    break
+                                logger.debug("Still on blogger's profile, pressing back to return to source list...")
+                                device.back()
+                                random_sleep(0.5, 1.0, modulable=False)
+
             else:
                 logger.info(
                     f"Skipped because your interact % is {interact_percentage}/100 and {username}'s post was unlucky!"

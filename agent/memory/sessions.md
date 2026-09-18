@@ -2,6 +2,100 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-071, review-045, co-054, route-048]
+  done:
+    - implemented-interactive-task-skip-shortcut-s-and-n-in-keyboard-listener-thread
+    - implemented-ipc-file-signal-watcher-accounts-username-skip-task-in-dashboard-state
+    - implemented-instant-countdown-breakout-in-utils-countdown-when-skip-task-requested
+    - hooked-task-skip-consumption-into-bot-flow-dispatch-loop-advancing-to-next-scheduled-job
+    - hooked-is-skip-task-requested-into-handle-posts-handle-likers-and-handle-blogger-in-handle-sources
+    - hooked-is-skip-task-requested-into-interact-reels-stalker-and-action-unfollow-followers-loops
+    - hooked-is-skip-task-requested-into-interact-with-user-profile-post-interaction-loop
+    - updated-tui-footer-and-stats-tables-with-visual-shortcut-indicators
+    - added-unit-tests-in-test-tui-dashboard-and-test-runtime-hardening
+    - synchronized-acp-documentation-and-requirements-design-spec
+    - validated-entire-acp-suite-zero-errors-zero-warnings
+    - verified-all-187-automated-regression-tests-passing-100-percent-green-and-zero-flake8-violations
+  deferred: []
+  key_fact: "Providing dual-vector task skip handling (interactive keyboard listener [S]/[N] plus IPC file signal accounts/<username>/.skip_task) enables immediate, graceful job skipping across both interactive TUI consoles and background/headless sessions without killing the main bot process."
+
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-069, audit-070, review-044, co-053]
+  done:
+    - diagnosed-zero-kpi-metrics-deadlock-likes-follows-comments-watched-actions-stalled-at-zero
+    - identified-root-cause-find-likers-container-returned-true-0-for-reels-failing-min-likers-filter
+    - fixed-find-likers-container-to-return-false-negative-one-bypassing-feed-likers-filter-on-reels
+    - fixed-interact-reels-telemetry-now-incrementing-totalwatched-on-each-watched-reel
+    - fixed-interact-reels-telemetry-now-incrementing-totallikes-and-calling-add-interaction-on-double-tap
+    - fixed-interact-reels-comment-username-passing-current-user-instead-of-hardcoded-reel-stalker
+    - fixed-feed-like-telemetry-recording-add-interaction-feed-in-handle-sources-handle-posts
+    - discovered-and-fixed-session-state-successfulinteractions-overwrite-bug-when-scraped-is-false
+    - added-unit-test-coverage-in-test-runtime-hardening-and-test-interact-reels
+    - verified-184-of-184-tests-passing-100-percent-green-and-zero-flake8-violations
+  deferred: []
+  key_fact: "Reels viewports do not have a feed-style likers container; returning (False, -1) from _find_likers_container signals to downstream filters that the liker count is undefined (-1 evaluates True in is_num_likers_in_range), allowing the post interaction and profile navigation pipelines to proceed instead of 100% of posts being skipped."
+
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-067, audit-068, co-052]
+  done:
+    - diagnosed-instagram-peek-preview-3d-touch-long-press-modal-stagnation-and-profile-hang
+    - identified-root-causes-long-touch-rpc-latency-missing-opened-post-detection-and-lingering-overlay
+    - implemented-opened-post-view-peek-preview-detection-and-like-state-inspection
+    - implemented-direct-in-preview-liking-ensuring-user-effort-is-not-wasted-when-preview-appears
+    - implemented-instant-peek-dismissal-evading-5-10s-feed-element-timeout-cascades
+    - hardened-posts-grid-view-navigatetopost-with-fast-center-coordinate-tap-evading-long-press-threshold
+    - implemented-consecutive-failure-circuit-breaker-in-interact-with-user-aborting-stuck-profiles-after-two-failures
+    - hardened-profile-exit-navigation-in-handle-sources-with-verified-is-still-on-profile-loop
+    - expanded-test-runtime-hardening-with-four-targeted-unit-tests-27-of-27-tests-passing
+    - verified-all-181-repo-tests-passing-100-percent-green-and-zero-flake8-violations
+  deferred: []
+  key_fact: "Under Android CPU latency, standard UI click events can exceed the ~400ms OnLongClickListener threshold and trigger Instagram's floating Peek Preview modal; recognizing this modal directly allows executing the Like action straight from the preview context menu (preventing wasted effort) and immediately dismissing it without triggering element timeouts or trapping the bot on the profile."
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-065, audit-066, co-051]
+  done:
+    - diagnosed-tui-metric-stagnation-root-cause-conversion-kpis-vs-operational-throughput
+    - extended-session-state-and-dashboard-state-with-real-time-effort-counters
+    - tracked-posts-scanned-profiles-checked-profiles-skipped-filter-pass-rate-ads-and-dialogs
+    - wired-live-step-execution-context-into-handle-sources-filter-interact-reels-and-views
+    - built-content-queue-telemetry-engine-scanning-accounts-content-queue-for-pending-media
+    - implemented-cross-platform-keyboard-listener-thread-capturing-u-for-on-demand-photo-upload
+    - hooked-consume-upload-request-into-bot-flow-with-upload-force-flag
+    - redesigned-stats-table-to-responsive-three-subtable-layout-with-compact-height-fallback
+    - added-seven-new-unit-tests-in-test-tui-dashboard-bringing-total-tests-to-173-all-green
+    - verified-zero-regressions-zero-flake8-violations-and-clean-non-tty-fallback
+  deferred: []
+  key_fact: "In organic Instagram automation, 90-95% of execution time is spent scanning posts and filtering profiles that get skipped; surfacing operational effort counters (posts scanned, profiles checked/skipped, filter pass rate %) breaks the static stats illusion and provides immediate visual feedback every few seconds."
+
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-062, route-048, audit-063, audit-064, review-043, co-050]
+  done:
+    - audited-all-commits-on-upstream-repo-joeahkim-instaaddict-against-v1-3-0
+    - verified-core-ui-fixes-already-integrated-and-enhanced-in-fork
+    - rejected-unsafe-upstream-changes-shell-injection-surrogate-splitting-and-path-breaks
+    - bumped-tested-instagram-version-to-447-0-0-55-81-in-init-py
+    - synchronized-pyproject-toml-dependencies-with-requirements-txt
+    - executed-pre-impl-audit-063-identifying-bare-excepts-subprocess-timeouts-and-unused-imports
+    - remediated-bare-except-blocks-in-interaction-and-download-from-github
+    - added-subprocess-timeout-guard-on-ghost-typing-adb-keyevent-call
+    - cleaned-all-unused-imports-across-core-modules-and-test-suites
+    - preserved-random-sleep-test-mock-compatibility-in-filter-py
+    - executed-post-impl-audit-064-and-coderabbit-style-review-043
+    - verified-168-of-168-automated-tests-passing-with-zero-regressions
+    - confirmed-flake8-linting-gate-zero-violations-on-f401-f811-f821-e722
+  deferred: []
+  key_fact: "Eliminating bare except: statements prevents unexpected swallowing of KeyboardInterrupt/SystemExit during bot execution; pairing explicit subprocess timeouts on all ADB interactions prevents indefinite bot freezes when the Android device subsystem hangs."
+
 - date: 2026-09-17
   executor: Antigravity
   branch: master

@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 from argparse import Namespace
 from datetime import datetime
 from os import path
@@ -274,7 +275,23 @@ def interact_with_user(
             photos_indices = photos_indices[:likes_value]
             photos_indices = sorted(photos_indices)
         post_grid_view = PostsGridView(device)
+        consecutive_open_failures = 0
         for i in range(len(photos_indices)):
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if (
+                    DashboardManager.is_active()
+                    and DashboardManager.get_instance().state.is_skip_task_requested()
+                ):
+                    logger.warning(
+                        "[TUI] Task skip requested by user ([S]/[N]). Breaking out of profile post interactions...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+            except Exception:
+                pass
+
             photo_index = photos_indices[i]
             row = photo_index // 3
             column = photo_index - row * 3
@@ -286,6 +303,38 @@ def interact_with_user(
             like_succeed = False
             if opened_post_view is None:
                 save_crash(device)
+                consecutive_open_failures += 1
+                for _ in range(3):
+                    if post_grid_view._is_still_on_profile():
+                        break
+                    logger.debug("Ensuring return to profile grid after failed open...")
+                    device.back()
+                    random_sleep(0.5, 1.0, modulable=False)
+                if consecutive_open_failures >= 2:
+                    logger.warning(
+                        f"Multiple consecutive post open failures for @{username}. Moving to next profile."
+                    )
+                    break
+                continue
+
+            consecutive_open_failures = 0
+
+            # Handle Peek Preview if triggered
+            if getattr(opened_post_view, "is_peek", False):
+                logger.info("Handling post interaction via Peek Preview.")
+                already_liked = opened_post_view.is_peek_already_liked()
+                if already_liked:
+                    logger.info("Post already liked (detected in Peek Preview)!")
+                else:
+                    like_succeed = opened_post_view.like_in_peek()
+                    if like_succeed:
+                        register_like(device, session_state)
+                        number_of_liked += 1
+                        interacted = True
+                    else:
+                        logger.warning("Fail to like post via Peek Preview.")
+                opened_post_view.dismiss_peek()
+                random_sleep(0.5, 1.0, modulable=False)
                 continue
             if media_type in (None, MediaType.UNKNOWN):
                 media_type = opened_post_view.detect_opened_media_type()
@@ -719,8 +768,6 @@ def _comment(
                     # Ghost Typing DOM Wake-up Hack
                     # Fire physical spacebar to wake React Native event listener natively
                     try:
-                        import subprocess
-
                         subprocess.run(
                             [
                                 "adb",
@@ -732,8 +779,9 @@ def _comment(
                                 "62",
                             ],
                             shell=False,
+                            timeout=5,
                         )
-                    except:
+                    except (subprocess.SubprocessError, OSError, Exception):
                         pass
 
                     # Wait for post button to appear (it only shows after typing)

@@ -2,6 +2,7 @@ import logging
 import random
 from time import sleep
 
+from colorama import Fore
 from InstaAddict.core.plugin_loader import Plugin
 from InstaAddict.core.views import TabBarView, UniversalActions, Direction
 from InstaAddict.core.interaction import _comment
@@ -70,7 +71,39 @@ class InteractReelsPlugin(Plugin):
         )
 
         for i in range(target_amount):
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if (
+                    DashboardManager.is_active()
+                    and DashboardManager.get_instance().state.is_skip_task_requested()
+                ):
+                    logger.warning(
+                        "[TUI] Task skip requested by user ([S]/[N]). Exiting interact-reels early...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+            except Exception:
+                pass
+
             logger.info(f"Watching Reel {i+1}/{target_amount}...")
+
+            if sessions and len(sessions) > 0:
+                if hasattr(sessions[-1], "increment_reels_evaluated"):
+                    sessions[-1].increment_reels_evaluated()
+                sessions[-1].totalWatched = getattr(sessions[-1], "totalWatched", 0) + 1
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if DashboardManager.is_active():
+                    dm = DashboardManager.get_instance()
+                    dm.state.update_activity(
+                        job="interact-reels",
+                        action=f"Evaluating Reel {i+1}/{target_amount}...",
+                    )
+                    dm.update_render()
+            except Exception:
+                pass
 
             w, h = d.info["displayWidth"], d.info["displayHeight"]
 
@@ -90,6 +123,8 @@ class InteractReelsPlugin(Plugin):
                 ad_button.exists(ui_timeout=1)
                 or sponsored.exists(ui_timeout=1)
             ):
+                if sessions and len(sessions) > 0 and hasattr(sessions[-1], "increment_ads_bypassed"):
+                    sessions[-1].increment_ads_bypassed()
                 logger.warning(
                     "Sponsored Advertisement detected. Flinging away..."
                 )
@@ -125,13 +160,20 @@ class InteractReelsPlugin(Plugin):
                 sleep(0.1)
                 d.click(w // 2, h // 2)
                 logger.info("Liked Reel via double-tap.")
+                UniversalActions.detect_block(device)
+                if sessions and len(sessions) > 0:
+                    sessions[-1].totalLikes = getattr(sessions[-1], "totalLikes", 0) + 1
+                    sessions[-1].add_interaction(
+                        "interact-reels", succeed=True, followed=False, scraped=False
+                    )
 
                 try:
                     from InstaAddict.core.views import MediaType
 
+                    current_user = getattr(sessions[-1], "my_username", None) if sessions else None
                     _comment(
                         device,
-                        my_username="REEL_STALKER",
+                        my_username=current_user or "REEL_STALKER",
                         comment_percentage=100,
                         args=configs.args,
                         session_state=sessions[-1],

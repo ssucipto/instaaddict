@@ -761,7 +761,7 @@ class PostsViewList:
         ).exists()
         if is_reel:
             logger.debug("In Reels viewer: bypassing feed likers container search.")
-            return True, 0
+            return False, -1
 
         universal_actions = UniversalActions(self.device)
         containers_gap = ResourceID.GAP_VIEW_AND_FOOTER_SPACE
@@ -1953,6 +1953,7 @@ class OpenedPostView:
     def __init__(self, device: DeviceFacade):
         self.device = device
         self.has_tags = False
+        self.is_peek = False
 
     def is_post_opened(self) -> bool:
         """Confirm a post detail or the reels viewer is actually showing."""
@@ -1969,6 +1970,58 @@ class OpenedPostView:
             )
         )
         return post_media.exists(Timeout.MEDIUM)
+
+    def is_peek_preview_opened(self) -> bool:
+        """Confirm if Instagram's 3D Touch / long-press Peek Preview popup is open.
+        This popup displays a floating preview card with a context menu containing
+        options like Like, Comment, Repost, Share, Report."""
+        like_btn = self.device.find(
+            classNameMatches="(?i)TextView|Button",
+            textMatches=case_insensitive_re("^(Like|Unlike)$"),
+        )
+        context_opt = self.device.find(
+            classNameMatches="(?i)TextView|Button",
+            textMatches=case_insensitive_re("^(Comment|Repost|Share|Report)$"),
+        )
+        if like_btn.exists(Timeout.TINY) and context_opt.exists(Timeout.TINY):
+            return True
+        return False
+
+    def is_peek_already_liked(self) -> bool:
+        """Check if the post in the Peek Preview is already liked (shows 'Unlike')."""
+        unlike_btn = self.device.find(
+            classNameMatches="(?i)TextView|Button",
+            textMatches=case_insensitive_re("^Unlike$"),
+        )
+        return unlike_btn.exists(Timeout.TINY)
+
+    def like_in_peek(self) -> bool:
+        """Perform a like directly from the Peek Preview context menu."""
+        if self.is_peek_already_liked():
+            logger.info("Post already liked (detected via Peek Preview menu)!")
+            return True
+        like_btn = self.device.find(
+            classNameMatches="(?i)TextView|Button",
+            textMatches=case_insensitive_re("^Like$"),
+        )
+        if like_btn.exists(Timeout.TINY):
+            logger.info("Liking post directly from Peek Preview menu ❤️.")
+            like_btn.click()
+            UniversalActions.detect_block(self.device)
+            random_sleep(0.5, 1.0, modulable=False)
+            return True
+        logger.warning("Like button not found in Peek Preview menu!")
+        return False
+
+    def dismiss_peek(self) -> bool:
+        """Cleanly and immediately dismiss the Peek Preview and return to profile grid."""
+        logger.debug("Dismissing Peek Preview...")
+        self.device.back()
+        random_sleep(0.5, 1.0, modulable=False)
+        profile_tabs = self.device.find(
+            resourceIdMatches=case_insensitive_re(ResourceID.PROFILE_TABS_CONTAINER)
+        )
+        return profile_tabs.exists(Timeout.SHORT)
 
     def detect_opened_media_type(self) -> MediaType:
         """Detect the media type from the opened post itself.
@@ -2299,8 +2352,20 @@ class PostsGridView:
         media_type, obj_count = PostsViewList.detect_media_type(content_desc)
         opened_post_view = OpenedPostView(self.device)
         for attempt in range(2):
-            post_view.click()
+            # Fast, crisp tap: calculate center coordinates to avoid lingering touches triggering Peek Preview
+            try:
+                bounds = post_view.get_bounds()
+                x_center = (bounds["left"] + bounds["right"]) // 2
+                y_center = (bounds["top"] + bounds["bottom"]) // 2
+                self.device.deviceV2.click(x_center, y_center)
+            except Exception:
+                post_view.click()
+
             if opened_post_view.is_post_opened() or not self._is_still_on_profile():
+                return opened_post_view, media_type, obj_count
+            if opened_post_view.is_peek_preview_opened():
+                logger.info("Peek Preview detected on post thumbnail.")
+                opened_post_view.is_peek = True
                 return opened_post_view, media_type, obj_count
             if attempt == 0:
                 logger.debug("Post didn't open, trying one more click...")
@@ -2318,11 +2383,19 @@ class PostsGridView:
         return None, None, None
 
 
+
 class ProfileView(ActionBarView):
     def __init__(self, device: DeviceFacade, is_own_profile=False):
         super().__init__(device)
         self.device = device
         self.is_own_profile = is_own_profile
+
+    def _is_still_on_profile(self) -> bool:
+        """The profile tab bar or header is only visible while on a profile."""
+        profile_tabs = self.device.find(
+            resourceIdMatches=case_insensitive_re(ResourceID.PROFILE_TABS_CONTAINER)
+        )
+        return profile_tabs.exists(Timeout.SHORT)
 
     def navigateToOptions(self):
         logger.debug("Navigate to Options")
@@ -3170,6 +3243,22 @@ class UniversalActions:
         except Exception as e:
             logger.debug(f"escape_in_app_browser check encountered error: {e}")
 
+        if escaped:
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if DashboardManager.is_active():
+                    dm = DashboardManager.get_instance()
+                    if dm.bound_session_state and hasattr(
+                        dm.bound_session_state, "increment_ads_bypassed"
+                    ):
+                        dm.bound_session_state.increment_ads_bypassed()
+                    else:
+                        dm.state.ads_bypassed += 1
+                    dm.update_render()
+            except Exception:
+                pass
+
         return escaped
 
     @staticmethod
@@ -3311,6 +3400,22 @@ class UniversalActions:
 
             if not dismissed_this_pass:
                 break
+
+        if dismissed_any:
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if DashboardManager.is_active():
+                    dm = DashboardManager.get_instance()
+                    if dm.bound_session_state and hasattr(
+                        dm.bound_session_state, "increment_dialogs_dismissed"
+                    ):
+                        dm.bound_session_state.increment_dialogs_dismissed()
+                    else:
+                        dm.state.dialogs_dismissed += 1
+                    dm.update_render()
+            except Exception:
+                pass
 
         return dismissed_any
 

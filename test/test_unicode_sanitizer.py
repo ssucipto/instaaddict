@@ -1,5 +1,3 @@
-import pytest
-import re
 from unittest.mock import MagicMock
 from InstaAddict.core.gemini_vision import _sanitize_response, _safe_extract_text
 from InstaAddict.core.device_facade import _split_into_grapheme_clusters

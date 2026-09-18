@@ -128,7 +128,7 @@ def download_from_github(
         else:
             print_text(e, "red", in_place=True)
         sys.exit()
-    except:
+    except Exception:
         print_text("✘ Failed", "red", in_place=True)
         sys.exit()
 
@@ -192,7 +192,7 @@ def download_from_github(
                 else:
                     print_text(e, "red", in_place=True)
                 sys.exit()
-            except:
+            except Exception:
                 print_text("✘ Failed", "red", in_place=True)
                 sys.exit()
 
@@ -247,7 +247,7 @@ def download_from_github(
                     else:
                         print_text(e, "red", in_place=True)
                     sys.exit()
-                except:
+                except Exception:
                     print_text("✘ Failed", "red", in_place=True)
                     sys.exit()
             else:
