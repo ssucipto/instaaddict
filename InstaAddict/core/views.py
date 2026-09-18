@@ -3245,17 +3245,23 @@ class UniversalActions:
 
         if escaped:
             try:
-                from InstaAddict.core.tui import DashboardManager
+                from InstaAddict.core.session_state import SessionState
 
-                if DashboardManager.is_active():
-                    dm = DashboardManager.get_instance()
-                    if dm.bound_session_state and hasattr(
-                        dm.bound_session_state, "increment_ads_bypassed"
-                    ):
-                        dm.bound_session_state.increment_ads_bypassed()
-                    else:
-                        dm.state.ads_bypassed += 1
-                    dm.update_render()
+                active_ss = SessionState.get_active()
+                if active_ss and hasattr(active_ss, "increment_ads_bypassed"):
+                    active_ss.increment_ads_bypassed()
+                else:
+                    from InstaAddict.core.tui import DashboardManager
+
+                    if DashboardManager.is_active():
+                        dm = DashboardManager.get_instance()
+                        if dm.bound_session_state and hasattr(
+                            dm.bound_session_state, "increment_ads_bypassed"
+                        ):
+                            dm.bound_session_state.increment_ads_bypassed()
+                        else:
+                            dm.state.ads_bypassed += 1
+                        dm.update_render()
             except Exception:
                 pass
 
@@ -3403,17 +3409,23 @@ class UniversalActions:
 
         if dismissed_any:
             try:
-                from InstaAddict.core.tui import DashboardManager
+                from InstaAddict.core.session_state import SessionState
 
-                if DashboardManager.is_active():
-                    dm = DashboardManager.get_instance()
-                    if dm.bound_session_state and hasattr(
-                        dm.bound_session_state, "increment_dialogs_dismissed"
-                    ):
-                        dm.bound_session_state.increment_dialogs_dismissed()
-                    else:
-                        dm.state.dialogs_dismissed += 1
-                    dm.update_render()
+                active_ss = SessionState.get_active()
+                if active_ss and hasattr(active_ss, "increment_dialogs_dismissed"):
+                    active_ss.increment_dialogs_dismissed()
+                else:
+                    from InstaAddict.core.tui import DashboardManager
+
+                    if DashboardManager.is_active():
+                        dm = DashboardManager.get_instance()
+                        if dm.bound_session_state and hasattr(
+                            dm.bound_session_state, "increment_dialogs_dismissed"
+                        ):
+                            dm.bound_session_state.increment_dialogs_dismissed()
+                        else:
+                            dm.state.dialogs_dismissed += 1
+                        dm.update_render()
             except Exception:
                 pass
 

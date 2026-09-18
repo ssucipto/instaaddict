@@ -637,6 +637,19 @@ def trim_txt(source: str, target: str) -> None:
 
 
 def stop_bot(device, sessions, session_state, was_sleeping=False):
+    try:
+        from InstaAddict.core.watchdog import BotWatchdog
+
+        BotWatchdog.get_instance().stop()
+    except Exception:
+        pass
+    try:
+        from InstaAddict.core.session_state import SessionState
+
+        SessionState.set_active(None)
+    except Exception:
+        pass
+
     from InstaAddict.core.log import disable_tui_logging
     from InstaAddict.core.tui import DashboardManager
 
@@ -824,6 +837,12 @@ def set_time_delta(args):
 
 
 def wait_for_next_session(time_left, session_state, sessions, device):
+    try:
+        from InstaAddict.core.watchdog import BotWatchdog
+
+        BotWatchdog.get_instance().pause()
+    except Exception:
+        pass
     hours, remainder = divmod(time_left.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     if args.kill_atx_agent:
@@ -855,6 +874,13 @@ def wait_for_next_session(time_left, session_state, sessions, device):
                     )
     except KeyboardInterrupt:
         stop_bot(device, sessions, session_state, was_sleeping=True)
+    finally:
+        try:
+            from InstaAddict.core.watchdog import BotWatchdog
+
+            BotWatchdog.get_instance().resume()
+        except Exception:
+            pass
 
 
 def inspect_current_view(user_list, _retries=2) -> Tuple[int, int]:

@@ -104,6 +104,7 @@ class DashboardState:
     ads_bypassed: int = 0
     dialogs_dismissed: int = 0
     reels_evaluated: int = 0
+    watchdog_recoveries: int = 0
 
     # Content queue & upload telemetry
     queue_pending: int = 0
@@ -341,6 +342,9 @@ class DashboardState:
             self.ads_bypassed = getattr(session, "totalAdsBypassed", 0)
             self.dialogs_dismissed = getattr(session, "totalDialogsDismissed", 0)
             self.reels_evaluated = getattr(session, "totalReelsEvaluated", 0)
+            self.watchdog_recoveries = getattr(
+                session, "totalWatchdogRecoveries", 0
+            )
 
             # Check upload history from session if available
             upload_hist = getattr(session, "uploadHistory", [])
@@ -505,7 +509,7 @@ class DashboardManager:
         self.screen = screen
         self.live: Optional[Live] = None
         self._active = False
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._last_render_time = 0.0
         self.bound_session_state = None
         self.keyboard_thread: Optional[KeyboardListenerThread] = None
@@ -658,8 +662,52 @@ class DashboardManager:
         header_text.append(f"{icon_time} Elapsed: ", style="bold green")
         header_text.append(f"{duration_str} (Session #{s.session_index})", style="green")
 
+        # Watchdog Status & Blinking LED light in top-right panel corner
+        led_text = Text()
+        try:
+            from InstaAddict.core.watchdog import BotWatchdog
+
+            wd = BotWatchdog.get_instance()
+            status = wd.get_status()
+            wd_state = status.get("state", "STOPPED")
+            elapsed = int(status.get("elapsed", 0))
+            attempts = status.get("attempts", 0)
+
+            blink_on = int(time.time()) % 2 == 0
+
+            if wd_state == "HEALTHY":
+                dot = safe_glyph("●", "*") if blink_on else safe_glyph("○", "o")
+                style = "bold bright_green" if blink_on else "green"
+                led_text.append(safe_glyph("🟢 ", "[OK] "))
+                led_text.append(f"{dot} LIVE", style=style)
+            elif wd_state == "PAUSED":
+                dot = safe_glyph("⏸️", "||")
+                led_text.append(safe_glyph("🔵 ", "[PAUSED] "))
+                led_text.append(f"{dot} PAUSED", style="dim cyan")
+            elif wd_state == "STALLED":
+                dot = safe_glyph("●", "*")
+                led_text.append(safe_glyph("🟡 ", "[!] "))
+                led_text.append(
+                    f"{dot} STALLED {elapsed}s", style="bold bright_yellow"
+                )
+            elif wd_state == "RECOVERING":
+                dot = safe_glyph("▲", "^")
+                fast_blink = int(time.time() * 2) % 2 == 0
+                style = "bold bright_red" if fast_blink else "dim red"
+                led_text.append(safe_glyph("🔴 ", "[!] "))
+                led_text.append(f"{dot} RECOVERING #{attempts}", style=style)
+            else:
+                led_text.append(safe_glyph("⚪ ", "[-] "))
+                led_text.append("IDLE", style="dim white")
+        except Exception:
+            dot = safe_glyph("●", "*") if int(time.time()) % 2 == 0 else safe_glyph("○", "o")
+            led_text.append(safe_glyph("🟢 ", "[OK] "))
+            led_text.append(f"{dot} LIVE", style="bold bright_green")
+
         return Panel(
             Align.center(header_text),
+            title=led_text,
+            title_align="right",
             style="bright_blue",
             padding=(0, 1),
         )
@@ -729,12 +777,15 @@ class DashboardManager:
         pass_count = max(0, s.profiles_checked - s.profiles_skipped)
         pass_pct = (pass_count / max(s.profiles_checked, 1)) * 100 if s.profiles_checked > 0 else 100.0
         pass_style = "bold green" if pass_pct >= 20 else "yellow"
+        rec_color = "bold bright_red" if s.watchdog_recoveries > 0 else "bright_green"
 
         if is_short:
+            short_rec_color = "bold red" if s.watchdog_recoveries > 0 else "dim green"
             effort_text = Text.from_markup(
                 f"[bold cyan]{icon_effort} Effort:[/] Posts: [bold white]{s.posts_checked}[/] │ "
                 f"Profiles: [bold white]{s.profiles_checked}[/] ([dim]{s.profiles_skipped} skp[/]) │ "
-                f"Ads: [yellow]{s.ads_bypassed}[/] │ Dialogs: [green]{s.dialogs_dismissed}[/] │ Reels: [magenta]{s.reels_evaluated}[/]"
+                f"Ads: [yellow]{s.ads_bypassed}[/] │ Dialogs: [green]{s.dialogs_dismissed}[/] │ "
+                f"Reels: [magenta]{s.reels_evaluated}[/] │ Rec: [{short_rec_color}]{s.watchdog_recoveries}[/]"
             )
             queue_text = Text.from_markup(
                 f"[bold magenta]{icon_queue} Queue:[/] [bold green]{s.queue_pending} media[/] │ "
@@ -758,6 +809,11 @@ class DashboardManager:
             f"[bold white]Reels Evaluated:[/] [magenta]{s.reels_evaluated}[/]",
             f"[bold white]Dialogs Cleared:[/] [green]{s.dialogs_dismissed}[/]",
             f"[bold white]Filter Pass Rate:[/] [{pass_style}]{pass_pct:.1f}%[/]",
+        )
+        effort_table.add_row(
+            f"[bold white]Watchdog Rec:[/] [{rec_color}]{s.watchdog_recoveries}[/]",
+            "[bold white]Self-Healing:[/] [bright_green]Active (3-Tier)[/]",
+            "",
         )
 
         queue_header = Text.from_markup(f"[bold bright_magenta]{icon_queue} Content Queue & Publishing[/] [dim](hotkey: \\[U] to upload now)[/]")

@@ -215,18 +215,27 @@ class Filter:
             self.storage.add_filter_user(username, profile_data, skip_reason)
 
         try:
+            from InstaAddict.core.session_state import SessionState
+
+            active_ss = SessionState.get_active()
+            if active_ss:
+                active_ss.increment_profiles_checked()
+                if skip_reason is not None:
+                    active_ss.increment_profiles_skipped()
+
             from InstaAddict.core.tui import DashboardManager
 
             if DashboardManager.is_active():
                 dm = DashboardManager.get_instance()
-                if dm.bound_session_state:
-                    dm.bound_session_state.increment_profiles_checked()
-                    if skip_reason is not None:
-                        dm.bound_session_state.increment_profiles_skipped()
-                else:
-                    dm.state.profiles_checked += 1
-                    if skip_reason is not None:
-                        dm.state.profiles_skipped += 1
+                if not active_ss:
+                    if dm.bound_session_state:
+                        dm.bound_session_state.increment_profiles_checked()
+                        if skip_reason is not None:
+                            dm.bound_session_state.increment_profiles_skipped()
+                    else:
+                        dm.state.profiles_checked += 1
+                        if skip_reason is not None:
+                            dm.state.profiles_skipped += 1
 
                 reason_str = (
                     f" [Skip: {skip_reason.name}]"

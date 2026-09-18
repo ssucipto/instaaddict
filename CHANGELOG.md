@@ -5,6 +5,21 @@
 Feature release introducing a modern, high-performance terminal user interface and live dashboard powered by `rich`, featuring real-time visual progress bars against safety limits, active target and cooldown context, and a live rolling log stream with automated headless fallback and legacy console encoding resilience.
 
 ### Added
+- **Autonomous Out-of-Band Watchdog Daemon & Blinking LED Heartbeat (`InstaAddict/core/watchdog.py`, `core/tui.py`, `core/bot_flow.py`, `core/utils.py`, `core/session_state.py`, `core/views.py`, `core/filter.py`)**:
+  - Implemented `BotWatchdog` background daemon thread running completely isolated from the main bot loop and ADB socket hangs.
+  - Implemented 3-Tier Escalation Recovery Strategy:
+    - Tier 1 (Soft Recovery - 90s Inactivity): Non-blocking isolated subprocess dispatch of `KEYCODE_WAKEUP` (`224`) and `KEYCODE_BACK` (`4`) to dismiss blocking overlays and restore screen navigation.
+    - Tier 2 (Task Skip - 105s Inactivity): Automatically triggers task skip via `DashboardManager.trigger_skip_task()` and `.skip_task` IPC to advance to the next scheduled task without process termination.
+    - Tier 3 (Nuclear Restart - 120s Inactivity): Force-stops `com.instagram.android` and relaunches app via Android monkey launcher `1`.
+  - Added a blinking "LED light" heartbeat indicator in the top-right corner of the TUI terminal interface panel:
+    - `🟢 [● LIVE]` pulsing green dot when execution is healthy and fresh.
+    - `🔵 [⏸️ PAUSED]` steady blue indicator during intentional sleeps, cooldowns, or off-hours (`wait_for_next_session`).
+    - `🟡 [● STALLED {elapsed}s]` bright yellow warning when activity has stalled (>30s).
+    - `🔴 [▲ RECOVERING #{attempts}]` flashing bright red alert during active recovery escalation.
+  - Resolved reentrant lock deadlock in `DashboardManager` by migrating `self._lock` from `threading.Lock()` to `threading.RLock()`.
+  - Decoupled operational metrics (`ads_bypassed`, `dialogs_dismissed`, `profiles_checked`, `profiles_skipped`) from TUI state via `SessionState.get_active()`, guaranteeing 100% accurate metric tracking in headless and CLI modes.
+  - Added `totalWatchdogRecoveries` metric to `SessionState`, `SessionStateEncoder`, and the TUI operational metrics table.
+  - Created 11-case test suite (`test/test_watchdog.py`) with 100% pass rate (201/201 tests passing project-wide).
 - **Task Skip Shortcut & Fast Next-Task Navigation Engine (`InstaAddict/core/tui.py`, `core/utils.py`, `core/bot_flow.py`, `core/handle_sources.py`, `plugins/interact_reels.py`, `plugins/action_unfollow_followers.py`)**:
   - Implemented interactive keyboard shortcuts `[S]` (Skip) and `[N]` (Next) in `KeyboardListenerThread` to immediately abort the currently active job/source and advance to the next scheduled task in the queue.
   - Implemented file-based IPC signal watcher (`accounts/<username>/.skip_task`) enabling external scripts, Telegram commands, or background sessions to skip tasks without direct console keystrokes.

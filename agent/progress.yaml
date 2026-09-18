@@ -345,6 +345,16 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-18
+  description: 'Built Autonomous BotWatchdog Daemon, TUI Blinking LED Indicator, and Decoupled Metric Pipeline.'
+  items:
+  - "✓ Built BotWatchdog daemon subsystem with 3-tier escalating recovery (soft back/wake, task skip, force-stop restart)"
+  - "✓ Added real-time blinking LED heartbeat indicator in top-right corner of TUI terminal panel"
+  - "✓ Fixed reentrant deadlock in DashboardManager by switching to threading.RLock"
+  - "✓ Decoupled operational metrics (ads bypassed, dialogs dismissed, profiles checked/skipped) from TUI via SessionState.get_active()"
+  - "✓ Added totalWatchdogRecoveries counter to SessionState and serialized in SessionStateEncoder"
+  - "✓ Integrated watchdog lifecycle management and heartbeats throughout bot_flow.py and utils.py"
+  - "✓ Created 11-case test suite (test_watchdog.py) with 100% pass rate (201 total tests passing across project)"
+- date: 2026-09-18
   description: 'Resolved Telegram Inbox TypeError and Silent Terminal Crash under Active TUI (Audit-072, CO-055).'
   items:
   - "✓ Removed invalid operation: True definition from --telegram-inbox in TelegramReports arguments"

@@ -26,6 +26,7 @@ from InstaAddict.core.persistent_list import PersistentList
 from InstaAddict.core.report import print_full_report
 from InstaAddict.core.session_state import SessionState, SessionStateEncoder
 from InstaAddict.core.storage import Storage
+from InstaAddict.core.watchdog import BotWatchdog
 from InstaAddict.core.utils import (
     ask_for_a_donation,
     can_repeat,
@@ -136,6 +137,13 @@ def start_bot(**kwargs):
         dashboard_manager.start()
         enable_tui_logging(dashboard_manager)
 
+    # Initialize and start autonomous watchdog
+    watchdog = BotWatchdog.get_instance(
+        device_id=configs.device_id,
+        app_id=configs.app_id,
+    )
+    watchdog.start()
+
     while True:
         if use_tui and not dashboard_manager.is_active():
             dashboard_manager.start()
@@ -145,7 +153,9 @@ def start_bot(**kwargs):
             configs.args.working_hours, configs.args.time_delta_session
         )
         if not inside_working_hours:
+            watchdog.pause()
             wait_for_next_session(time_left, session_state, sessions, device)
+            watchdog.resume()
         pre_post_script(path=configs.args.pre_script)
         if getattr(configs.args, "telegram_inbox", False) or getattr(
             configs.args, "telegram_reports", False
@@ -161,7 +171,10 @@ def start_bot(**kwargs):
         get_device_info(device)
         session_state = SessionState(configs)
         session_state.set_limits_session()
+        SessionState.set_active(session_state)
         sessions.append(session_state)
+        watchdog.resume()
+        watchdog.heartbeat("session_init", "Session initialized")
         if dashboard_manager.is_active():
             dashboard_manager.bind_session_state(session_state)
             dashboard_manager.state.session_index = len(sessions)
@@ -341,6 +354,7 @@ def start_bot(**kwargs):
         if not configs.args.debug and not only_upload_requested:
             countdown(10, "Bot will start in: ")
         for plugin in jobs_list:
+            watchdog.heartbeat(f"job:{plugin}", f"Starting {plugin}")
             inside_working_hours, time_left = SessionState.inside_working_hours(
                 configs.args.working_hours, configs.args.time_delta_session
             )
@@ -500,6 +514,7 @@ def start_bot(**kwargs):
                 configs.actions[plugin].run(
                     device, configs, storage, sessions, filters, plugin
                 )
+                watchdog.heartbeat(f"job:{plugin}_done", f"Completed {plugin}")
                 if dashboard_manager.is_active():
                     dashboard_manager.state.consume_skip_task_request()
                 unfollow_jobs.remove(plugin)
@@ -535,6 +550,7 @@ def start_bot(**kwargs):
                 configs.actions[plugin].run(
                     device, configs, storage, sessions, filters, plugin
                 )
+                watchdog.heartbeat(f"job:{plugin}_done", f"Completed {plugin}")
                 if dashboard_manager.is_active():
                     dashboard_manager.state.consume_skip_task_request()
                 print_limits = True
@@ -605,6 +621,7 @@ def start_bot(**kwargs):
                 logger.info(
                     f'Next session will start at: {(datetime.now() + timedelta(seconds=time_left)).strftime("%H:%M:%S (%Y/%m/%d)")}.'
                 )
+                watchdog.pause()
                 try:
                     sleep(time_left)
                 except KeyboardInterrupt:
@@ -614,6 +631,8 @@ def start_bot(**kwargs):
                         session_state,
                         was_sleeping=True,
                     )
+                finally:
+                    watchdog.resume()
             else:
                 print_telegram_reports(
                     configs,
@@ -622,18 +641,23 @@ def start_bot(**kwargs):
                     following_now,
                     time_left.total_seconds(),
                 )
+                watchdog.pause()
                 wait_for_next_session(
                     time_left,
                     session_state,
                     sessions,
                     device,
                 )
+                watchdog.resume()
         else:
             break
 
     if dashboard_manager.is_active():
         dashboard_manager.stop()
         disable_tui_logging()
+
+    watchdog.stop()
+    SessionState.set_active(None)
 
     print_telegram_reports(
         configs,

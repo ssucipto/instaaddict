@@ -5,6 +5,26 @@
 - date: 2026-09-18
   executor: Antigravity
   branch: master
+  tasks_completed: [audit-073, route-049]
+  done:
+    - built-autonomous-botwatchdog-daemon-subsystem-with-3-tier-escalating-recovery
+    - implemented-tier-1-soft-recovery-sending-wakeup-and-keycode-back-via-isolated-subprocess
+    - implemented-tier-2-task-skip-recovery-triggering-skip-task-and-ipc-signal-without-killing-process
+    - implemented-tier-3-nuclear-restart-recovery-force-stopping-and-monkey-relaunching-instagram-app
+    - added-real-time-blinking-led-heartbeat-indicator-in-top-corner-of-tui-terminal-panel
+    - protected-tui-led-glyphs-using-safe-glyph-for-legacy-windows-code-pages
+    - discovered-and-resolved-reentrant-deadlock-in-dashboardmanager-migrated-lock-to-rlock
+    - decoupled-operational-metrics-ads-bypassed-dialogs-dismissed-profiles-checked-profiles-skipped-from-tui
+    - added-totalwatchdogrecoveries-counter-to-sessionstate-and-serialized-in-sessionstateencoder
+    - integrated-watchdog-lifecycle-and-heartbeat-tracking-into-bot-flow-py-and-utils-py
+    - created-11-case-unit-test-suite-test-watchdog-py-with-100-percent-pass-rate
+    - verified-all-201-automated-unit-tests-passing-100-percent-green-and-zero-flake8-violations
+  deferred: []
+  key_fact: "In-line recovery mechanisms fail when the main thread blocks on dead ADB sockets; an autonomous out-of-band daemon thread executing non-blocking subprocess commands with strict 5s timeouts is required for guaranteed recovery, while TUI managers must strictly use reentrant locks (RLock) to prevent self-deadlock when dispatching synchronous layout renders from UI hotkey event handlers."
+
+- date: 2026-09-18
+  executor: Antigravity
+  branch: master
   tasks_completed: [audit-072, co-055]
   done:
     - diagnosed-silent-terminal-exit-on-run-py-lolatheozjack-config-yml

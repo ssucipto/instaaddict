@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from enum import Enum, auto
 from json import JSONEncoder
+from typing import Optional
 
 from InstaAddict.core.utils import get_value
 
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class SessionState:
+    _active_session = None
     id = None
     args = {}
     my_username = None
@@ -27,6 +29,7 @@ class SessionState:
     removedMassFollowers = []
     totalScraped = 0
     totalCrashes = 0
+    totalWatchdogRecoveries = 0
     totalPostsChecked = 0
     totalProfilesChecked = 0
     totalProfilesSkipped = 0
@@ -35,6 +38,14 @@ class SessionState:
     totalReelsEvaluated = 0
     startTime = None
     finishTime = None
+
+    @classmethod
+    def get_active(cls) -> Optional["SessionState"]:
+        return cls._active_session
+
+    @classmethod
+    def set_active(cls, session: Optional["SessionState"]):
+        cls._active_session = session
 
     def __init__(self, configs):
         self.id = str(uuid.uuid4())
@@ -54,6 +65,7 @@ class SessionState:
         self.removedMassFollowers = []
         self.totalScraped = {}
         self.totalCrashes = 0
+        self.totalWatchdogRecoveries = 0
         self.totalPostsChecked = 0
         self.totalProfilesChecked = 0
         self.totalProfilesSkipped = 0
@@ -74,6 +86,12 @@ class SessionState:
                 DashboardManager.get_instance().state.update_from_session_state(self)
         except Exception:
             pass
+
+    def increment_watchdog_recoveries(self, count: int = 1):
+        self.totalWatchdogRecoveries = (
+            getattr(self, "totalWatchdogRecoveries", 0) + count
+        )
+        self._sync_tui()
 
     def increment_posts_checked(self, count: int = 1):
         self.totalPostsChecked = getattr(self, "totalPostsChecked", 0) + count
@@ -363,6 +381,9 @@ class SessionStateEncoder(JSONEncoder):
             "total_unfollowed": session_state.totalUnfollowed,
             "total_scraped": session_state.totalScraped,
             "total_crashes": getattr(session_state, "totalCrashes", 0),
+            "total_watchdog_recoveries": getattr(
+                session_state, "totalWatchdogRecoveries", 0
+            ),
             "total_posts_checked": getattr(session_state, "totalPostsChecked", 0),
             "total_profiles_checked": getattr(session_state, "totalProfilesChecked", 0),
             "total_profiles_skipped": getattr(session_state, "totalProfilesSkipped", 0),
