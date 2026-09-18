@@ -325,6 +325,8 @@ def start_bot(**kwargs):
                 jobs_list.remove("telegram-reports")
                 if configs.args.telegram_reports:
                     telegram_reports_at_end = True
+            if "telegram-inbox" in jobs_list:
+                jobs_list.remove("telegram-inbox")
             if "upload-posts" in jobs_list:
                 jobs_list.remove("upload-posts")
                 jobs_list.insert(0, "upload-posts")

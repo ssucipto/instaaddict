@@ -345,6 +345,15 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-18
+  description: 'Resolved Telegram Inbox TypeError and Silent Terminal Crash under Active TUI (Audit-072, CO-055).'
+  items:
+  - "✓ Removed invalid operation: True definition from --telegram-inbox in TelegramReports arguments"
+  - "✓ Added defensive argument handling in TelegramReports.run() to tolerate standard operational dispatcher invocations without TypeError"
+  - "✓ Explicitly stripped telegram-inbox from jobs_list in bot_flow.py to prevent spurious job execution"
+  - "✓ Enhanced handle_uncaught_exception in log.py to stop active DashboardManager and delegate to sys.__excepthook__ so crash tracebacks are never masked"
+  - "✓ Added 3 regression unit tests in test_telegram_inbox.py (190/190 total repo tests passing, 100% green)"
+  - "✓ Authored audit-072 and resolved carryover CO-055 as fixed"
+- date: 2026-09-18
   description: 'Implemented Task Skip Shortcut ([S] / [N]) and Fast Next-Task Navigation Engine.'
   items:
   - "✓ Added interactive keyboard listeners [S] and [N] to skip currently active bot task"

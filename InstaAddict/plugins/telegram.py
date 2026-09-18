@@ -1055,11 +1055,35 @@ class TelegramReports(Plugin):
                 "arg": "--telegram-inbox",
                 "help": "poll Telegram for incoming media and descriptions to queue for upload",
                 "action": "store_true",
-                "operation": True,
             },
         ]
 
-    def run(self, config, plugin, followers_now, following_now, time_left):
+    def run(
+        self,
+        config=None,
+        plugin=None,
+        followers_now=None,
+        following_now=None,
+        time_left=None,
+        *args,
+        **kwargs,
+    ):
+        # Defensive check: If called via standard action plugin dispatcher
+        # e.g., run(device, configs, storage, sessions, filters, plugin)
+        if len(args) > 0 or not isinstance(plugin, (str, type(None))):
+            logger.debug(
+                "TelegramReports.run() invoked via action plugin dispatcher; "
+                "TelegramReports is a reporting plugin and not an operational "
+                "interaction job. Skipping."
+            )
+            return
+
+        if config is None or not hasattr(config, "args"):
+            logger.debug(
+                "TelegramReports.run() invoked without valid config; skipping."
+            )
+            return
+
         username = config.args.username
         if username is None:
             logger.error("You have to specify a username for getting reports!")

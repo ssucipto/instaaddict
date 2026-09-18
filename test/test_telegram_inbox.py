@@ -210,3 +210,73 @@ def test_upload_posts_sends_telegram_notification(temp_account_dir):
         assert "Instagram Post Published!" in tg_text
         assert "test_media.jpg" in tg_text
         assert "Awesome day in the park!" in tg_text
+
+
+def test_telegram_inbox_argument_not_an_operation():
+    """Verify --telegram-inbox is NOT marked as an operation."""
+    from InstaAddict.plugins.telegram import TelegramReports
+
+    plugin = TelegramReports()
+    inbox_arg = next(
+        (a for a in plugin.arguments if a.get("arg") == "--telegram-inbox"),
+        None,
+    )
+    assert inbox_arg is not None
+    assert inbox_arg.get("operation", False) is False
+
+    reports_arg = next(
+        (a for a in plugin.arguments if a.get("arg") == "--telegram-reports"),
+        None,
+    )
+    assert reports_arg is not None
+    assert reports_arg.get("operation", False) is True
+
+
+def test_telegram_reports_run_resilient_to_operational_dispatch():
+    """Verify TelegramReports.run tolerates standard operational invocation."""
+    from InstaAddict.plugins.telegram import TelegramReports
+
+    plugin = TelegramReports()
+    mock_device = MagicMock()
+    mock_configs = MagicMock()
+    mock_configs.args.username = "test_user"
+    mock_storage = MagicMock()
+    mock_sessions = [MagicMock()]
+    mock_filters = MagicMock()
+
+    # Standard operational plugin call: run(dev, cfg, stor, sess, filt, plug)
+    # Must not raise TypeError
+    plugin.run(
+        mock_device,
+        mock_configs,
+        mock_storage,
+        mock_sessions,
+        mock_filters,
+        "telegram-inbox",
+    )
+
+
+def test_uncaught_exception_stops_tui_and_calls_excepthook():
+    """Verify handle_uncaught_exception stops TUI and calls excepthook."""
+    import sys
+    import InstaAddict.core.log as log_module
+
+    mock_mgr = MagicMock()
+    with patch("InstaAddict.core.tui.DashboardManager.is_active",
+               return_value=True), \
+         patch("InstaAddict.core.tui.DashboardManager.get_instance",
+               return_value=mock_mgr), \
+         patch("InstaAddict.core.log.disable_tui_logging") as mock_disable_tui, \
+         patch.object(sys, "__excepthook__") as mock_orig_excepthook:
+
+        # Re-initialize logging or directly test sys.excepthook
+        log_module.configure_logger(debug=False, username="test_user")
+        excepthook = sys.excepthook
+
+        test_exc = TypeError("TelegramReports.run() takes 6 positional args")
+        excepthook(TypeError, test_exc, None)
+
+        mock_mgr.stop.assert_called_once()
+        mock_disable_tui.assert_called_once()
+        mock_orig_excepthook.assert_called_once_with(TypeError, test_exc, None)
+

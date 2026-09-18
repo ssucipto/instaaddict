@@ -143,12 +143,27 @@ def configure_logger(debug, username):
         if issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
+
+        try:
+            from InstaAddict.core.tui import DashboardManager
+
+            if DashboardManager.is_active():
+                DashboardManager.get_instance().stop()
+                disable_tui_logging()
+        except Exception:
+            pass
+
         try:
             root_logger.critical(
                 "Uncaught fatal exception:", exc_info=(exc_type, exc_value, exc_traceback)
             )
         except (KeyboardInterrupt, SystemExit):
             sys.exit(0)
+        except Exception:
+            pass
+
+        try:
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
         except Exception:
             pass
 

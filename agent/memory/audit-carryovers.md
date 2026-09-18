@@ -698,4 +698,18 @@ carryovers:
       - test/test_tui_dashboard.py
       - test/test_runtime_hardening.py
 
+  - id: CO-055
+    audit_report: agent/reports/audit-072-telegram-inbox-operation-type-error-and-tui-crash.md
+    date_raised: 2026-09-18
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-18'
+    verified_in_audit: agent/reports/audit-072-telegram-inbox-operation-type-error-and-tui-crash.md
+    summary: "Resolved fatal TypeError in TelegramReports.run() and invisible console crash under active TUI. Removed operation: True from --telegram-inbox, added defensive signature handling in TelegramReports.run(), stripped telegram-inbox from jobs_list in bot_flow.py, and ensured handle_uncaught_exception tears down DashboardManager and dispatches to sys.__excepthook__."
+    affected_files:
+      - InstaAddict/plugins/telegram.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/log.py
+      - test/test_telegram_inbox.py
+
 

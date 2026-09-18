@@ -59,6 +59,14 @@ Feature release introducing a modern, high-performance terminal user interface a
   - Bumped tested Instagram version target to `447.0.0.55.81` (`InstaAddict/__init__.py`).
   - Synchronized `pyproject.toml` dependencies with `requirements.txt` (`uiautomator2~=2.16.19`, `packaging~=26.2`, `standard-pkg-resources>=1.0.0`, `imageio[ffmpeg]`, `websocket-client`, `rich>=13.0.0`).
 
+### Fixed
+- **Telegram Inbox Fatal TypeError & Silent TUI Crash Remediation (`InstaAddict/plugins/telegram.py`, `core/bot_flow.py`, `core/log.py`)**:
+  - Removed invalid `"operation": True` from `--telegram-inbox` in `TelegramReports` argument definition, preventing `telegram-inbox` from being erroneously scheduled as an operational interaction job.
+  - Added defensive argument handling in `TelegramReports.run()` with `*args, **kwargs` and action dispatcher detection, preventing `TypeError` if invoked via the operational plugin dispatcher.
+  - Added explicit removal of `telegram-inbox` from `jobs_list` in `bot_flow.py`.
+  - Updated `handle_uncaught_exception` in `InstaAddict/core/log.py` to automatically tear down active `DashboardManager` and reattach console logging before delegating to `sys.__excepthook__`, ensuring crash tracebacks are clearly visible in the console.
+  - Added regression test suite in `test/test_telegram_inbox.py` verifying argument metadata, dispatch resilience, and excepthook TUI teardown.
+
 **Full diff**: `v1.2.1...v1.3.0`
 
 ## v1.2.1 — Modal Dialog Dismissal, Rate Instagram Handling & Stuck-Screen Self-Healing
