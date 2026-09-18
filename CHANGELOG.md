@@ -5,6 +5,14 @@
 Feature release introducing a modern, high-performance terminal user interface and live dashboard powered by `rich`, featuring real-time visual progress bars against safety limits, active target and cooldown context, and a live rolling log stream with automated headless fallback and legacy console encoding resilience.
 
 ### Added
+- **Photo Form Factor & Aspect Ratio Preservation Engine (`InstaAddict/plugins/upload_posts.py`, `core/resources.py`, `test/test_upload_aspect_ratio.py`)**:
+  - Implemented automatic image aspect ratio detection via Pillow (`PIL.Image`), accurately distinguishing `landscape` (width/height > 1.05), `portrait` (width/height < 0.95), and `square` form factors.
+  - Built multi-tier composer aspect ratio adjustment in `UploadPostsPlugin`:
+    - **Tier 1 (Modern Instagram v446+)**: Opens the `Ratio` creation tool from the horizontal toolstrip, selects the matching `Landscape` or `Portrait` option from the bottom sheet modal, and applies with `bottom_sheet_done_button`.
+    - **Tier 2 (Classic Cropper Fallback)**: Toggles aspect ratio via `cropper_toggle_button` or `descriptionMatches="(?i).*(crop|aspect ratio|full size|expand).*"`.
+  - Automatically dismisses initial blocking composer modals before ratio adjustment to guarantee frictionless navigation.
+  - Added `--upload-force-square` CLI argument and `upload-force-square: true/false` YAML configuration option for operators who explicitly want 1:1 square crop.
+  - Created 13-case unit test suite (`test/test_upload_aspect_ratio.py`) with 100% pass rate and zero regressions across existing upload test suites.
 - **Autonomous Out-of-Band Watchdog Daemon & Blinking LED Heartbeat (`InstaAddict/core/watchdog.py`, `core/tui.py`, `core/bot_flow.py`, `core/utils.py`, `core/session_state.py`, `core/views.py`, `core/filter.py`)**:
   - Implemented `BotWatchdog` background daemon thread running completely isolated from the main bot loop and ADB socket hangs.
   - Implemented 3-Tier Escalation Recovery Strategy:

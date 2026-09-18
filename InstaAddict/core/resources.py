@@ -103,6 +103,14 @@ class ResourceID:
             f"{APP_ID}:id/caption_input_text_view"
         )
         self.SHARE_FOOTER_BUTTON = f"{APP_ID}:id/share_footer_button"
+        self.CROPPER_TOGGLE_BUTTON = (
+            f"{APP_ID}:id/cropper_toggle_button|{APP_ID}:id/crop_button|{APP_ID}:id/button_crop"
+        )
+        self.BOTTOM_SHEET_DONE_BUTTON = f"{APP_ID}:id/bottom_sheet_done_button"
+        self.BOTTOM_SHEET_CANCEL_BUTTON = (
+            f"{APP_ID}:id/bottom_sheet_cancel_button"
+        )
+        self.BOTTOM_SHEET_TITLE = f"{APP_ID}:id/bottom_sheet_title"
         self.MENU_SETTINGS_ROW = f"{APP_ID}:id/menu_settings_row"
         self.MENU_OPTION_TEXT = f"{APP_ID}:id/menu_option_text"
         self.NEGATIVE_BUTTON = f"{APP_ID}:id/negative_button"

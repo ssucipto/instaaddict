@@ -345,6 +345,16 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-18
+  description: 'Implemented Photo Form Factor & Aspect Ratio Preservation Engine (Audit-074).'
+  items:
+  - "✓ Built automatic aspect ratio detection via Pillow classifying landscape (ratio > 1.05), portrait (ratio < 0.95), and square"
+  - "✓ Implemented Tier 1 Modern Instagram v446+ Ratio toolstrip selection opening bottom sheet and choosing Landscape or Portrait"
+  - "✓ Implemented Tier 2 Classic cropper_toggle_button fallback with defensive exception guards"
+  - "✓ Added composer popup dismissal before ratio adjustment to prevent UI blocking"
+  - "✓ Added --upload-force-square CLI argument and upload-force-square YAML option for forced 1:1 square cropping"
+  - "✓ Created 13-case unit test suite (test_upload_aspect_ratio.py) with 100% pass rate"
+  - "✓ Verified zero regressions on full upload test suite (36/36 passing in test_upload_posts.py)"
+- date: 2026-09-18
   description: 'Built Autonomous BotWatchdog Daemon, TUI Blinking LED Indicator, and Decoupled Metric Pipeline.'
   items:
   - "✓ Built BotWatchdog daemon subsystem with 3-tier escalating recovery (soft back/wake, task skip, force-stop restart)"

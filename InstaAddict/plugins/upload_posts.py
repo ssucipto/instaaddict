@@ -69,6 +69,11 @@ class UploadPostsPlugin(Plugin):
                 "help": "Force upload immediately by bypassing the 12-hour rate-limit check",
                 "action": "store_true",
             },
+            {
+                "arg": "--upload-force-square",
+                "help": "Force 1:1 square crop even if source media is landscape or portrait",
+                "action": "store_true",
+            },
         ]
 
     def _resolve_username(self, configs: Any, sessions: Any) -> str:
@@ -396,6 +401,23 @@ class UploadPostsPlugin(Plugin):
         # Flag: post hashtags in first comment instead of caption (CO-020 / F-02)
         hashtags_in_comment = getattr(configs.args, "upload_hashtags_in_comment", False) is True
 
+        # Flag: force 1:1 square crop even if source media is landscape or portrait
+        force_square = (
+            getattr(configs.args, "upload_force_square", False) is True
+            if hasattr(configs, "args")
+            else False
+        )
+        if not force_square and config_path and os.path.exists(config_path):
+            try:
+                import yaml
+
+                with open(config_path, "r", encoding="utf-8") as f:
+                    user_conf = yaml.safe_load(f) or {}
+                    if user_conf.get("upload-force-square", False) is True:
+                        force_square = True
+            except Exception:
+                pass
+
         # Check for custom queue directory via CLI args or YAML config
         custom_queue_dir = None
         if hasattr(configs, "args") and hasattr(configs.args, "upload_queue_dir"):
@@ -505,7 +527,9 @@ class UploadPostsPlugin(Plugin):
                 f"Uploading {media_file} with caption: {caption_snippet!r}"
             )
             try:
-                success = self._upload_to_ig(device, media_path, caption_for_composer)
+                success = self._upload_to_ig(
+                    device, media_path, caption_for_composer, force_square=force_square
+                )
             except Exception as e:
                 logger.error(
                     f"Unexpected exception during Instagram upload of {media_file}: {e}",
@@ -773,8 +797,158 @@ class UploadPostsPlugin(Plugin):
             logger.debug(f"MediaStore query error: {e}")
         return None
 
+    def _detect_media_aspect_ratio(self, media_path: str) -> str:
+        """Inspects media dimensions and classifies form factor as 'landscape', 'portrait', or 'square'."""
+        if not media_path or not os.path.exists(media_path):
+            return "square"
+
+        try:
+            from PIL import Image
+
+            with Image.open(media_path) as img:
+                width, height = img.size
+                if width <= 0 or height <= 0:
+                    return "square"
+                ratio = float(width) / float(height)
+                logger.info(
+                    f"Media form factor analysis for {os.path.basename(media_path)}: "
+                    f"{width}x{height} (ratio: {ratio:.3f})"
+                )
+                if ratio > 1.05:
+                    return "landscape"
+                elif ratio < 0.95:
+                    return "portrait"
+                else:
+                    return "square"
+        except Exception as e:
+            logger.debug(
+                f"Failed to inspect media dimensions via PIL for {media_path}: {e}"
+            )
+
+        return "square"
+
+    def _adjust_aspect_ratio(self, device: Any, form_factor: str) -> bool:
+        """Adjusts the Instagram composer aspect ratio to match the original media form factor.
+
+        Supports both modern Instagram v446+ (Ratio toolstrip -> bottom sheet modal)
+        and classic cropper toggle buttons.
+        """
+        if form_factor == "square":
+            logger.info("Media is square (1:1); keeping default square crop.")
+            return True
+
+        target_name = "Landscape" if form_factor == "landscape" else "Portrait"
+        logger.info(
+            f"Preserving original form factor: attempting to set Instagram composer aspect ratio to {target_name}..."
+        )
+
+        d = device.deviceV2
+        app_id = getattr(device, "app_id", "com.instagram.android")
+        res_attr = getattr(device, "ResourceID", None)
+        if res_attr is None or isinstance(res_attr, type):
+            resource_id = ResourceID(app_id)
+        else:
+            resource_id = res_attr
+
+        # Tier 1: Modern Instagram v446+ "Ratio" Tool in Horizontal Creation Strip
+        try:
+            ratio_btn = d(textMatches="(?i)^Ratio$")
+            if not ratio_btn.exists(timeout=2):
+                ratio_btn = d(descriptionMatches="(?i)^Ratio$")
+
+            # If not immediately visible, attempt a small horizontal scroll on creation toolstrip
+            if not ratio_btn.exists(timeout=1):
+                h_scroll = d(classNameMatches=".*HorizontalScrollView.*")
+                if h_scroll.exists(timeout=1):
+                    try:
+                        h_scroll.scroll.to(textMatches="(?i)^Ratio$")
+                    except Exception:
+                        try:
+                            h_scroll.swipe("left", steps=10)
+                        except Exception:
+                            pass
+                    if not ratio_btn.exists(timeout=1):
+                        ratio_btn = d(textMatches="(?i)^Ratio$")
+                    if not ratio_btn.exists(timeout=1):
+                        ratio_btn = d(descriptionMatches="(?i)^Ratio$")
+
+            if ratio_btn.exists(timeout=2):
+                logger.info("Found 'Ratio' creation tool. Opening aspect ratio bottom sheet...")
+                ratio_btn.click()
+                random_sleep(1, 2)
+
+                # Find the target option (Landscape or Portrait)
+                target_opt = d(textMatches=f"(?i)^{target_name}$")
+                if not target_opt.exists(timeout=2):
+                    target_opt = d(descriptionMatches=f"(?i)^{target_name}$")
+
+                if target_opt.exists(timeout=2):
+                    logger.info(f"Selecting '{target_name}' aspect ratio option...")
+                    target_opt.click()
+                    random_sleep(0.5, 1.0)
+                else:
+                    logger.debug(
+                        f"Target aspect ratio option '{target_name}' not found in Ratio modal. "
+                        "Checking for 'Original' / 'Full size' fallback..."
+                    )
+                    orig_opt = d(textMatches="(?i)^(Original|Full size|Expand)$")
+                    if orig_opt.exists(timeout=1):
+                        orig_opt.click()
+                        random_sleep(0.5, 1.0)
+
+                # Tap 'Done' button on bottom sheet
+                done_btn = d(resourceId=resource_id.BOTTOM_SHEET_DONE_BUTTON)
+                if not done_btn.exists(timeout=2):
+                    done_btn = d(textMatches="(?i)^Done$")
+                if not done_btn.exists(timeout=2):
+                    done_btn = d(descriptionMatches="(?i)^Done$")
+
+                if done_btn.exists(timeout=2):
+                    done_btn.click()
+                    random_sleep(1, 2)
+                    logger.info(
+                        f"Successfully set composer aspect ratio to {target_name} (Tier 1 Ratio Tool)."
+                    )
+                    return True
+                else:
+                    logger.debug("Done button not found; closing bottom sheet via back key...")
+                    d.press("back")
+                    random_sleep(1, 2)
+                    return True
+        except Exception as e:
+            logger.debug(f"Tier 1 Ratio tool selection encountered exception: {e}")
+
+        # Tier 2: Classic Cropper Toggle Button (cropper_toggle_button)
+        try:
+            cropper_btn = d(resourceId=resource_id.CROPPER_TOGGLE_BUTTON)
+            if not cropper_btn.exists(timeout=1):
+                cropper_btn = d(
+                    resourceIdMatches=".*cropper_toggle_button.*|.*crop_button.*|.*button_crop.*"
+                )
+            if not cropper_btn.exists(timeout=1):
+                cropper_btn = d(
+                    descriptionMatches="(?i).*(crop|aspect ratio|full size|expand|fit to screen).*"
+                )
+
+            if cropper_btn.exists(timeout=2):
+                logger.info("Found classic cropper toggle button. Tapping to toggle aspect ratio...")
+                cropper_btn.click()
+                random_sleep(1, 2)
+                logger.info(
+                    f"Successfully toggled aspect ratio for {target_name} (Tier 2 Cropper Toggle)."
+                )
+                return True
+        except Exception as e:
+            logger.debug(f"Tier 2 Cropper toggle encountered exception: {e}")
+
+        logger.warning(
+            f"Could not locate aspect ratio controls to set {target_name}. "
+            "Proceeding with Instagram default framing."
+        )
+        return False
+
     def _upload_to_ig(
-        self, device: Any, media_path: str, caption: str
+        self, device: Any, media_path: str, caption: str, force_square: bool = False
     ) -> bool:
         """Drives Instagram composer flow using native ADD_TO_FEED intent and UIAutomator2."""
         serial: str = device.deviceV2.serial
@@ -893,6 +1067,25 @@ class UploadPostsPlugin(Plugin):
             resource_id = ResourceID(app_id)
         else:
             resource_id = res_attr
+
+        # 4b. Dismiss any initial informational composer modal dialog if present
+        ok_btn = d(
+            textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss|Cancel|Maybe later|Skip|Keep editing)$"
+        )
+        if ok_btn.exists(timeout=2):
+            logger.info("Dismissing initial informational composer modal dialog...")
+            ok_btn.click()
+            random_sleep(1, 2)
+
+        # 4c. Adjust aspect ratio to preserve native form factor (unless force_square is requested)
+        if not force_square:
+            form_factor = self._detect_media_aspect_ratio(media_path)
+            if form_factor in ("landscape", "portrait"):
+                self._adjust_aspect_ratio(device, form_factor)
+        else:
+            logger.info(
+                "Force square mode active (--upload-force-square); bypassing aspect ratio adjustment."
+            )
 
         # 5. Advance composer steps (Crop/Audio -> Filters -> Share Sheet)
         max_steps = 6
