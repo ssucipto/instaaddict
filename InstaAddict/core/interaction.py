@@ -222,12 +222,17 @@ def interact_with_user(
             )
 
         likes_value = get_value(likes_count, "Likes count: {}", 2)
-        (
-            _,
-            _,
-            _,
-            can_comment_job,
-        ) = profile_filter.can_comment(current_mode)
+        can_comment_job = True
+        if profile_filter is not None and hasattr(profile_filter, "can_comment"):
+            try:
+                (
+                    _,
+                    _,
+                    _,
+                    can_comment_job,
+                ) = profile_filter.can_comment(current_mode)
+            except (ValueError, TypeError):
+                can_comment_job = True
         if can_comment_job and comment_percentage != 0:
             max_comments_pro_user = get_value(
                 args.max_comments_pro_user, "Max comment count: {}", 1
@@ -357,8 +362,6 @@ def interact_with_user(
                     if video_opened:
                         opened_post_view.watch_media(media_type)
                         like_succeed = opened_post_view.like_video()
-                        logger.debug("Closing video...")
-                        device.back()
                 elif media_type in (
                     MediaType.CAROUSEL,
                     MediaType.PHOTO,
@@ -368,13 +371,16 @@ def interact_with_user(
                         _browse_carousel(device, obj_count)
                     opened_post_view.watch_media(media_type)
                     like_succeed = opened_post_view.like_post()
-                    logger.debug("Closing photo/carousel post...")
-                    device.back()  # mirrors VIDEO branch – prevents infinite same-photo loop
                 if like_succeed:
                     register_like(device, session_state)
                     number_of_liked += 1
                 else:
                     logger.warning("Fail to like post. Let's continue...")
+            else:
+                logger.warning("Can't find the post element!")
+                save_crash(device)
+
+            if opened_post_view and already_liked is not None:
                 if comment_percentage != 0 and can_comment(
                     media_type, profile_filter, current_mode
                 ):
@@ -393,9 +399,6 @@ def interact_with_user(
                         logger.info(
                             f"You've already did {max_comments_pro_user} {'comment' if max_comments_pro_user<=1 else 'comments'} for this user!"
                         )
-            else:
-                logger.warning("Can't find the post element!")
-                save_crash(device)
             if like_succeed or comment_done:
                 interacted = True
 
@@ -408,8 +411,9 @@ def interact_with_user(
             for _ in range(3):
                 if post_grid_view._is_still_on_profile():
                     break
-                logger.debug("We are in the wrong place...")
+                logger.debug("Exiting post view to profile grid...")
                 device.back()
+                random_sleep(0.5, 1.0, modulable=False)
             else:
                 logger.warning("Can't go back to the profile!")
             # Allow RecyclerView grid to re-lay out before next child(index=N) lookup
@@ -459,6 +463,8 @@ def can_like(session_state: SessionState, likes_percentage: int) -> bool:
 
 
 def can_comment(media_type: MediaType, profile_filter, current_mode) -> bool:
+    if profile_filter is None:
+        return True
     (
         can_comment_photos,
         can_comment_videos,

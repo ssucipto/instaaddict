@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.4.0
+  version: 1.4.1
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -344,6 +344,29 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-19
+  description: 'Full Implementation Audit, Quality Hardening, Session State Invariant Fix & Follows/Comments Robustness (Route-057, Audit-087, Review-049).'
+  items:
+  - "✓ Audited implementation fully for gaps, shortcuts, and inconsistencies across engagement pipelines (Audit-087)"
+  - "✓ Evaluated codebase against ACP 64-rule quality standards with zero critical regressions (Review-049)"
+  - "✓ Fixed SessionState.totalFollowed dictionary invariant: preserved dict[str, int] structure updated atomically via add_interaction"
+  - "✓ Implemented range-safe percentage parsing via get_value in interact_reels.py, preventing ValueError on '30-40' ranges"
+  - "✓ Decoupled comment execution from like freshness in interaction.py, allowing comments on already-liked posts"
+  - "✓ Guarded profile_filter.can_comment against None filter objects and tuple unpacking mismatches"
+  - "✓ Enforced non-empty fallback guarantees in load_random_comment via DEFAULT_COMMENTS"
+  - "✓ Created 5-case test suite in test_follows_and_comments_robustness.py (284/284 total tests passing, 100% green)"
+  - "✓ Verified zero flake8 linting violations with standard clean style"
+- date: 2026-09-19
+  description: 'Remediated 0-Follows and 0-Comments: Reels False-Positive Ad Bypass, Inline Follow Button, and Post Comment Lifecycle (Route-056, Audit-086).'
+  items:
+  - "✓ Audited live runtime logs (lolatheozjack.log): diagnosed 100% false-positive ad classification on Reels and premature back navigation"
+  - "✓ Excluded 'Subscribe' (creator badge) from ad CTA regex in interact_reels.py"
+  - "✓ Enforced vertical screen position (top > h*0.4) and banner width (> w*0.25) before classifying Reels ads, ignoring recycled off-screen views"
+  - "✓ Added inline_follow_button to Reels follow selector regex matching Instagram v446+ layout"
+  - "✓ Removed premature device.back() calls in interaction.py, keeping posts open while _comment() evaluates and executes"
+  - "✓ Set interact-percentage to 100% in accounts/lolatheozjack/config.yml to eliminate probabilistic target drops"
+  - "✓ Authored audit-086 deep-dive report and route-056 specification"
+  - "✓ Created 6-case unit test suite (test_reels_ad_and_follow_fix.py) with 100% pass rate (279/279 total tests passing)"
 - date: 2026-09-19
   description: 'Restored Follows and Comments Mechanics, Added Reels Follow Action, and Tuned Vision AI Aussie Voice (Route-055, Audit-085).'
   items:

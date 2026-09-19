@@ -56,4 +56,14 @@
   correction: Extract Reels captions via a 5-tier strategy (direct attributes, child TextView traversal with username filtering, alternative selectors, XML hierarchy parsing, and trailing '...more' stripping), decode both raw control bytes/chars (\x13, \x15, \x04) and character fallbacks in keyboard listeners, and poll is_upload_requested() responsively inside inter-session sleep slices and long-running engagement loops.
   priority: high
 
+- date: 2026-09-19
+  task_type: bugfix
+  mistake: Reels classified 100% of organic posts as ads because ad_cta_regex contained 'Subscribe' (creator badge) and recycled off-screen views matched 'Learn more', while post-view comments failed because device.back() was invoked immediately after liking (before _comment was called).
+  correction: Exclude 'Subscribe' from ad_cta_regex and enforce spatial bounds (top > h*0.4, width > w*0.25) before classifying Reels ads, match inline_follow_button in Reels follow selector, and defer device.back() until after commenting finishes so post remains open during comment actions.
+  priority: high
 
+- date: 2026-09-19
+  task_type: bugfix
+  mistake: Directly assigning an integer to SessionState.totalFollowed violates its dict[str, int] contract, causing limit checks (sum(totalFollowed.values())) and reporting to crash with AttributeError or TypeError; casting range strings ("30-40") with int() fails with ValueError; and gating _comment() behind already_liked is not None and not already_liked starves commenting on already-liked posts.
+  correction: Preserve SessionState.totalFollowed as a dictionary updated via add_interaction(), use get_value() for range-safe percentage parsing, and decouple comment evaluation from whether the post was freshly liked or already liked.
+  priority: high

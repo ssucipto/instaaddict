@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.4.1 — Engagement Pipeline Hardening, Reels Ad Filtering & Invariant Robustness
+
+Patch release resolving false-positive Reels ad classification, inline follow button discovery in modern Instagram v446+, session state dictionary type invariants, range-safe percentage expression parsing, post-lifecycle comment decoupling for already-liked posts, and defensive profile filter null-guards.
+
+### Fixed
+- **Reels False-Positive Ad Classification (`InstaAddict/plugins/interact_reels.py`, `test/test_reels_ad_and_follow_fix.py`)**:
+  - Excluded `"Subscribe"` from ad CTA regex patterns to avoid misclassifying organic creator channels with subscription badges.
+  - Enforced vertical spatial bounds (`top > height * 0.4`) and banner width thresholds (`width > width * 0.25`) before declaring ad buttons, preventing recycled off-screen views and top-docked ViewPager headers from dropping organic Reels.
+- **Modern Instagram v446+ Inline Follow Button Discovery (`InstaAddict/plugins/interact_reels.py`)**:
+  - Added `inline_follow_button` and description matching (`descriptionMatches="(?i)^Follow$"`) to the Reels creator follow selector, ensuring reliable follows during Reels playback.
+- **Session State Follow Invariant Protection (`InstaAddict/plugins/interact_reels.py`, `test/test_follows_and_comments_robustness.py`)**:
+  - Preserved `SessionState.totalFollowed` as a `dict[str, int]` updated atomically through `SessionState.add_interaction()`, preventing `AttributeError` / `TypeError` crashes during session limit verification and TUI rendering.
+  - Maintained backward compatibility with integer test mocks via conditional type guarding.
+- **Range-Safe Percentage Parsing (`InstaAddict/plugins/interact_reels.py`)**:
+  - Replaced direct `int()` casting on `evaluate_percentage` and `follow_percentage` with `get_value()`, preventing `ValueError` crashes when configured with range expressions like `"30-40"`.
+- **Post-Lifecycle Comment Decoupling (`InstaAddict/core/interaction.py`)**:
+  - Removed premature `device.back()` calls immediately following photo/video likes, ensuring posts remain open while `_comment()` evaluates.
+  - Decoupled comment execution from like freshness, allowing comments to be posted on already-liked posts when allowed by session limits and user filters.
+- **Filter Null-Safety & Fallback Guarantees (`InstaAddict/core/interaction.py`)**:
+  - Guarded `can_comment()` against `profile_filter is None` and wrapped tuple unpacking defensively against structure mismatches.
+  - Ensured `load_random_comment()` strictly guarantees a non-empty string fallback from `DEFAULT_COMMENTS`.
+
 ## v1.4.0 — Engagement Pipeline Restoration, Follower Cache, and Aussie Vision Voice
 
 Feature release delivering root-cause resolution for zero follows and zero comments, native Reels follow action, 5-tier ViewGroup caption extraction, atomic local followers caching, directional unfollow sorting, Ctrl-chord hotkeys with ASCII control byte decoding, em-dash regex sanitization, and subtle Aussie dog voice prompt tuning for Gemini Vision AI.

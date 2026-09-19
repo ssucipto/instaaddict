@@ -80,7 +80,7 @@ class InteractReelsPlugin(Plugin):
             ad_cta_regex = (
                 "(?i)^(Learn More|Install Now|Install|Shop Now|Download|"
                 "Sign Up|Watch More|Apply Now|Get Offer|Book Now|"
-                "Contact Us|Play Game|Subscribe|Open app)$"
+                "Contact Us|Play Game|Open app)$"
             )
 
             for i in range(target_amount):
@@ -141,10 +141,24 @@ class InteractReelsPlugin(Plugin):
                 # 2. Check if current reel itself is an ad
                 ad_button = device.find(textMatches=ad_cta_regex)
                 sponsored = device.find(textMatches="(?i)^Sponsored$")
-                if (
-                    ad_button.exists(ui_timeout=1)
-                    or sponsored.exists(ui_timeout=1)
-                ):
+                is_ad = False
+                if sponsored.exists(ui_timeout=1):
+                    is_ad = True
+                elif ad_button.exists(ui_timeout=1):
+                    try:
+                        b = ad_button.get_bounds()
+                        # Real ad CTA button is located in the lower portion of the screen (y > h * 0.4)
+                        # and has a substantial banner width (width > w * 0.25)
+                        top_val = b.get("top", 0) if b else 0
+                        width_val = (b.get("right", 0) - b.get("left", 0)) if b else 0
+                        if b and top_val > (h * 0.4) and width_val > (w * 0.25):
+                            is_ad = True
+                        else:
+                            logger.debug(f"Ignoring ad candidate with non-CTA bounds: {b}")
+                    except Exception as e:
+                        logger.debug(f"Could not verify ad button bounds: {e}")
+
+                if is_ad:
                     if sessions and len(sessions) > 0 and hasattr(sessions[-1], "increment_ads_bypassed"):
                         sessions[-1].increment_ads_bypassed()
                     logger.warning(
@@ -158,7 +172,8 @@ class InteractReelsPlugin(Plugin):
                 sleep(2)
 
                 # 1. THROTTLE & FILTER
-                eval_pct = int(getattr(configs.args, "evaluate_percentage", None) or 70)
+                raw_eval = getattr(configs.args, "evaluate_percentage", None)
+                eval_pct = get_value(str(raw_eval), None, 70) if raw_eval is not None else 70
                 if random.randint(1, 100) > eval_pct:
                     logger.info("Skipping reel evaluation to preserve quota.")
                     device.swipe(Direction.UP, 0.85)
@@ -187,16 +202,22 @@ class InteractReelsPlugin(Plugin):
                         sessions[-1].totalLikes = getattr(sessions[-1], "totalLikes", 0) + 1
 
                     # Optional Follow Reel Creator
-                    follow_pct = int(getattr(configs.args, "follow_percentage", None) or 0)
+                    raw_follow = getattr(configs.args, "follow_percentage", None)
+                    follow_pct = get_value(str(raw_follow), None, 0) if raw_follow is not None else 0
                     followed_creator = False
                     if follow_pct > 0 and random.randint(1, 100) <= follow_pct:
                         if sessions and len(sessions) > 0 and not sessions[-1].check_limit(
                             limit_type=sessions[-1].Limit.FOLLOWS, output=False
                         ):
                             follow_btn = device.find(
-                                resourceIdMatches=".*clips_follow_button.*|.*follow_button.*",
+                                resourceIdMatches=".*inline_follow_button.*|.*clips_follow_button.*|.*follow_button.*",
                                 textMatches="(?i)^Follow$"
                             )
+                            if not follow_btn.exists():
+                                follow_btn = device.find(
+                                    resourceIdMatches=".*inline_follow_button.*|.*clips_follow_button.*|.*follow_button.*",
+                                    descriptionMatches="(?i)^Follow$"
+                                )
                             if not follow_btn.exists():
                                 follow_btn = device.find(
                                     descriptionMatches="(?i)^Follow$"
@@ -213,12 +234,11 @@ class InteractReelsPlugin(Plugin):
                                     "Followed Reel creator! 🐾",
                                     extra={"color": f"{Fore.GREEN}"}
                                 )
-                                sessions[-1].totalFollowed = (
-                                    getattr(sessions[-1], "totalFollowed", 0) + 1
-                                )
                                 followed_creator = True
 
                     if sessions and len(sessions) > 0:
+                        if followed_creator and isinstance(getattr(sessions[-1], "totalFollowed", None), int):
+                            sessions[-1].totalFollowed += 1
                         sessions[-1].add_interaction(
                             "interact-reels",
                             succeed=True,
