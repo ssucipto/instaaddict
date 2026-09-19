@@ -1,9 +1,9 @@
 # Project Requirements: InstaAddict
 
 **Project Name**: InstaAddict  
-**Version**: 1.3.0  
+**Version**: 1.4.0  
 **Created**: 2026-09-11  
-**Last Updated**: 2026-09-18  
+**Last Updated**: 2026-09-19  
 **Status**: Active  
 
 ---
@@ -88,5 +88,23 @@ InstaAddict is an active continuation and evolution of the GramAddict project, f
 - **Fast Coordinate Tap**: Element center coordinate tapping in `navigateToPost` to stay under Android's ~400ms `OnLongClickListener` threshold.
 - **Reels Viewport Likers Bypass**: Signals undefined likers count `(False, -1)` on full-screen Reels viewports to downstream filters, preventing 100% of organic posts from being skipped when `min_likers > 0`.
 - **Synchronized Reels Telemetry**: Accurate `totalWatched`, `totalLikes`, and `add_interaction` recording across double-tap reel interactions and dynamic `current_user` comment verification.
+
+### 12. Multi-Tier Reels Caption Extraction & Ctrl-Chord Hotkeys
+- **5-Tier ViewGroup Caption Parsing**: Decoupled caption extraction for `clips_caption_component` containers that return empty strings for top-level text queries, traversing child TextViews while filtering creator usernames.
+- **Trailing '...more' Stripping**: Clean truncation of Instagram UI expander tokens without corrupting hashtags or trailing sentences.
+- **Ctrl-Chord Keyboard Engine (`Ctrl+S`, `Ctrl+U`, `Ctrl+D`, `Ctrl+C`)**: Full decoding of ASCII control codes (`\x13`, `\x15`, `\x04`, `\x03`) and literal character fallbacks across Windows (`msvcrt`) and Unix (`termios`) consoles.
+- **Dynamic Debug Toggle & Responsive In-Session Polling**: Instant log level flipping (`DEBUG` / `INFO`) and sliced 5s sleep polling for responsive command interception.
+
+### 13. Persistent Followers Cache & Non-Scraping Unfollow Optimization
+- **Persistent Atomic Followers Cache (`followers_cache.json`)**: Local JSON store updated on session completion with atomic file rename semantics.
+- **Follower Count Delta Guard**: Automatically bypasses follower list scraping when the profile header follower count matches the cached count.
+- **4-Tier Profile Header 'Follows you' Badge Detection**: Checks for the native badge on candidate profile headers, eliminating 80–90% of redundant following-list scrapes.
+- **Directional Sorting (`--sort-followers-latest`)**: Targets recent followings first to minimize interaction roundtrips.
+
+### 14. Follows & Comments Restoration, Reels Follow & Aussie Voice Persona
+- **Reels Author Follow Action**: Native follow button resolution (`clips_follow_button`) directly within the active video viewport during high-relevance Reels playback.
+- **Permissive Mode Defaults**: `filter.can_comment()` defaults omitted mode keys to `True`, unblocking commenting pipelines.
+- **Anti-AI Formatting Regex Sanitizer**: Eradicates em-dashes (`—`) and en-dashes (`–`), replacing them with conversational punctuation.
+- **Subtle Aussie Dog Voice**: Prompt-level conditioning enforcing authentic Australian dog vernacular (*reckon*, *heaps*, *ripper*, *mate*, *cheers*, *keen*) restricted to punchy 3–6 word lengths without corporate jargon.
 
 

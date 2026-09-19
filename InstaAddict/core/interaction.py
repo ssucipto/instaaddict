@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 from argparse import Namespace
 from datetime import datetime
@@ -280,15 +281,20 @@ def interact_with_user(
             try:
                 from InstaAddict.core.tui import DashboardManager
 
-                if (
-                    DashboardManager.is_active()
-                    and DashboardManager.get_instance().state.is_skip_task_requested()
-                ):
-                    logger.warning(
-                        "[TUI] Task skip requested by user ([S]/[N]). Breaking out of profile post interactions...",
-                        extra={"color": f"{Fore.YELLOW}"},
-                    )
-                    break
+                if DashboardManager.is_active():
+                    dm = DashboardManager.get_instance()
+                    if dm.state.is_skip_task_requested():
+                        logger.warning(
+                            "[TUI] Task skip requested by user ([CTRL+S]). Breaking out of profile post interactions...",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        break
+                    if dm.state.is_upload_requested():
+                        logger.info(
+                            "[TUI] Immediate upload requested by user ([CTRL+U]). Exiting profile post interactions to execute upload...",
+                            extra={"color": f"{Fore.MAGENTA}"},
+                        )
+                        break
             except Exception:
                 pass
 
@@ -690,32 +696,37 @@ def _comment(
 
         universal_actions = UniversalActions(device)
         # we have to do a little swipe for preventing get the previous post comments button (which is covered by top bar, but present in hierarchy!!)
-        universal_actions._swipe_points(
-            direction=Direction.DOWN, delta_y=randint(150, 250)
-        )
-        tab_bar = device.find(
-            resourceId=ResourceID.TAB_BAR,
-        )
-        media = device.find(
-            resourceIdMatches=ResourceID.MEDIA_CONTAINER,
-        )
-        if tab_bar.exists() and media.exists():
-            if (
-                int(tab_bar.get_bounds()["top"]) - int(media.get_bounds()["bottom"])
-                < 150
-            ):
-                universal_actions._swipe_points(
-                    direction=Direction.DOWN, delta_y=randint(150, 250)
-                )
-        else:
-            logger.debug(
-                "Tab bar or media container not found — skipping extra swipe check."
+        if media_type != MediaType.REEL:
+            universal_actions._swipe_points(
+                direction=Direction.DOWN, delta_y=randint(150, 250)
             )
+            tab_bar = device.find(
+                resourceId=ResourceID.TAB_BAR,
+            )
+            media = device.find(
+                resourceIdMatches=ResourceID.MEDIA_CONTAINER,
+            )
+            if tab_bar.exists() and media.exists():
+                if (
+                    int(tab_bar.get_bounds()["top"]) - int(media.get_bounds()["bottom"])
+                    < 150
+                ):
+                    universal_actions._swipe_points(
+                        direction=Direction.DOWN, delta_y=randint(150, 250)
+                    )
+            else:
+                logger.debug(
+                    "Tab bar or media container not found — skipping extra swipe check."
+                )
         # look at hashtag of comment
         for _ in range(2):
             comment_button = device.find(
-                resourceId=ResourceID.ROW_FEED_BUTTON_COMMENT,
+                resourceIdMatches=f"{ResourceID.ROW_FEED_BUTTON_COMMENT}|.*comment_button.*|.*clips_comment_button.*"
             )
+            if not comment_button.exists():
+                comment_button = device.find(
+                    descriptionMatches="(?i)^Comments?$"
+                )
             if comment_button.exists():
                 logger.info("Open comments of post.")
                 comment_button.click()
@@ -835,30 +846,48 @@ def _comment(
 
                 universal_actions.detect_block(device)
                 universal_actions.close_keyboard(device)
-                # Verify comment was posted by checking for "{username} said {comment}" pattern in content-desc
-                # This is the reliable signal based on UI hierarchy analysis
-                posted_text = device.find(description=f"{my_username} said {comment}")
-                if posted_text.exists(Timeout.MEDIUM):
-                    logger.info("Comment succeed.", extra={"color": f"{Fore.GREEN}"})
-                    session_state.totalComments += 1
+                # Verify comment was posted using multi-tier signals:
+                # Tier 1: Check for comment text in content-description
+                comment_sub = comment.strip()[:20] if comment else ""
+                posted_text = device.find(
+                    descriptionMatches=f"(?i).*{re.escape(comment_sub)}.*"
+                )
+                comment_confirmed = False
+                if posted_text.exists(Timeout.SHORT):
+                    logger.info("Comment succeed (confirmed via accessibility description).", extra={"color": f"{Fore.GREEN}"})
                     comment_confirmed = True
                 else:
-                    logger.warning("Failed to check if comment succeed.")
-                    comment_confirmed = False
+                    # Tier 2: Check if comment_box was cleared or dismissed
+                    box_check = device.find(
+                        resourceIdMatches=f"{ResourceID.LAYOUT_COMMENT_THREAD_EDITTEXT}|{ResourceID.LAYOUT_COMMENT_THREAD_EDITTEXT_MULTILINE}"
+                    )
+                    post_btn_check = device.find(
+                        resourceIdMatches=f"{ResourceID.LAYOUT_COMMENT_THREAD_POST_BUTTON_ICON}|{ResourceID.LAYOUT_COMMENT_THREAD_POST_BUTTON_CLICK_AREA}"
+                    )
+                    if not box_check.exists() or (box_check.get_text() or "").strip() == "" or not post_btn_check.exists():
+                        logger.info("Comment succeed (confirmed via input submission transition).", extra={"color": f"{Fore.GREEN}"})
+                        comment_confirmed = True
+                    else:
+                        logger.warning("Failed to check if comment succeed.")
+                        comment_confirmed = False
+
+                if comment_confirmed:
+                    session_state.totalComments += 1
 
                 logger.info("Go back to post view.")
                 device.back()
                 return comment_confirmed
             else:
                 like_button = device.find(
-                    resourceId=ResourceID.ROW_FEED_BUTTON_LIKE,
+                    resourceIdMatches=f"{ResourceID.ROW_FEED_BUTTON_LIKE}|.*like_button.*",
                 )
-                if like_button.exists():
+                if like_button.exists() and media_type != MediaType.REEL:
                     logger.info("This post has comments disabled.")
                     return False
-                universal_actions._swipe_points(
-                    direction=Direction.DOWN, delta_y=randint(150, 250)
-                )
+                if media_type != MediaType.REEL:
+                    universal_actions._swipe_points(
+                        direction=Direction.DOWN, delta_y=randint(150, 250)
+                    )
     return False
 
 
@@ -998,32 +1027,42 @@ def load_random_message(my_username: str) -> Optional[str]:
 
 
 def load_random_comment(my_username: str, media_type: MediaType) -> Optional[str]:
+    DEFAULT_COMMENTS = [
+        "Ripper shot mate! :paw_prints:",
+        "Heaps good! :dog:",
+        "Reckon this is gold! :raised_hands:",
+        "What a champion! :heart:",
+        "Proper legend! :sparkles:",
+        "Looking sharp mate! :fire:",
+        "Love this heaps! :clap:",
+    ]
     lines = _load_and_clean_txt_file(my_username, storage.FILENAME_COMMENTS)
-    if lines is None:
-        return None
+    if lines is None or len(lines) == 0:
+        chosen = choice(DEFAULT_COMMENTS)
+        return emoji.emojize(spintax.spin(chosen), use_aliases=True)
     try:
         photo_header = lines.index("%PHOTO")
         video_header = lines.index("%VIDEO")
         carousel_header = lines.index("%CAROUSEL")
+        photo_comments = lines[photo_header + 1 : video_header]
+        video_comments = lines[video_header + 1 : carousel_header]
+        carousel_comments = lines[carousel_header + 1 :]
+        random_comment = ""
+        if media_type == MediaType.PHOTO:
+            random_comment = choice(photo_comments) if len(photo_comments) > 0 else ""
+        elif media_type in (MediaType.VIDEO, MediaType.IGTV, MediaType.REEL):
+            random_comment = choice(video_comments) if len(video_comments) > 0 else ""
+        elif media_type == MediaType.CAROUSEL:
+            random_comment = choice(carousel_comments) if len(carousel_comments) > 0 else ""
+        if random_comment != "":
+            return emoji.emojize(spintax.spin(random_comment), use_aliases=True)
     except ValueError:
-        logger.warning(
-            f"You didn't follow the rules for sections in your {storage.FILENAME_COMMENTS} txt file! Look at config example."
-        )
-        return None
-    photo_comments = lines[photo_header + 1 : video_header]
-    video_comments = lines[video_header + 1 : carousel_header]
-    carousel_comments = lines[carousel_header + 1 :]
-    random_comment = ""
-    if media_type == MediaType.PHOTO:
-        random_comment = choice(photo_comments) if len(photo_comments) > 0 else ""
-    elif media_type in (MediaType.VIDEO, MediaType.IGTV, MediaType.REEL):
-        random_comment = choice(video_comments) if len(video_comments) > 0 else ""
-    elif media_type == MediaType.CAROUSEL:
-        random_comment = choice(carousel_comments) if len(carousel_comments) > 0 else ""
-    if random_comment != "":
-        return emoji.emojize(spintax.spin(random_comment), use_aliases=True)
-    else:
-        return None
+        non_header_lines = [l for l in lines if not l.startswith("%")]
+        if non_header_lines:
+            return emoji.emojize(spintax.spin(choice(non_header_lines)), use_aliases=True)
+
+    chosen = choice(DEFAULT_COMMENTS)
+    return emoji.emojize(spintax.spin(chosen), use_aliases=True)
 
 
 def _follow(device, username, follow_percentage, args, session_state, swipe_amount):
@@ -1042,19 +1081,28 @@ def _follow(device, username, follow_percentage, args, session_state, swipe_amou
 
         FOLLOW_REGEX = "^Follow$"
         follow_button = device.find(
-            clickable=True,
             textMatches=case_insensitive_re(FOLLOW_REGEX),
         )
+        if not follow_button.exists():
+            follow_button = device.find(
+                descriptionMatches=case_insensitive_re(FOLLOW_REGEX),
+            )
         UNFOLLOW_REGEX = "^Following|^Requested"
         unfollow_button = device.find(
-            clickable=True,
             textMatches=case_insensitive_re(UNFOLLOW_REGEX),
         )
+        if not unfollow_button.exists():
+            unfollow_button = device.find(
+                descriptionMatches=case_insensitive_re(UNFOLLOW_REGEX),
+            )
         FOLLOWBACK_REGEX = "^Follow Back$"
         followback_button = device.find(
-            clickable=True,
             textMatches=case_insensitive_re(FOLLOWBACK_REGEX),
         )
+        if not followback_button.exists():
+            followback_button = device.find(
+                descriptionMatches=case_insensitive_re(FOLLOWBACK_REGEX),
+            )
 
         if followback_button.exists():
             logger.info(
@@ -1071,10 +1119,14 @@ def _follow(device, username, follow_percentage, args, session_state, swipe_amou
             max_tries = 3
             for n in range(max_tries):
                 follow_button.click()
-                if device.find(
-                    textMatches=UNFOLLOW_REGEX,
-                    clickable=True,
-                ).exists(Timeout.SHORT):
+                if (
+                    device.find(
+                        textMatches=case_insensitive_re(UNFOLLOW_REGEX),
+                    ).exists(Timeout.SHORT)
+                    or device.find(
+                        descriptionMatches=case_insensitive_re(UNFOLLOW_REGEX),
+                    ).exists(Timeout.SHORT)
+                ):
                     logger.info(f"Followed @{username}", extra={"color": Fore.GREEN})
                     universal_actions.detect_block(device)
                     return True

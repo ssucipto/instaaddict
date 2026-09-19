@@ -25,6 +25,7 @@ from InstaAddict.core.resources import TabBarText
 from InstaAddict.core.utils import (
     ActionBlockedError,
     get_value,
+    inspect_current_view,
     random_sleep,
     save_crash,
 )
@@ -1132,6 +1133,90 @@ class PostsViewList:
                     return caption["text"]
         return None
 
+    @staticmethod
+    def _clean_trailing_more(text: str) -> str:
+        if not text:
+            return ""
+        s = text.strip()
+        return re.sub(r"(\s*\.{2,}\s*more|\s+more)$", "", s, flags=re.IGNORECASE).strip()
+
+    def _find_reels_caption_from_hierarchy(self, username: Optional[str] = None) -> Optional[str]:
+        """Inspects UI XML hierarchy to extract Reels caption text when direct element lookups fail."""
+        try:
+            root = ET.fromstring(self.device.deviceV2.dump_hierarchy())
+        except Exception as e:
+            logger.debug(f"Can't parse UI hierarchy for Reels caption: {e}")
+            return None
+
+        clean_user = (PostsViewList._normalize_ig_text(username) or "").lstrip("@").lower()
+        caption_candidates = []
+
+        for node in root.iter("node"):
+            bounds = PostsViewList._bounds_from_xml_node(node)
+            if bounds is None or node.attrib.get("visible-to-user") != "true":
+                continue
+
+            res_id = (node.attrib.get("resource-id", "") or "").lower()
+            cls_name = (node.attrib.get("class", "") or "").lower()
+            text = PostsViewList._normalize_ig_text(node.attrib.get("text"))
+            desc = PostsViewList._normalize_ig_text(node.attrib.get("content-desc"))
+            content = text or desc
+            if not content:
+                continue
+
+            # Skip button widgets, numbers, timestamps, system UI, or author username itself
+            if "button" in cls_name and "textview" not in cls_name:
+                continue
+            if clean_user and content.lower() == clean_user:
+                continue
+            if re.match(r"^\d+([.,]\d+)?[kmb]?$", content, flags=re.IGNORECASE):
+                continue
+            if re.match(r"^\d+\s*(s|m|h|d|w)$", content, flags=re.IGNORECASE):
+                continue
+
+            # Prioritize nodes matching known Reels caption resource IDs
+            is_caption_id = any(
+                term in res_id
+                for term in [
+                    "clips_caption",
+                    "clips_viewer_caption",
+                    "video_caption",
+                    "reel_viewer_title",
+                    "expandable_text",
+                ]
+            )
+
+            # Check if within bottom-left viewport typical of Reels caption area
+            try:
+                disp_h = self.device.get_info()["displayHeight"]
+                disp_w = self.device.get_info()["displayWidth"]
+            except Exception:
+                disp_h = 2400
+                disp_w = 1080
+
+            in_reels_area = (
+                bounds["top"] >= disp_h * 0.4
+                and bounds["bottom"] <= disp_h * 0.98
+                and bounds["left"] <= disp_w * 0.85
+            )
+
+            if is_caption_id or in_reels_area:
+                cleaned = PostsViewList._clean_trailing_more(content)
+                if cleaned and len(cleaned) > 2:
+                    caption_candidates.append({
+                        "text": cleaned,
+                        "is_id_match": is_caption_id,
+                        "top": bounds["top"],
+                        "len": len(cleaned),
+                    })
+
+        if not caption_candidates:
+            return None
+
+        # Sort: priority to explicit ID match, then by text length (captions are longer than metadata)
+        caption_candidates.sort(key=lambda c: (not c["is_id_match"], -c["len"]))
+        return caption_candidates[0]["text"]
+
     def _check_if_last_post(
         self, last_description, current_job
     ) -> Tuple[bool, str, str, bool, bool, bool]:
@@ -1153,9 +1238,77 @@ class PostsViewList:
         clips_caption = self.device.find(
             resourceIdMatches=ResourceID.CLIPS_CAPTION_COMPONENT
         )
-        if clips_caption.exists():
-            desc_txt = clips_caption.get_desc() or clips_caption.get_text()
+        is_on_reel = (
+            (isinstance(current_job, str) and "reels" in current_job.lower())
+            or clips_caption.exists()
+        )
+        if not is_on_reel:
+            reels_marker = self.device.find(
+                resourceIdMatches=case_insensitive_re([
+                    ResourceID.CLIPS_VIDEO_CONTAINER,
+                    ResourceID.CLIPS_AUTHOR_USERNAME,
+                    ResourceID.ROOT_CLIPS_LAYOUT,
+                ])
+            )
+            is_on_reel = reels_marker.exists()
+
+        if is_on_reel:
+            desc_txt = None
+
+            # Tier 1: Direct attributes on clips_caption container
+            if clips_caption.exists():
+                desc_txt = clips_caption.get_desc() or clips_caption.get_text()
+
+            # Tier 2: Child TextView elements inside clips_caption container
+            if not desc_txt and clips_caption.exists():
+                try:
+                    child_tv = clips_caption.child(className=ClassName.TEXT_VIEW)
+                    if child_tv.exists():
+                        num_children = child_tv.count_items()
+                        if num_children > 1:
+                            segments = []
+                            clean_uname = (username or "").lstrip("@").lower()
+                            for idx in range(num_children):
+                                segment = child_tv.get_text(error=False, index=idx)
+                                if not segment:
+                                    try:
+                                        segment = child_tv.child(index=idx).get_desc()
+                                    except Exception:
+                                        segment = None
+                                if segment and segment.strip():
+                                    seg_clean = PostsViewList._normalize_ig_text(segment)
+                                    if seg_clean.lstrip("@").lower() != clean_uname:
+                                        segments.append(seg_clean)
+                            if segments:
+                                desc_txt = " ".join(segments)
+                        else:
+                            desc_txt = child_tv.get_text(error=False) or child_tv.get_desc()
+                except Exception as ex:
+                    logger.debug(f"Error querying clips_caption child TextViews: {ex}")
+
+            # Tier 3: Alternative known Reels caption resource IDs
+            if not desc_txt:
+                alt_caption_regex = (
+                    r".*clips.*caption.*|.*clips.*viewer.*caption.*|.*video_caption.*|"
+                    r".*reel.*viewer.*title.*|.*expandable_text.*"
+                )
+                alt_caption = self.device.find(resourceIdMatches=alt_caption_regex)
+                if alt_caption.exists():
+                    desc_txt = alt_caption.get_desc() or alt_caption.get_text()
+                    if not desc_txt:
+                        try:
+                            alt_child = alt_caption.child(className=ClassName.TEXT_VIEW)
+                            if alt_child.exists():
+                                desc_txt = alt_child.get_text(error=False) or alt_child.get_desc()
+                        except Exception:
+                            pass
+
+            # Tier 4: XML hierarchy dump traversal
+            if not desc_txt:
+                desc_txt = self._find_reels_caption_from_hierarchy(username)
+
             if desc_txt:
+                desc_txt = PostsViewList._clean_trailing_more(desc_txt)
                 new_description = PostsViewList._normalize_ig_text(desc_txt).upper()
                 if new_description != last_description:
                     return False, new_description, username, is_ad, is_hashtag, has_tags
@@ -1163,6 +1316,7 @@ class PostsViewList:
                     "This post has the same description and author as the last one."
                 )
                 return True, new_description, username, is_ad, is_hashtag, has_tags
+
             logger.info("This Reel post hasn't a caption description...")
             return False, "", username, is_ad, is_hashtag, has_tags
         for _ in range(8):
@@ -2540,17 +2694,35 @@ class ProfileView(ActionBarView):
     def getFollowButton(self):
         button_regex = f"{ClassName.BUTTON}|{ClassName.TEXT_VIEW}"
         following_regex_all = "^following|^requested|^follow back|^follow"
+        # Primary lookup: text matching without strict clickable constraint on TextView
         following_or_follow_back_button = self.device.find(
             classNameMatches=button_regex,
-            clickable=True,
             textMatches=case_insensitive_re(following_regex_all),
         )
+        if not following_or_follow_back_button.exists(Timeout.SHORT):
+            # Fallback 1: check content-description
+            following_or_follow_back_button = self.device.find(
+                descriptionMatches=case_insensitive_re(following_regex_all),
+            )
+        if not following_or_follow_back_button.exists(Timeout.SHORT):
+            # Fallback 2: check common profile follow button resource IDs
+            following_or_follow_back_button = self.device.find(
+                resourceIdMatches=r".*profile_header_follow_button.*|.*button_profile_header_follow.*|.*profile_header_actions_top_row.*"
+            )
         if following_or_follow_back_button.exists(Timeout.MEDIUM):
-            button_text = following_or_follow_back_button.get_text().casefold()
-            if button_text in ["following", "requested"]:
+            raw_text = (following_or_follow_back_button.get_text() or "").strip()
+            if not raw_text:
+                raw_text = (
+                    following_or_follow_back_button.get_property("contentDescription")
+                    or ""
+                ).strip()
+            button_text = raw_text.casefold()
+            if any(s in button_text for s in ["following", "requested"]):
                 button_status = FollowStatus.FOLLOWING
-            elif button_text == "follow back":
+            elif "follow back" in button_text:
                 button_status = FollowStatus.FOLLOW_BACK
+            elif "follow" in button_text:
+                button_status = FollowStatus.FOLLOW
             else:
                 button_status = FollowStatus.FOLLOW
             return following_or_follow_back_button, button_status
@@ -2559,6 +2731,47 @@ class ProfileView(ActionBarView):
                 "The follow button doesn't exist! Maybe the profile is not loaded!"
             )
             return None, FollowStatus.NONE
+
+    def has_follows_you_badge(self) -> bool:
+        """
+        Check if profile header displays 'Follows you' badge or context label.
+        Used to verify whether the candidate follows you without navigating into
+        their following list.
+        """
+        # Tier 1: Dedicated subtitle TextView with exact text 'Follows you'
+        badge = self.device.find(
+            className=ClassName.TEXT_VIEW,
+            textMatches="(?i)^Follows you$",
+        )
+        if badge.exists(Timeout.SHORT):
+            return True
+
+        # Tier 2: Accessibility contentDescription on any view
+        badge_desc = self.device.find(
+            descriptionMatches="(?i)^Follows you$",
+        )
+        if badge_desc.exists(Timeout.SHORT):
+            return True
+
+        # Tier 3: Follow context text / mutual label containing 'follows you'
+        context_id = getattr(ResourceID, "PROFILE_HEADER_FOLLOW_CONTEXT_TEXT", ".*follow_context.*")
+        context = self.device.find(
+            resourceIdMatches=f"{context_id}|.*follow_context.*"
+        )
+        if context.exists(Timeout.SHORT):
+            txt = (context.get_text() or "").strip()
+            if "follows you" in txt.casefold():
+                return True
+
+        # Tier 4: Check if follow button says 'Follow Back' (when user not following them)
+        follow_btn = self.device.find(
+            classNameMatches=ClassName.BUTTON_OR_TEXTVIEW_REGEX,
+            textMatches="(?i)^Follow back$",
+        )
+        if follow_btn.exists(Timeout.SHORT):
+            return True
+
+        return False
 
     def getUsername(self, watching_stories=False, error=True):
         action_bar = self._getActionBarTitleBtn(watching_stories, error=error)
@@ -2785,9 +2998,71 @@ class ProfileView(ActionBarView):
                 if not followers_tab.get_property("selected"):
                     followers_tab.click()
                 return True
+            # Fallback: Instagram often navigates directly into the Followers list
+            following_list = self.device.find(
+                resourceIdMatches=f"{ResourceID.FOLLOW_LIST_CONTAINER}|.*follow_list.*|.*recycler.*"
+            )
+            if following_list.exists(Timeout.SHORT):
+                logger.debug("Followers list container detected directly.")
+                return True
+            tab_layout = self.device.find(
+                resourceIdMatches=ResourceID.UNIFIED_FOLLOW_LIST_TAB_LAYOUT
+            )
+            if tab_layout.exists(Timeout.SHORT):
+                return True
+            return True
         else:
             logger.error("Can't find followers tab!")
             return False
+
+    def harvest_visible_followers(self, max_scrolls: int = 2) -> list:
+        """
+        Harvest visible follower usernames from the Followers list container.
+        Bounded by max_scrolls to minimize action footprint.
+        """
+        harvested = []
+        seen = set()
+        user_list_id = getattr(ResourceID, "USER_LIST_CONTAINER", ".*user_list.*")
+        primary_name_id = getattr(ResourceID, "ROW_USER_PRIMARY_NAME", ".*row_user_primary_name.*")
+        list_id = getattr(ResourceID, "LIST", ".*list.*")
+        for scroll_i in range(max_scrolls + 1):
+            user_list = self.device.find(
+                resourceIdMatches=user_list_id,
+            )
+            row_height, n_users = inspect_current_view(user_list)
+            for item in user_list:
+                cur_row_height = item.get_height()
+                if cur_row_height < row_height:
+                    continue
+                user_name_view = item.child(
+                    resourceIdMatches=f"{primary_name_id}|.*follow_list_username.*|.*row_profile_header_username.*"
+                )
+                if not user_name_view.exists():
+                    user_info_view = item.child(index=1)
+                    if user_info_view.exists():
+                        candidate = user_info_view.child(index=0).child()
+                        if candidate.exists():
+                            user_name_view = candidate
+                if not user_name_view.exists():
+                    text_views = item.child(className=ClassName.TEXT_VIEW)
+                    for tv in text_views:
+                        txt = (tv.get_text() or "").strip()
+                        if txt and not any(kw in txt.casefold() for kw in ["following", "follow", "remove", "message", "requested"]):
+                            user_name_view = tv
+                            break
+                if user_name_view.exists():
+                    uname = (user_name_view.get_text() or "").strip()
+                    if uname and uname.casefold() not in seen:
+                        seen.add(uname.casefold())
+                        harvested.append(uname)
+
+            if scroll_i < max_scrolls:
+                list_view = self.device.find(resourceId=list_id)
+                if list_view.exists(Timeout.SHORT):
+                    list_view.scroll(Direction.DOWN)
+                else:
+                    break
+        return harvested
 
     def navigateToFollowing(self):
         logger.info("Navigate to following.")
@@ -2803,6 +3078,19 @@ class ProfileView(ActionBarView):
                 if not following_tab.get_property("selected"):
                     following_tab.click()
                 return True
+            # Fallback: Instagram often navigates directly into the Following list
+            following_list = self.device.find(
+                resourceIdMatches=f"{ResourceID.FOLLOW_LIST_CONTAINER}|.*follow_list.*|.*recycler.*"
+            )
+            if following_list.exists(Timeout.SHORT):
+                logger.debug("Following list container detected directly.")
+                return True
+            tab_layout = self.device.find(
+                resourceIdMatches=ResourceID.UNIFIED_FOLLOW_LIST_TAB_LAYOUT
+            )
+            if tab_layout.exists(Timeout.SHORT):
+                return True
+            return True
         else:
             logger.error("Can't find following tab!")
             return False
@@ -2932,7 +3220,9 @@ class FollowingView:
 
         # Fast path: some rows show a direct "Following" button we can tap
         # straight away, instead of going through the three-dots menu.
-        following_button = user_row.child(index=2, textMatches="^Following$")
+        following_button = user_row.child(textMatches="(?i)^Following$")
+        if not following_button.exists(Timeout.SHORT):
+            following_button = user_row.child(index=2, textMatches="(?i)^Following$")
         if following_button.exists(Timeout.SHORT):
             logger.debug("Direct 'Following' button found, using it.")
             following_button.click()
@@ -2979,7 +3269,9 @@ class FollowingView:
         UniversalActions.detect_block(self.device)
         # "Follow back" shows up for accounts that follow you: the unfollow worked
         FOLLOW_REGEX = "^Follow$|^Follow back$"
-        follow_button = user_row.child(index=2, textMatches=FOLLOW_REGEX)
+        follow_button = user_row.child(textMatches=case_insensitive_re(FOLLOW_REGEX))
+        if not follow_button.exists(Timeout.SHORT):
+            follow_button = user_row.child(index=2, textMatches=case_insensitive_re(FOLLOW_REGEX))
         if follow_button.exists(Timeout.SHORT):
             logger.info(
                 f"{username} unfollowed.",

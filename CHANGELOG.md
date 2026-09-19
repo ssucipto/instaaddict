@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.4.0 — Engagement Pipeline Restoration, Follower Cache, and Aussie Vision Voice
+
+Feature release delivering root-cause resolution for zero follows and zero comments, native Reels follow action, 5-tier ViewGroup caption extraction, atomic local followers caching, directional unfollow sorting, Ctrl-chord hotkeys with ASCII control byte decoding, em-dash regex sanitization, and subtle Aussie dog voice prompt tuning for Gemini Vision AI.
+
+### Added
+- **Native Reels Follow Action (`InstaAddict/plugins/interact_reels.py`, `test/test_follows_and_comments_remediation.py`)**:
+  - Implemented creator follow action directly within the active video viewport targeting `clips_follow_button` and `"Follow"` text/description buttons.
+  - Automatically registers follows in session state (`sessions[-1].totalFollowed += 1`) and enforces configured session follow limits.
+  - Raised default `evaluate_percentage` from 25% to **70%** for active Vision AI commenting.
+- **Vision AI Subtle Aussie Voice & Anti-AI Formatting Sanitizer (`InstaAddict/core/gemini_vision.py`, `core/interaction.py`)**:
+  - Built regex replacement in `_sanitize_response()` that eradicates em-dashes (`—`) and en-dashes (`–`), replacing them with natural conversational commas.
+  - Enhanced Vision AI system prompts to strictly ban corporate AI self-identifications, buzzwords, and excessive punctuation, conditioning responses with authentic Australian dog vernacular (*reckon*, *heaps*, *ripper*, *mate*, *cheers*, *keen*) in punchy 3–6 word sentences.
+  - Updated fallback comments in `InstaAddict/core/interaction.py` to match authentic Aussie dog styling.
+- **Comment Permissibility Mode Fix (`InstaAddict/core/filter.py`, `accounts/lolatheozjack/filters.yml`)**:
+  - Fixed `Filter.can_comment()` to default to `True` when mode-specific comment keys are omitted from `filters.yml`, preventing silent suppression of commenting pipelines.
+- **Persistent Local Followers Cache & Non-Scraping Unfollow Optimization (`InstaAddict/core/storage.py`, `plugins/action_unfollow_followers.py`, `core/views.py`, `test/test_unfollow_optimization.py`)**:
+  - Implemented atomic `followers_cache.json` persistence with O(1) in-memory lookup.
+  - Added follower count delta guard: bypasses follower list scraping completely when the profile header follower count matches the cached count.
+  - Implemented 4-tier "Follows you" badge detection on profile headers, eliminating 80–90% of redundant following-list scrapes.
+  - Added directional sorting CLI flags (`--sort-followers-latest`) to target recent followings first.
+- **Multi-Tier Reels Caption Extraction & Ctrl-Chord Hotkeys (`InstaAddict/plugins/interact_reels.py`, `core/tui.py`, `core/utils.py`, `test/test_reels_caption_and_ctrl_shortcuts.py`)**:
+  - Built 5-tier caption extraction traversing child `TextView` nodes inside `clips_caption_component` ViewGroup containers.
+  - Added `clean_trailing_more()` to strip `...more` expander tokens without corrupting hashtags or trailing sentences.
+  - Migrated interactive keyboard listeners to Ctrl chords (`Ctrl+S`, `Ctrl+U`, `Ctrl+D`, `Ctrl+C`) with full ASCII control byte decoding (`\x13`, `\x15`, `\x04`, `\x03`).
+  - Added dynamic debug logging toggle (`Ctrl+D`) and sliced 5s sleep polling for responsive upload command execution.
+- **Thread-Safe Matplotlib Backend & Watchdog Hardening (`InstaAddict/__init__.py`, `core/watchdog.py`, `test/test_matplotlib_backend.py`, `test/test_watchdog.py`)**:
+  - Forced headless `Agg` backend for matplotlib at process entrypoints, preventing Windows `Tcl_AsyncDelete` thread panics.
+  - Corrected escalation timer reset in `BotWatchdog` to guarantee multi-tier escalation from soft recovery to task skip and app relaunch during persistent hangs.
+
 ## v1.3.0 — Modern Terminal User Interface (TUI) & Live Dashboard
 
 Feature release introducing a modern, high-performance terminal user interface and live dashboard powered by `rich`, featuring real-time visual progress bars against safety limits, active target and cooldown context, and a live rolling log stream with automated headless fallback and legacy console encoding resilience.

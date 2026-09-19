@@ -1,6 +1,6 @@
 project:
   name: InstaAddict
-  version: 1.3.0
+  version: 1.4.0
   started: 2026-09-11
   status: completed
   current_milestone: null
@@ -336,7 +336,7 @@ documentation:
   milestone_documents: 8
   pattern_documents: 2
   task_documents: 0
-  last_updated: '2026-09-18'
+  last_updated: '2026-09-19'
 progress:
   planning: 100
   implementation: 100
@@ -344,6 +344,33 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: 2026-09-19
+  description: 'Restored Follows and Comments Mechanics, Added Reels Follow Action, and Tuned Vision AI Aussie Voice (Route-055, Audit-085).'
+  items:
+  - "✓ Diagnosed 0-follows and 0-comments root causes: hashtag top-post saturation and missing comment permission key in filters.yml"
+  - "✓ Fixed can_comment in filter.py to default to True when mode is omitted in filters.yml"
+  - "✓ Eradicated em-dashes and en-dashes from Gemini Vision responses via regex sanitizer, replacing with commas"
+  - "✓ Enforced concise (3-6 words) subtle Aussie dog voice and banned corporate AI jargon in Vision AI prompts"
+  - "✓ Updated fallback comments in interaction.py with authentic Aussie dog vernacular"
+  - "✓ Implemented native Reels follow action in interact_reels.py targeting clips_follow_button"
+  - "✓ Raised default reels evaluate percentage to 70% for active Vision AI commenting"
+  - "✓ Created 12 unit tests in test_follows_and_comments_remediation.py with 100% pass rate (273/273 total repo tests green)"
+- date: 2026-09-19
+  description: 'Implemented Persistent Local Followers Cache and Non-Scraping Unfollow Optimization (Route-054, Audit-082/083/084).'
+  items:
+  - "✓ Built atomic local followers cache (followers_cache.json) with O(1) in-memory lookup"
+  - "✓ Implemented follower count delta guard bypassing harvest when profile follower count is unchanged"
+  - "✓ Implemented 4-tier 'Follows you' profile header badge inspection, eliminating 80-90% of profile scraping"
+  - "✓ Added directional sorting CLI flags (--sort-followers-latest) for targeted unfollows"
+  - "✓ Created 16 unit tests in test_unfollow_optimization.py with 100% pass rate"
+- date: 2026-09-19
+  description: 'Implemented Multi-Tier Reels Caption Extraction and Ctrl Shortcut Keyboard Engine (Route-053, Audit-079/080/081).'
+  items:
+  - "✓ Implemented 5-tier Reels caption extraction querying child TextViews inside clips_caption_component ViewGroup"
+  - "✓ Added clean_trailing_more to strip '...more' without truncating tags or words"
+  - "✓ Migrated interactive terminal shortcuts to Ctrl chords (Ctrl+S, Ctrl+U, Ctrl+D, Ctrl+C) with ASCII control byte decoding"
+  - "✓ Added dynamic debug logging toggle (Ctrl+D) and in-loop upload request polling"
+  - "✓ Created 12 unit tests in test_reels_caption_and_ctrl_shortcuts.py with 100% pass rate"
 - date: 2026-09-18
   description: 'Implemented Photo Form Factor & Aspect Ratio Preservation Engine (Audit-074).'
   items:

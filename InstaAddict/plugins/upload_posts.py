@@ -490,6 +490,13 @@ class UploadPostsPlugin(Plugin):
         )
 
         for media_file in media_files:
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat("upload-posts", f"Processing upload: {media_file}")
+            except Exception:
+                pass
+
             base_name = os.path.splitext(media_file)[0]
             media_path = os.path.join(pending_dir, media_file)
 
@@ -521,11 +528,19 @@ class UploadPostsPlugin(Plugin):
                     )
 
             caption_snippet = (
-                (caption_for_composer[:40] + "...") if len(caption_for_composer) > 40 else caption_for_composer
+                caption_for_composer[:60] + "..."
+                if len(caption_for_composer) > 60
+                else caption_for_composer
             )
             logger.info(
                 f"Uploading {media_file} with caption: {caption_snippet!r}"
             )
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat("upload-posts", f"Entering composer for {media_file}")
+            except Exception:
+                pass
             try:
                 success = self._upload_to_ig(
                     device, media_path, caption_for_composer, force_square=force_square

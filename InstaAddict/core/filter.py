@@ -617,11 +617,13 @@ class Filter:
 
     def can_comment(self, current_mode) -> Tuple[bool, bool, bool, bool]:
         if self.conditions is not None:
+            mode_key = "comment_" + current_mode.replace("-", "_") if current_mode else ""
+            mode_allowed = self.conditions.get(mode_key, True) if mode_key else True
             return (
                 self.conditions.get(FIELD_COMMENT_PHOTOS, True),
                 self.conditions.get(FIELD_COMMENT_VIDEOS, True),
                 self.conditions.get(FIELD_COMMENT_CAROUSELS, True),
-                self.conditions.get("comment_" + current_mode.replace("-", "_"), False),
+                mode_allowed,
             )
         else:
             logger.debug("filters.yml (or legacy filter.json) is not loaded!")

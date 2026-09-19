@@ -1,16 +1,27 @@
 import json
-import matplotlib.pyplot as plt
-import os
 import logging
-from colorama import Fore, Style
-from datetime import timedelta, datetime
-from enum import Enum, unique
-from matplotlib import ticker
-from matplotlib.backends.backend_pdf import PdfPages
-import matplotlib.dates as mdates
+import os
 import sys
+from datetime import datetime, timedelta
+from enum import Enum, unique
 
+from colorama import Fore, Style
 from InstaAddict.core.plugin_loader import Plugin
+
+try:
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+    import matplotlib.dates as mdates
+    from matplotlib import ticker
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    mdates = None
+    ticker = None
+    PdfPages = None
+    plt = None
 
 A4_WIDTH_INCHES = 8.27
 A4_HEIGHT_INCHES = 11.69
@@ -36,6 +47,13 @@ class DataAnalytics(Plugin):
         ]
 
     def run(self, device, configs, storage, sessions, plugin):
+        if not MATPLOTLIB_AVAILABLE:
+            logger.error(
+                "Matplotlib is required to generate analytics reports. "
+                "Please install it via: pip install 'instaaddict[analytics]' or pip install matplotlib"
+            )
+            return
+
         self.args = configs.args
         self.session_state = sessions[-1]
         self.username = self.session_state.my_username
@@ -141,8 +159,8 @@ class DataAnalytics(Plugin):
         axes3.set_xlabel("Date")
         axes3.xaxis.grid(True, linestyle="--")
 
-        pdf.savefig()
-        plt.close()
+        pdf.savefig(fig)
+        plt.close(fig)
 
     def filter_sessions(self, sessions, period):
         if period == Period.LAST_WEEK:
@@ -227,7 +245,7 @@ class DataAnalytics(Plugin):
         )
 
         pdf.savefig(fig)
-        plt.close()
+        plt.close(fig)
 
     def generate_markdown_report(self, sessions, filename):
         with open(filename, "w", encoding="utf-8") as f:

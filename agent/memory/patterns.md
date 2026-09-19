@@ -31,3 +31,10 @@
   description: "Detect floating Peek Preview (long-press/3D Touch) modals, ingest actions directly from the preview context menu to avoid wasted navigation effort, dismiss immediately, and enforce consecutive failure circuit breakers with verified exit loops."
   context: "Mobile app automation (Instagram, etc.) where touch sensitivity or RPC latency triggers long-press context modals instead of opening views, resulting in trapped navigation and zero-action timeout cascades."
   solution: "Check for preview context buttons ('Like', 'Comment') on post open; execute like directly on the preview menu and register telemetry if present; calculate explicit element center coordinates for instantaneous tap events; enforce a 2-consecutive failure circuit breaker on un-openable profiles; and verify exit with a multi-iteration loop checking _is_still_on_profile() before proceeding."
+
+- date: 2026-09-19
+  name: follower-count-delta-guard-and-profile-header-badge
+  description: "Bypass follower list traversal when account follower count is unchanged via delta guard on atomic local cache, and eliminate following-list inspection by reading native profile header 'Follows you' badge."
+  context: "Social platform automation (Instagram) where verifying follow-back status previously required scraping thousands of followers and navigating deep into candidate following lists."
+  solution: "Compare session_state.my_followers_count with storage cached count; if delta is 0, skip follower scraping entirely. Cache harvested followers in a persistent JSON set for O(1) membership check. When candidate profile is opened, inspect the profile header for 'Follows you' badge across 4 resilient fallback tiers, completely eliminating candidate following-list navigation."
+

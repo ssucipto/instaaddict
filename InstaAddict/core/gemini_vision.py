@@ -37,8 +37,28 @@ except (IndexError, OSError, yaml.YAMLError) as e:
 
 
 
+def get_active_persona(override: str = None) -> str:
+    """Resolve active AI persona dynamically with CLI config and override fallback."""
+    if override and str(override).strip():
+        return str(override).strip()
+    global UNIVERSAL_PERSONA
+    try:
+        if "--config" in sys.argv:
+            idx = sys.argv.index("--config")
+            if idx + 1 < len(sys.argv):
+                conf_path = sys.argv[idx + 1]
+                if os.path.exists(conf_path):
+                    with open(conf_path, "r", encoding="utf-8") as yc:
+                        user_conf = yaml.safe_load(yc) or {}
+                        if "ai-persona" in user_conf:
+                            UNIVERSAL_PERSONA = user_conf["ai-persona"]
+    except (IndexError, OSError, yaml.YAMLError) as e:
+        logger.debug(f"Could not refresh ai-persona from CLI config: {e}")
+    return UNIVERSAL_PERSONA
+
+
 def _sanitize_response(text: str) -> str:
-    """Sanitizes LLM outputs: strips hidden zero-width Unicode/ZWJ characters, skin tones, and AI outings."""
+    """Sanitizes LLM outputs: strips hidden zero-width Unicode/ZWJ characters, skin tones, em-dashes, and AI outings."""
     if not text:
         return ""
     # Strip zero-width and invisible control characters (ZWJ U+200D, ZWSP U+200B, BOM U+FEFF, soft hyphen, bidi overrides)
@@ -46,8 +66,14 @@ def _sanitize_response(text: str) -> str:
     # Strip emoji skin-tone modifiers (U+1F3FB - U+1F3FF) to avoid compound mojibake on Android IME
     text = re.sub(r"[\U0001F3FB-\U0001F3FF]", "", text)
 
+    # Sanitize em-dashes (U+2014) and en-dashes (U+2013) to prevent dead-giveaway AI punctuation
+    text = text.replace("—", ", ").replace("–", "- ")
+    # Clean up double punctuation or awkward spacing created by dash replacement
+    text = re.sub(r"\s*,\s*,+", ",", text)
+    text = re.sub(r"\s+", " ", text)
+
     forbidden = re.compile(
-        r"(AI|language model|cannot assist|safety reasons|I'm an AI|As an AI|I can't|sorry)", 
+        r"(AI|language model|cannot assist|safety reasons|I'm an AI|As an AI|I can't|sorry|as an artificial)", 
         re.IGNORECASE
     )
     if forbidden.search(text):
@@ -108,12 +134,15 @@ def get_vision_comment(device, _reserved: str = '') -> str:
             img = img.convert("RGB")
             img.thumbnail((512, 512), Image.Resampling.LANCZOS)
             
+            active_persona = get_active_persona()
             system_prompt = (
-                f"Your Persona: '{UNIVERSAL_PERSONA}'. "
+                f"Your Persona: '{active_persona}'. "
                 "You are leaving a comment on someone's Instagram post as this persona. "
                 "Look at this screenshot, identify ONE highly specific, narrow detail in the frame. "
                 "Write a natural, slang-friendly comment about it in exactly 3 to 6 words. "
                 "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'. "
+                "NEVER use em-dashes (— or –). NEVER sound like an AI assistant or bot. "
+                "Speak naturally and casually with a slight, subtle Aussie flavour (e.g. subtle Aussie phrasing like 'reckon', 'heaps', 'ripper', 'mate', 'cheers', 'keen', but keep it subtle and not over-the-top cartoonish). "
                 "Always reply in English regardless of localized text."
             )
 
@@ -244,7 +273,8 @@ def get_vision_caption(
                 f"{hook_instruction} "
                 "Then, add exactly 3-5 highly relevant hashtags. "
                 "UNDER ABSOLUTELY NO CIRCUMSTANCES CAN YOU USE THE '@' SYMBOL OR TAG ANY USERS! "
-                "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text)."
+                "Do NOT use generic corporate language. Do NOT write markdown (no asterisks or bold text). "
+                "NEVER use em-dashes (— or –). Write with an authentic human voice with a slight, natural Aussie flavour."
             )
 
             model = genai.GenerativeModel(
@@ -338,12 +368,15 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
             img = img.convert("RGB")
             img.thumbnail((512, 512), Image.Resampling.LANCZOS)
             
+            active_persona = get_active_persona()
             prompt = (
-                f"Your Persona: '{UNIVERSAL_PERSONA}'. "
+                f"Your Persona: '{active_persona}'. "
                 f"Look at this screenshot of an Instagram Reel. Is it predominantly about {topic}? "
                 "If NO, reply strictly with the word: NO. "
                 "If YES, write a natural, slang-friendly comment about a highly specific, narrow detail in exactly 3 to 6 words. "
-                "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'."
+                "NO hashtags. Maximum of 1 basic emoji. DO NOT use generic words like 'beautiful', 'awesome', 'cute'. "
+                "NEVER use em-dashes (— or –). NEVER sound like an AI assistant or bot. "
+                "Speak naturally and casually with a slight, subtle Aussie flavour (e.g. subtle Aussie phrasing like 'reckon', 'heaps', 'ripper', 'mate', 'cheers', 'keen', but keep it subtle and not over-the-top cartoonish)."
             )
             
             model = genai.GenerativeModel(

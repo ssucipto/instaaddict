@@ -15,6 +15,7 @@ REPORTS = "reports"
 FILENAME_HISTORY_FILTER_USERS = "history_filters_users.json"
 FILENAME_INTERACTED_USERS = "interacted_users.json"
 FILENAME_NON_BOT_FOLLOWINGS = "non_bot_followings.json"
+FILENAME_FOLLOWERS_CACHE = "followers_cache.json"
 OLD_FILTER = "filter.json"
 FILTER = "filters.yml"
 USER_LAST_INTERACTION = "last_interaction"
@@ -79,6 +80,35 @@ class Storage:
                         f"Failed to load {json_file.name}, starting with empty non-bot followings cache: {e}"
                     )
                     self.non_bot_followings = {}
+
+        self.followers_cache = {
+            "last_followers_count": 0,
+            "last_updated": None,
+            "followers": {},
+        }
+        self._followers_cache_dirty = False
+        self.followers_cache_path = os.path.join(
+            self.account_path, FILENAME_FOLLOWERS_CACHE
+        )
+        if os.path.isfile(self.followers_cache_path):
+            with open(self.followers_cache_path, encoding="utf-8") as json_file:
+                try:
+                    data = json.load(json_file)
+                    if isinstance(data, dict):
+                        self.followers_cache = {
+                            "last_followers_count": data.get("last_followers_count", 0),
+                            "last_updated": data.get("last_updated", None),
+                            "followers": data.get("followers", {}),
+                        }
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to load {json_file.name}, starting with empty followers cache: {e}"
+                    )
+                    self.followers_cache = {
+                        "last_followers_count": 0,
+                        "last_updated": None,
+                        "followers": {},
+                    }
         self.filter_path = os.path.join(self.account_path, FILTER)
         if not os.path.exists(self.filter_path):
             self.filter_path = os.path.join(self.account_path, OLD_FILTER)
@@ -211,6 +241,96 @@ class Storage:
         self._non_bot_followings_dirty = True
         self.save_non_bot_followings()
 
+    def is_follower(self, username: str) -> bool:
+        """Check if username is recorded in the persistent local followers cache."""
+        if not username:
+            return False
+        return username.casefold() in self.followers_cache.get("followers", {})
+
+    def add_follower(self, username: str, save: bool = True) -> None:
+        """Add a single follower to the local followers cache with timestamp."""
+        if not username:
+            return
+        key = username.casefold()
+        followers = self.followers_cache.setdefault("followers", {})
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        followers[key] = now_str
+        self.followers_cache["last_updated"] = now_str
+        self._followers_cache_dirty = True
+        if save:
+            self.save_followers_cache()
+
+    def add_followers_batch(
+        self, usernames: list, current_followers_count: Optional[int] = None, save: bool = True
+    ) -> None:
+        """Add a batch of followers and update metadata."""
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        followers = self.followers_cache.setdefault("followers", {})
+        for u in usernames:
+            if u:
+                followers[u.casefold()] = now_str
+                self._followers_cache_dirty = True
+        if current_followers_count is not None:
+            self.followers_cache["last_followers_count"] = int(current_followers_count)
+            self._followers_cache_dirty = True
+        self.followers_cache["last_updated"] = now_str
+        if save:
+            self.save_followers_cache()
+
+    def save_followers_cache(self) -> None:
+        """Flush in-memory followers_cache to disk atomically if dirty."""
+        if not self._followers_cache_dirty:
+            return
+        if self.followers_cache_path is not None:
+            try:
+                with atomic_write(
+                    self.followers_cache_path, overwrite=True, encoding="utf-8"
+                ) as outfile:
+                    json.dump(self.followers_cache, outfile, indent=4, sort_keys=False)
+                self._followers_cache_dirty = False
+            except Exception as e:
+                logger.error(f"Failed to write followers_cache.json: {e}")
+
+    def get_cached_followers_count(self) -> int:
+        """Get the last recorded followers count from cache metadata."""
+        return self.followers_cache.get("last_followers_count", 0)
+
+    def get_followers_cache_size(self) -> int:
+        """Get total number of cached follower entries."""
+        return len(self.followers_cache.get("followers", {}))
+
+    def set_followers_cache(
+        self, followers: Union[dict, list], last_followers_count: int, save: bool = True
+    ) -> None:
+        """Set or replace full followers cache contents."""
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        followers_dict = {}
+        if isinstance(followers, dict):
+            for k, v in followers.items():
+                followers_dict[k.casefold()] = v
+        elif isinstance(followers, (list, set)):
+            for u in followers:
+                if u:
+                    followers_dict[u.casefold()] = now_str
+        self.followers_cache = {
+            "last_followers_count": int(last_followers_count),
+            "last_updated": now_str,
+            "followers": followers_dict,
+        }
+        self._followers_cache_dirty = True
+        if save:
+            self.save_followers_cache()
+
+    def clear_followers_cache(self) -> None:
+        """Clear all entries in the local followers cache and persist to disk."""
+        self.followers_cache = {
+            "last_followers_count": 0,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+            "followers": {},
+        }
+        self._followers_cache_dirty = True
+        self.save_followers_cache()
+
     def add_filter_user(self, username, profile_data, skip_reason=None):
         user = profile_data.__dict__
         user["follow_button_text"] = (
@@ -256,7 +376,8 @@ class Storage:
                 self.save_non_bot_followings()
         elif unfollowed:
             user[USER_FOLLOWING_STATUS] = FollowingStatus.UNFOLLOWED.name.casefold()
-            # If the user was unfollowed, also remove from non_bot_followings as they are now tracked in interacted_users
+            # If the user was unfollowed, also remove from non_bot_followings
+            # as they are now tracked in interacted_users
             if username and username.casefold() in self.non_bot_followings:
                 del self.non_bot_followings[username.casefold()]
                 self._non_bot_followings_dirty = True

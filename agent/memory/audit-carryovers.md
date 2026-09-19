@@ -712,4 +712,83 @@ carryovers:
       - InstaAddict/core/log.py
       - test/test_telegram_inbox.py
 
+  - id: CO-056
+    audit_report: agent/reports/audit-075-self-healing-recovery-and-watchdog-resilience.md
+    date_raised: 2026-09-18
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'audit-077'
+    summary: "Fix BotWatchdog escalation timer reset bug in _execute_soft_recovery where resetting self.last_heartbeat = time.time() prevents the watchdog from ever escalating from Tier 1 to Tier 2 (task skip) and Tier 3 (nuclear app relaunch) during persistent hangs."
+    affected_files:
+      - InstaAddict/core/watchdog.py
+      - test/test_watchdog.py
+
+  - id: CO-057
+    audit_report: agent/reports/audit-075-self-healing-recovery-and-watchdog-resilience.md
+    date_raised: 2026-09-18
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'audit-077'
+    summary: "Instrument granular heartbeat emission across countdown(), DashboardState.update_activity(), interact_reels, handle_sources, and upload_posts to prevent false-positive watchdog stall triggers during long healthy operations exceeding 90 seconds."
+    affected_files:
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/tui.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/plugins/upload_posts.py
+      - test/test_watchdog.py
+
+  - id: CO-058
+    audit_report: agent/reports/audit-076-tcl-asyncdelete-wrong-thread-and-matplotlib-backend.md
+    date_raised: 2026-09-19
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'self-verification'
+    summary: "Eliminate Tcl_AsyncDelete fatal thread crash by forcing non-GUI Agg backend for matplotlib, setting MPLBACKEND=Agg at process entrypoints, guarding optional dependencies, and isolating pyplot from multithreaded teardown."
+    affected_files:
+      - run.py
+      - InstaAddict/__init__.py
+      - InstaAddict/__main__.py
+      - InstaAddict/plugins/data_analytics.py
+      - test/test_matplotlib_backend.py
+
+  - id: CO-059
+    audit_report: agent/reports/audit-077-follows-unfollows-comments-zero-metrics-investigation.md
+    date_raised: 2026-09-19
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'audit-078'
+    summary: "Resolve zero follows metric by removing strict clickable=True constraint on TextView nodes in ProfileView.getFollowButton() and interaction._follow(), preventing profiles from being falsely dropped with SkipReason.NOT_LOADED in Filter.check_profile()."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/filter.py
+
+  - id: CO-060
+    audit_report: agent/reports/audit-077-follows-unfollows-comments-zero-metrics-investigation.md
+    date_raised: 2026-09-19
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'audit-078'
+    summary: "Resolve zero comments metric by preventing destructive downward swipe on MediaType.REEL in _comment(), adding multi-tier comment button locators for Reels, implementing robust multi-tier comment post verification, and providing safe fallback comments."
+    affected_files:
+      - InstaAddict/core/interaction.py
+      - InstaAddict/plugins/interact_reels.py
+
+  - id: CO-061
+    audit_report: agent/reports/audit-077-follows-unfollows-comments-zero-metrics-investigation.md
+    date_raised: 2026-09-19
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-19'
+    verified_in_audit: 'audit-078'
+    summary: "Resolve zero unfollows metric by ensuring ProfileView.navigateToFollowing() returns True when the following list opens directly, replacing rigid child index traversal in user list iteration with resilient element discovery, and supporting multi-tier unfollow confirmation locators."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/plugins/action_unfollow_followers.py
 

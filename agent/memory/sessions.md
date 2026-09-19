@@ -2,6 +2,67 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-19
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-085, route-055]
+  done:
+    - audited-session-history-and-discovered-zero-follows-and-zero-comments-root-causes
+    - identified-niche-saturation-in-hashtag-top-feed-with-all-candidates-already-followed
+    - identified-comment-permissibility-filter-defaulting-to-false-blocking-post-comments
+    - fixed-can-comment-in-filter-py-defaulting-to-true-when-omitted-in-filters-yml
+    - eradicated-em-dashes-and-en-dashes-in-gemini-vision-sanitizer-replacing-with-commas
+    - blocked-ai-self-identifications-and-corporate-jargon-in-gemini-vision-responses
+    - enriched-vision-prompts-with-subtle-aussie-dog-voice-in-3-to-6-words
+    - updated-default-fallback-comments-with-natural-aussie-dog-vernacular
+    - implemented-reels-author-follow-action-in-interact-reels-targeting-clips-follow-button
+    - raised-reels-evaluate-percentage-default-to-70-percent-for-active-vision-commenting
+    - updated-lolatheozjack-filters-yml-and-config-yml-with-explicit-comment-and-eval-rates
+    - created-12-unit-tests-in-test-follows-and-comments-remediation-py-with-100-percent-pass-rate
+    - validated-all-acp-documents-memory-and-cross-layer-status-with-zero-errors
+    - synchronized-requirements-md-and-progress-yaml-with-routes-053-054-055
+    - bumped-release-version-to-v1-4-0-across-core-acp-docs-and-changelog-md
+    - verified-full-273-unit-test-suite-with-zero-failures-and-zero-flake8-lint-errors
+  deferred: []
+  key_fact: "In InstaAddict filter checks, conditions.get('comment_' + mode, False) silently blocks commenting if filters.yml omits the specific mode key; defaulting to True preserves intended comment_percentage execution, while Vision AI comments require regex-level em-dash eradication and strict prompt banning to prevent dead giveaway LLM formatting on social media."
+
+- date: 2026-09-19
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-082, audit-083, route-054, audit-084, review-047]
+  done:
+    - researched-modern-instagram-bot-capabilities-2025-2026-and-unfollow-optimization-patterns
+    - authored-pre-implementation-audit-audit-083-verifying-zero-pending-carryovers-and-remediation-specifications
+    - implemented-persistent-local-followers-cache-followers-cache-json-with-atomic-write-and-o1-lookup
+    - implemented-follower-count-delta-guard-bypassing-followers-harvest-when-count-is-unchanged
+    - added-resilient-harvest-visible-followers-for-new-followers-and-first-run-cache-hydration
+    - implemented-4-tier-has-follows-you-badge-detection-on-profile-header-eliminating-following-list-scraping
+    - added-directional-sorting-cli-flags-defaulting-to-latest-to-surface-recent-targets-and-save-quota
+    - created-16-case-unit-test-suite-test-unfollow-optimization-py-with-100-percent-pass-rate
+    - authored-post-implementation-verification-audit-audit-084-documenting-15000x-speedup
+    - completed-64-rule-code-quality-review-review-047-and-verified-zero-flake8-lint-errors
+  deferred: []
+  key_fact: "Checking mutual followers by visiting candidate profiles and scrolling their following list causes excessive ADB roundtrips and triggers Instagram anti-scraping blocks; caching the local follower list with atomic writes and inspecting the native 'Follows you' badge on the profile header allows O(1) in-memory checks and reduces profile visits by 80-90% with zero following-list scraping."
+
+- date: 2026-09-19
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-079, audit-080, route-053, audit-081]
+  done:
+    - audited-reels-caption-extraction-mechanism-and-identified-viewgroup-container-empty-string-root-cause
+    - implemented-5-tier-reels-caption-extraction-supporting-direct-attributes-child-textviews-alternative-selectors-and-xml-hierarchy
+    - implemented-clean-trailing-more-to-strip-more-and-ellipsis-more-without-truncating-words-or-hashtags
+    - diagnosed-unresponsive-u-shortcut-identifying-msvcrt-ascii-control-bytes-and-high-level-polling-delay
+    - migrated-all-interactive-shortcuts-to-ctrl-chords-ctrl-s-skip-ctrl-u-upload-ctrl-d-debug-ctrl-c-stop
+    - mapped-ascii-control-bytes-and-chars-with-seamless-single-letter-fallbacks-in-keyboard-listener-thread
+    - implemented-dynamic-debug-logging-toggle-via-ctrl-d-flipping-root-logger-between-debug-and-info
+    - enhanced-wait-for-next-session-with-5-second-sleep-slices-and-immediate-wakeup-on-upload-request
+    - added-responsive-in-loop-polling-for-is-upload-requested-across-all-engagement-and-interaction-loops
+    - updated-tui-footer-with-clear-ctrl-indicators-and-added-12-unit-tests-in-test-reels-caption-and-ctrl-shortcuts
+    - verified-100-percent-green-pass-rate-across-all-245-unit-and-regression-tests-with-zero-violations
+  deferred: []
+  key_fact: "In modern Android UIAutomator2, clips_caption_component is a ViewGroup container that yields empty string for get_text()/get_desc(); its caption content must be extracted by querying child TextViews and concatenating segments (skipping author username), while Windows and Unix terminals transmit CTRL chords as ASCII control characters (\\x13 for Ctrl+S, \\x15 for Ctrl+U, \\x04 for Ctrl+D) which must be decoded alongside character fallbacks."
+
 - date: 2026-09-18
   executor: Antigravity
   branch: master

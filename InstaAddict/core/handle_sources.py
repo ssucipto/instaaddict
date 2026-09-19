@@ -108,15 +108,20 @@ def handle_blogger(
     try:
         from InstaAddict.core.tui import DashboardManager
 
-        if (
-            DashboardManager.is_active()
-            and DashboardManager.get_instance().state.is_skip_task_requested()
-        ):
-            logger.warning(
-                f"[TUI] Task skip requested by user ([S]/[N]). Skipping blogger @{blogger}...",
-                extra={"color": f"{Fore.YELLOW}"},
-            )
-            return
+        if DashboardManager.is_active():
+            dm = DashboardManager.get_instance()
+            if dm.state.is_skip_task_requested():
+                logger.warning(
+                    f"[TUI] Task skip requested by user ([CTRL+S]). Skipping blogger @{blogger}...",
+                    extra={"color": f"{Fore.YELLOW}"},
+                )
+                return
+            if dm.state.is_upload_requested():
+                logger.info(
+                    f"[TUI] Immediate upload requested by user ([CTRL+U]). Exiting blogger @{blogger} to execute upload...",
+                    extra={"color": f"{Fore.MAGENTA}"},
+                )
+                return
     except Exception:
         pass
 
@@ -368,17 +373,32 @@ def handle_likers(
             pass
 
         try:
+            from InstaAddict.core.watchdog import record_heartbeat
+
+            record_heartbeat(
+                stage=f"{current_job} ({target})" if target else str(current_job),
+                action=f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)}",
+            )
+        except Exception:
+            pass
+
+        try:
             from InstaAddict.core.tui import DashboardManager
 
-            if (
-                DashboardManager.is_active()
-                and DashboardManager.get_instance().state.is_skip_task_requested()
-            ):
-                logger.warning(
-                    f"[TUI] Task skip requested by user ([S]/[N]). Breaking out of likers for {target}...",
-                    extra={"color": f"{Fore.YELLOW}"},
-                )
-                break
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                if dm.state.is_skip_task_requested():
+                    logger.warning(
+                        f"[TUI] Task skip requested by user ([CTRL+S]). Breaking out of likers for {target}...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+                if dm.state.is_upload_requested():
+                    logger.info(
+                        f"[TUI] Immediate upload requested by user ([CTRL+U]). Exiting {current_job} to execute upload...",
+                        extra={"color": f"{Fore.MAGENTA}"},
+                    )
+                    break
         except Exception:
             pass
 
@@ -612,15 +632,20 @@ def handle_posts(
         try:
             from InstaAddict.core.tui import DashboardManager
 
-            if (
-                DashboardManager.is_active()
-                and DashboardManager.get_instance().state.is_skip_task_requested()
-            ):
-                logger.warning(
-                    f"[TUI] Task skip requested by user ([S]/[N]). Breaking out of {current_job} ({target})...",
-                    extra={"color": f"{Fore.YELLOW}"},
-                )
-                break
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                if dm.state.is_skip_task_requested():
+                    logger.warning(
+                        f"[TUI] Task skip requested by user ([CTRL+S]). Breaking out of {current_job} ({target})...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+                if dm.state.is_upload_requested():
+                    logger.info(
+                        f"[TUI] Immediate upload requested by user ([CTRL+U]). Exiting {current_job} ({target}) to execute upload...",
+                        extra={"color": f"{Fore.MAGENTA}"},
+                    )
+                    break
         except Exception:
             pass
 
@@ -658,6 +683,16 @@ def handle_posts(
                     source=target or current_job,
                 )
                 dm.update_render()
+        except Exception:
+            pass
+
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+
+            record_heartbeat(
+                stage=f"{current_job} ({target})" if target else str(current_job),
+                action=f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)}",
+            )
         except Exception:
             pass
 

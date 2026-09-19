@@ -302,10 +302,11 @@ class TestDashboardManager:
         footer = mgr._render_footer()
         assert isinstance(footer, Panel)
         plain_footer = getattr(footer.renderable, "renderable", footer.renderable).plain
-        assert "[U]" in plain_footer
+        assert "[Ctrl+U]" in plain_footer
         assert "Upload Queued Photo" in plain_footer
-        assert "[S]" in plain_footer
+        assert "[Ctrl+S]" in plain_footer
         assert "Skip Task" in plain_footer
+        assert "[Ctrl+D]" in plain_footer
 
     def test_keyboard_listener_keys(self):
         mgr = DashboardManager.get_instance()
@@ -314,6 +315,7 @@ class TestDashboardManager:
         with patch.object(mgr, "trigger_upload_request") as mock_upload, \
              patch.object(mgr, "trigger_debug_toggle") as mock_debug, \
              patch.object(mgr, "trigger_skip_task") as mock_skip:
+            # Letter fallbacks
             listener._handle_key("u")
             mock_upload.assert_called_once()
             listener._handle_key("d")
@@ -322,6 +324,22 @@ class TestDashboardManager:
             assert mock_skip.call_count == 1
             listener._handle_key("n")
             assert mock_skip.call_count == 2
+
+            # Control characters (bytes and str)
+            listener._handle_key(b"\x15")  # Ctrl+U
+            assert mock_upload.call_count == 2
+            listener._handle_key("\x15")   # Ctrl+U str
+            assert mock_upload.call_count == 3
+
+            listener._handle_key(b"\x04")  # Ctrl+D
+            assert mock_debug.call_count == 2
+            listener._handle_key("\x04")   # Ctrl+D str
+            assert mock_debug.call_count == 3
+
+            listener._handle_key(b"\x13")  # Ctrl+S
+            assert mock_skip.call_count == 3
+            listener._handle_key("\x13")   # Ctrl+S str
+            assert mock_skip.call_count == 4
 
     def test_keyboard_listener_non_tty_graceful_exit(self):
         mgr = DashboardManager.get_instance()

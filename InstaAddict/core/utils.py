@@ -432,11 +432,16 @@ def show_ending_conditions():
 
 def countdown(seconds: int = 10, waiting_message: str = "") -> None:
     from InstaAddict.core.tui import DashboardManager
+    from InstaAddict.core.watchdog import record_heartbeat
 
     if DashboardManager.is_active():
         mgr = DashboardManager.get_instance()
         try:
             while seconds:
+                record_heartbeat(
+                    "countdown",
+                    f"{waiting_message} {seconds}s" if waiting_message else f"Sleeping {seconds}s",
+                )
                 if mgr.state.consume_skip_task_request():
                     logger.info("[TUI] Countdown skipped by user shortcut ([S]/[N]).")
                     break
@@ -450,6 +455,10 @@ def countdown(seconds: int = 10, waiting_message: str = "") -> None:
         return
 
     while seconds:
+        record_heartbeat(
+            "countdown",
+            f"{waiting_message} {seconds}s" if waiting_message else f"Sleeping {seconds}s",
+        )
         print(waiting_message, f"{seconds:02d}", end="\r")
         time.sleep(1)
         seconds -= 1
@@ -845,7 +854,7 @@ def wait_for_next_session(time_left, session_state, sessions, device):
         pass
     hours, remainder = divmod(time_left.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    if args.kill_atx_agent:
+    if args is not None and getattr(args, "kill_atx_agent", False):
         kill_atx_agent(device)
     logger.info(
         f'Next session will start at: {(datetime.now()+ time_left).strftime("%H:%M:%S (%Y/%m/%d)")}.',
@@ -858,9 +867,25 @@ def wait_for_next_session(time_left, session_state, sessions, device):
     try:
         total_seconds = time_left.total_seconds()
         while total_seconds > 0:
-            slice_sleep = min(20.0, total_seconds)
+            slice_sleep = min(5.0, total_seconds)
             sleep(slice_sleep)
             total_seconds -= slice_sleep
+
+            try:
+                from InstaAddict.core.tui import DashboardManager
+
+                if (
+                    DashboardManager.is_active()
+                    and DashboardManager.get_instance().state.is_upload_requested()
+                ):
+                    logger.info(
+                        "[TUI] On-demand upload requested via [CTRL+U] during sleep. Waking up immediately to process upload...",
+                        extra={"color": f"{Fore.MAGENTA}"},
+                    )
+                    break
+            except Exception:
+                pass
+
             if getattr(args, "telegram_inbox", False) or getattr(
                 args, "telegram_reports", False
             ):

@@ -134,6 +134,11 @@ class DashboardState:
         with self.lock:
             self.upload_requested = True
 
+    def is_upload_requested(self) -> bool:
+        """Non-destructively check if manual upload is requested."""
+        with self.lock:
+            return bool(self.upload_requested)
+
     def consume_skip_task_request(self) -> bool:
         """Atomically consume any pending skip task request triggered via hotkey [S]/[N] or IPC file."""
         with self.lock:
@@ -299,6 +304,10 @@ class DashboardState:
                 self.target_user = target
             if source is not None:
                 self.target_source = source
+
+        from InstaAddict.core.watchdog import record_heartbeat
+
+        record_heartbeat(stage=self.current_job, action=self.current_action)
 
     def update_countdown(self, seconds: Optional[int], message: str = ""):
         with self.lock:
@@ -466,8 +475,7 @@ class KeyboardListenerThread(threading.Thread):
                         if ch in (b"\x00", b"\xe0"):
                             msvcrt.getch()
                             continue
-                        key = ch.decode("utf-8", errors="ignore").lower()
-                        self._handle_key(key)
+                        self._handle_key(ch)
                     time.sleep(0.1)
                 except Exception:
                     time.sleep(0.2)
@@ -478,17 +486,26 @@ class KeyboardListenerThread(threading.Thread):
                 try:
                     rlist, _, _ = select.select([sys.stdin], [], [], 0.2)
                     if rlist:
-                        key = sys.stdin.read(1).lower()
+                        key = sys.stdin.read(1)
                         self._handle_key(key)
                 except Exception:
                     time.sleep(0.2)
 
-    def _handle_key(self, key: str):
-        if key == "u":
-            self.manager.trigger_upload_request()
-        elif key in ("s", "n"):
+    def _handle_key(self, key: Any):
+        if key is None:
+            return
+
+        bval = key if isinstance(key, bytes) else key.encode("utf-8", errors="ignore")
+        sval = key if isinstance(key, str) else key.decode("utf-8", errors="ignore")
+
+        # CTRL+S: b'\x13' (byte 19), '\x13', or fallbacks 's', 'S', 'n', 'N'
+        if bval == b"\x13" or sval in ("\x13", "s", "S", "n", "N"):
             self.manager.trigger_skip_task()
-        elif key == "d":
+        # CTRL+U: b'\x15' (byte 21), '\x15', or fallbacks 'u', 'U'
+        elif bval == b"\x15" or sval in ("\x15", "u", "U"):
+            self.manager.trigger_upload_request()
+        # CTRL+D: b'\x04' (byte 4), '\x04', or fallbacks 'd', 'D'
+        elif bval == b"\x04" or sval in ("\x04", "d", "D"):
             self.manager.trigger_debug_toggle()
 
 
@@ -538,40 +555,52 @@ class DashboardManager:
         return cls._instance._active
 
     def trigger_upload_request(self):
-        """Handle on-demand upload hotkey [U]."""
+        """Handle on-demand upload hotkey [CTRL+U]."""
         with self._lock:
             self.state.upload_requested = True
             self.state.update_activity(
-                action="[U] Manual upload requested from pending queue...",
+                action="[CTRL+U] Manual upload requested from pending queue...",
             )
             self.state.add_log(
                 "INFO",
                 datetime.now().strftime("%H:%M:%S"),
-                "User pressed [U]: Immediate queue photo upload requested!",
+                "User pressed [CTRL+U]: Immediate queue photo upload requested!",
             )
             self.update_render(force=True)
 
     def trigger_skip_task(self):
-        """Handle skip task hotkey [S] / [N]."""
+        """Handle skip task hotkey [CTRL+S]."""
         with self._lock:
             self.state.skip_task_requested = True
             self.state.update_activity(
-                action="[S] Task skip requested! Advancing to next task...",
+                action="[CTRL+S] Task skip requested! Advancing to next task...",
             )
             self.state.add_log(
                 "WARNING",
                 datetime.now().strftime("%H:%M:%S"),
-                "User pressed [S]/[N]: Skipping current task and advancing to next scheduled task...",
+                "User pressed [CTRL+S]: Skipping current task and advancing to next scheduled task...",
             )
             self.update_render(force=True)
 
     def trigger_debug_toggle(self):
-        """Handle debug / refresh hotkey [D]."""
+        """Handle debug toggle hotkey [CTRL+D]."""
         with self._lock:
+            root_logger = logging.getLogger()
+            current_level = root_logger.getEffectiveLevel()
+            if current_level <= logging.DEBUG:
+                new_level = logging.INFO
+                lvl_str = "INFO (quiet)"
+            else:
+                new_level = logging.DEBUG
+                lvl_str = "DEBUG (verbose)"
+            root_logger.setLevel(new_level)
+            self.state.update_activity(
+                action=f"[CTRL+D] Log level switched to {lvl_str}",
+            )
             self.state.add_log(
                 "INFO",
                 datetime.now().strftime("%H:%M:%S"),
-                "User pressed [D]: Forcing telemetry sync and full TUI re-render.",
+                f"User pressed [CTRL+D]: Log level switched to {lvl_str}. Full TUI re-render forced.",
             )
             self.update_render(force=True)
 
@@ -916,11 +945,11 @@ class DashboardManager:
         footer_text = Text()
         footer_text.append(" [Ctrl+C] ", style="bold bright_red")
         footer_text.append(f"Stop  {sep} ", style="dim white")
-        footer_text.append(" [S] ", style="bold bright_yellow")
+        footer_text.append(" [Ctrl+S] ", style="bold bright_yellow")
         footer_text.append(f"Skip Task  {sep} ", style="bright_white")
-        footer_text.append(" [U] ", style="bold bright_magenta")
+        footer_text.append(" [Ctrl+U] ", style="bold bright_magenta")
         footer_text.append(f"Upload Queued Photo  {sep} ", style="bright_white")
-        footer_text.append(" [D] ", style="bold bright_yellow")
+        footer_text.append(" [Ctrl+D] ", style="bold bright_yellow")
         footer_text.append(f"Debug  {sep} ", style="dim white")
         footer_text.append(" Mode: ", style="bold cyan")
         footer_text.append(f"Live (Human Sim)  {sep} ", style="bold green")

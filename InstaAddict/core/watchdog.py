@@ -80,6 +80,8 @@ class BotWatchdog:
         self.check_interval: float = max(check_interval, 0.5)
 
         self.last_heartbeat: float = time.time()
+        self.current_tier: int = 0
+        self.last_recovery_time: float = 0.0
         self.current_stage: str = "init"
         self.current_action: str = "starting"
         self.is_paused: bool = False
@@ -105,6 +107,7 @@ class BotWatchdog:
                 self.current_stage = stage
             if action is not None:
                 self.current_action = action
+            self.current_tier = 0
             self.recovering = False
 
     def pause(self):
@@ -112,12 +115,16 @@ class BotWatchdog:
         with self._lock:
             self.is_paused = True
             self.last_heartbeat = time.time()
+            self.current_tier = 0
+            self.recovering = False
 
     def resume(self):
         """Resume watchdog monitoring upon entering active execution work."""
         with self._lock:
             self.is_paused = False
             self.last_heartbeat = time.time()
+            self.current_tier = 0
+            self.recovering = False
 
     def start(self):
         """Start the background watchdog monitoring thread."""
@@ -127,6 +134,8 @@ class BotWatchdog:
             self._stop_event.clear()
             self.is_running = True
             self.last_heartbeat = time.time()
+            self.current_tier = 0
+            self.recovering = False
             self._thread = threading.Thread(
                 target=self._run_loop,
                 name="BotWatchdogThread",
@@ -155,7 +164,7 @@ class BotWatchdog:
                 state = "STOPPED"
             elif self.is_paused:
                 state = "PAUSED"
-            elif self.recovering or elapsed >= self.soft_timeout:
+            elif self.recovering or self.current_tier > 0 or elapsed >= self.soft_timeout:
                 state = "RECOVERING"
             elif elapsed >= 30.0:
                 state = "STALLED"
@@ -166,6 +175,7 @@ class BotWatchdog:
                 "state": state,
                 "elapsed": elapsed,
                 "attempts": self.recovery_attempts,
+                "current_tier": self.current_tier,
                 "stage": self.current_stage,
                 "action": self.current_action,
                 "is_paused": self.is_paused,
@@ -190,13 +200,18 @@ class BotWatchdog:
                     continue
                 now = time.time()
                 elapsed = now - self.last_heartbeat
+                tier = self.current_tier
+                last_rec = self.last_recovery_time
 
             if elapsed >= self.hard_timeout:
-                self._execute_hard_recovery(elapsed)
+                if tier < 3 or (now - last_rec >= self.hard_timeout):
+                    self._execute_hard_recovery(elapsed)
             elif elapsed >= self.skip_timeout:
-                self._execute_skip_recovery(elapsed)
+                if tier < 2:
+                    self._execute_skip_recovery(elapsed)
             elif elapsed >= self.soft_timeout:
-                self._execute_soft_recovery(elapsed)
+                if tier < 1:
+                    self._execute_soft_recovery(elapsed)
 
     def _run_adb_cmd(
         self,
@@ -235,6 +250,8 @@ class BotWatchdog:
         """Tier 1: Send KEYCODE_WAKEUP and KEYCODE_BACK."""
         with self._lock:
             self.recovering = True
+            self.current_tier = 1
+            self.last_recovery_time = time.time()
             self.recovery_attempts += 1
             self.recovery_history.append(
                 {
@@ -256,14 +273,13 @@ class BotWatchdog:
             self._run_adb_cmd(["shell", "input", "keyevent", "4"])
         except Exception as e:
             logger.error(f"[WATCHDOG] Soft recovery execution error: {e}")
-        finally:
-            with self._lock:
-                self.last_heartbeat = time.time()
 
     def _execute_skip_recovery(self, elapsed: float):
         """Tier 2: Request task skip to advance to next scheduled work item."""
         with self._lock:
             self.recovering = True
+            self.current_tier = 2
+            self.last_recovery_time = time.time()
             self.recovery_attempts += 1
             self.recovery_history.append(
                 {
@@ -296,14 +312,13 @@ class BotWatchdog:
                         f.write(str(time.time()))
         except Exception as e:
             logger.error(f"[WATCHDOG] Skip recovery execution error: {e}")
-        finally:
-            with self._lock:
-                self.last_heartbeat = time.time()
 
     def _execute_hard_recovery(self, elapsed: float):
         """Tier 3: Nuclear recovery: force-stop app and relaunch via monkey."""
         with self._lock:
             self.recovering = True
+            self.current_tier = 3
+            self.last_recovery_time = time.time()
             self.recovery_attempts += 1
             self.recovery_history.append(
                 {
@@ -335,6 +350,13 @@ class BotWatchdog:
             )
         except Exception as e:
             logger.error(f"[WATCHDOG] Hard recovery execution error: {e}")
-        finally:
-            with self._lock:
-                self.last_heartbeat = time.time()
+
+
+def record_heartbeat(stage: Optional[str] = None, action: Optional[str] = None) -> None:
+    """Safe module-level utility to record a heartbeat without throwing exceptions."""
+    try:
+        if BotWatchdog._instance is not None:
+            BotWatchdog.get_instance().heartbeat(stage=stage, action=action)
+    except Exception:
+        pass
+

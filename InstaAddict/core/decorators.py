@@ -142,6 +142,13 @@ def restart(
     close_instagram(device)
     check_if_crash_popup_is_there(device)
     random_sleep()
+    if hasattr(device, "ensure_uiautomator_alive"):
+        try:
+            device.ensure_uiautomator_alive()
+        except Exception as e:
+            logger.debug(
+                f"UiAutomator resurrection check during restart encountered: {e}"
+            )
     if not open_instagram(device):
         print_full_report(sessions, configs.args.scrape_to_file)
         sessions.persist(directory=session_state.my_username)

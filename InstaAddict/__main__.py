@@ -1,4 +1,6 @@
 import argparse
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
 from os import getcwd, path
 
 from InstaAddict import __version__
