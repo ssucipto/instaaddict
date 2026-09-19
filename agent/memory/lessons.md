@@ -2,6 +2,12 @@
 # Populated automatically when developer says "log it" or "wrong, log this"
 # Max 5 entries loaded per session, filtered to current task_type + priority:high
 
+- date: 2026-09-19
+  task_type: bugfix
+  mistake: Double-tap likes and creator follows in interact_reels.py were strictly nested inside if comment_text:, causing likes and follows to be discarded when Gemini Vision was safety-blocked, rate-limited, or empty. Furthermore, pytest collected ad-hoc scripts from scratch/ trying to connect to offline emulators.
+  correction: Decouple Reels likes, follows, and comments so each engagement action executes independently based on its own rate and limits, provide fallback comments when Vision AI is dead or throttled, and explicitly scope testpaths = ["test"] in pyproject.toml.
+  priority: high
+
 - date: 2026-09-12
   task_type: bugfix
   mistake: Hashtag search typed character-by-character while wait_fastinput_ime timed out, repeatedly erasing input, and space-separated hashtags were treated as a single query.
@@ -67,3 +73,10 @@
   mistake: Directly assigning an integer to SessionState.totalFollowed violates its dict[str, int] contract, causing limit checks (sum(totalFollowed.values())) and reporting to crash with AttributeError or TypeError; casting range strings ("30-40") with int() fails with ValueError; and gating _comment() behind already_liked is not None and not already_liked starves commenting on already-liked posts.
   correction: Preserve SessionState.totalFollowed as a dictionary updated via add_interaction(), use get_value() for range-safe percentage parsing, and decouple comment evaluation from whether the post was freshly liked or already liked.
   priority: high
+
+- date: 2026-09-19
+  task_type: bugfix
+  mistake: In handle_sources.py, handle_posts lacked post-commenting logic, rendering feed commenting dead code and leaving opened hashtag posts uncommented. In addition, caller duplicating session_state.totalComments += 1 double-counted comments because _comment() already increments it, and top hashtag posts were saturated with already-followed accounts.
+  correction: Integrate post-view commenting directly into handle_posts with MediaType detection, respect profile_filter.can_comment(current_job) and comment_percentage with get_value range parsing, let _comment() be the single source of truth for totalComments, record feed interactions via storage.add_interacted_user, and drive follower discovery via blogger-followers and interact-reels with end-if-likes-limit-reached set to false.
+  priority: high
+

@@ -834,17 +834,86 @@ def handle_posts(
                                         )
                                     except Exception as e:
                                         logger.debug(f"HashtagManager reset saturation failed: {e}")
+
+                                # Post-view commenting on feed or hashtag posts
+                                raw_comment = getattr(getattr(self, "args", None), "comment_percentage", None)
+                                comment_pct = (
+                                    get_value(str(raw_comment), None, 0)
+                                    if isinstance(raw_comment, (int, float, str))
+                                    else 0
+                                )
+                                can_comment_job = True
+                                if profile_filter is not None and hasattr(profile_filter, "can_comment"):
+                                    try:
+                                        _, _, _, can_comment_job = profile_filter.can_comment(current_job)
+                                    except Exception:
+                                        can_comment_job = True
+
+                                comment_limit_reached = (
+                                    session_state.check_limit(
+                                        limit_type=session_state.Limit.COMMENTS, output=False
+                                    ) is True
+                                    if session_state and hasattr(session_state, "check_limit")
+                                    else False
+                                )
+                                if can_comment_job and comment_pct > 0 and not comment_limit_reached:
+                                    if randint(1, 100) <= comment_pct:
+                                        try:
+                                            from InstaAddict.core.interaction import _comment
+                                            from InstaAddict.core.views import MediaType
+
+                                            media_type = (
+                                                opened_post_view.detect_opened_media_type()
+                                                if hasattr(opened_post_view, "detect_opened_media_type")
+                                                else MediaType.PHOTO
+                                            )
+                                            my_user = getattr(session_state, "my_username", None) or "FEED_INTERACTOR"
+                                            commented = _comment(
+                                                device,
+                                                my_username=my_user,
+                                                comment_percentage=100,
+                                                args=getattr(self, "args", None),
+                                                session_state=session_state,
+                                                media_type=media_type,
+                                            )
+                                            if commented:
+                                                logger.info(
+                                                    "Successfully commented on post! 💬",
+                                                    extra={"color": f"{Fore.GREEN}"},
+                                                )
+                                        except Exception as e:
+                                            logger.error(f"Post-view comment error: {e}")
+
                                 if current_job == "feed":
                                     count += 1
                                     if hasattr(session_state, "add_interaction"):
                                         session_state.add_interaction(
                                             "feed", succeed=True, followed=False, scraped=False
                                         )
+                                    if storage is not None and hasattr(storage, "add_interacted_user"):
+                                        try:
+                                            storage.add_interacted_user(
+                                                username,
+                                                session_id=session_state.id if session_state else None,
+                                                job_name=current_job,
+                                                target=target,
+                                                liked=1 if liked else 0,
+                                                commented=1 if 'commented' in locals() and commented else 0,
+                                                followed=False,
+                                                is_requested=False,
+                                                scraped=False,
+                                                pm_sent=False,
+                                            )
+                                        except Exception as e:
+                                            logger.debug(f"Storage add_interacted_user for feed: {e}")
                                     logger.info(
                                         f"Interacted feed bloggers: {count}/{count_feed_limit}"
                                     )
                                     likes_limit = self.session_state.check_limit(
                                         limit_type=self.session_state.Limit.LIKES
+                                    )
+                                    comments_limit = self.session_state.check_limit(
+                                        limit_type=self.session_state.Limit.COMMENTS
                                     )
                                     success_limit = self.session_state.check_limit(
                                         limit_type=self.session_state.Limit.SUCCESS
@@ -852,7 +921,7 @@ def handle_posts(
                                     total_limit = self.session_state.check_limit(
                                         limit_type=self.session_state.Limit.TOTAL
                                     )
-                                    if likes_limit or success_limit or total_limit:
+                                    if likes_limit or comments_limit or success_limit or total_limit:
                                         logger.info("Limit reached, finish.")
                                         break
                                     if count >= count_feed_limit:

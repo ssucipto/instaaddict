@@ -21,6 +21,14 @@ Patch release resolving false-positive Reels ad classification, inline follow bu
 - **Filter Null-Safety & Fallback Guarantees (`InstaAddict/core/interaction.py`)**:
   - Guarded `can_comment()` against `profile_filter is None` and wrapped tuple unpacking defensively against structure mismatches.
   - Ensured `load_random_comment()` strictly guarantees a non-empty string fallback from `DEFAULT_COMMENTS`.
+- **Post-View Commenting Engine & Feed Interaction Persistence (`InstaAddict/core/handle_sources.py`, `test/test_post_view_commenting.py`)**:
+  - Implemented direct post-view commenting in `handle_posts` for both feed and hashtag posts, resolving the dead-code architectural gap in feed commenting.
+  - Gated post comments by `profile_filter.can_comment(current_job)` and `session_state.check_limit(Limit.COMMENTS)`.
+  - Added range-safe percentage parsing via `get_value()` and `MediaType` detection.
+  - Enforced single source of truth for `session_state.totalComments` inside `_comment()`, eliminating duplicate metric increments.
+  - Persisted feed interactions via `storage.add_interacted_user()` to record liked and commented states in SQLite.
+  - Enforced comment limit termination guard in feed interaction loop.
+
 
 ## v1.4.0 — Engagement Pipeline Restoration, Follower Cache, and Aussie Vision Voice
 

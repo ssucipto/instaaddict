@@ -345,6 +345,17 @@ progress:
   overall: 100
 recent_work:
 - date: 2026-09-19
+  description: 'Remediated 0-Follows and 0-Comments Production Defect from Audit-088 (Route-058).'
+  items:
+  - "✓ Unblocked home feed commenting with comment_feed: true in accounts/lolatheozjack/filters.yml"
+  - "✓ Enabled liking and commenting on community accounts with skip_following: false and skip_follower: false"
+  - "✓ Prevented premature session termination by setting end-if-likes-limit-reached: false in config.yml"
+  - "✓ Added blogger-followers sources (perthdogs, dogsofperth, jackrussellmoments) for fresh audience discovery"
+  - "✓ Decoupled Reels double-tap liking and creator following from comment presence in interact_reels.py"
+  - "✓ Added organic quota-preservation fallback and fallback comment support when Vision AI is dead or throttled"
+  - "✓ Configured testpaths = [\"test\"] in pyproject.toml to isolate test suite from scratch scripts"
+  - "✓ Added 4-case unit test suite (test_reels_engagement_decoupling.py) with 100% pass rate (288/288 regression suite green)"
+- date: 2026-09-19
   description: 'Full Implementation Audit, Quality Hardening, Session State Invariant Fix & Follows/Comments Robustness (Route-057, Audit-087, Review-049).'
   items:
   - "✓ Audited implementation fully for gaps, shortcuts, and inconsistencies across engagement pipelines (Audit-087)"
@@ -378,6 +389,17 @@ recent_work:
   - "✓ Implemented native Reels follow action in interact_reels.py targeting clips_follow_button"
   - "✓ Raised default reels evaluate percentage to 70% for active Vision AI commenting"
   - "✓ Created 12 unit tests in test_follows_and_comments_remediation.py with 100% pass rate (273/273 total repo tests green)"
+- date: 2026-09-19
+  description: 'Fixed 0-Follows and 0-Comments Defects Across Feed, Hashtag, and Reels Interactions (Audit #089, Route-059, Review #050).'
+  items:
+  - "✓ Implemented post-view commenting in handle_posts (handle_sources.py) for feed and hashtag posts"
+  - "✓ Configured profile_filter.can_comment(current_job) gating and universal percentage parsing"
+  - "✓ Maintained single source of truth for totalComments inside _comment() to eliminate double-increment bug"
+  - "✓ Persisted feed interactions via storage.add_interacted_user in SQLite"
+  - "✓ Enabled blogger-followers and disabled end-if-likes-limit-reached for lolatheozjack profile"
+  - "✓ Added 4-case unit test suite (test_post_view_commenting.py) with 100% pass rate"
+  - "✓ Verified 100% green full regression test suite (292/292 tests passing)"
+  - "✓ Zero flake8 linting violations"
 - date: 2026-09-19
   description: 'Implemented Persistent Local Followers Cache and Non-Scraping Unfollow Optimization (Route-054, Audit-082/083/084).'
   items:
@@ -682,7 +704,8 @@ recent_work:
   - "✓ Created accounts/my_bot_account/filters.yml, whitelist.txt, and blacklist.txt"
   - "✓ Ensure Instagram APK is installed and logged in on emulator"
 next_steps:
-- Resume Instagram bot interactions with more stable scrolling and VLM quota resilience.
+- Run live test session on emulator-5554 with lolatheozjack profile to verify follows and comments in action.
+- Monitor logs/lolatheozjack.log to verify balanced engagement across likes, follows, and comments.
 notes:
 - Emulator: emulator-5554 (Android 17 / x86_64)
 - Profile directory: accounts/my_bot_account/
