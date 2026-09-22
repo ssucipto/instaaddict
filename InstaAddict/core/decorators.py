@@ -78,6 +78,12 @@ def run_safely(device, device_id, sessions, session_state, screen_record, config
                     print_traceback=False,
                 )
 
+            except EmptyList:
+                logger.info(
+                    "Empty list encountered (empty/restricted source or list end) - advancing task without crash restart."
+                )
+                return
+
             except (
                 DeviceFacade.JsonRpcError,
                 IndexError,
@@ -86,7 +92,6 @@ def run_safely(device, device_id, sessions, session_state, screen_record, config
                 UiObjectNotFoundError,
                 AdbError,
                 RequestsConnectionError,
-                EmptyList,
             ):
                 restart(
                     device,

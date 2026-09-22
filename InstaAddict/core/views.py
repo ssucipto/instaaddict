@@ -426,7 +426,13 @@ class HomeView(ActionBarView):
         if not search_btn.exists(Timeout.SHORT):
             logger.warning("Search icon not found in Home action bar.")
             return None
-        search_btn.click()
+        try:
+            search_btn.click()
+        except (DeviceFacade.JsonRpcError, Exception) as e:
+            logger.warning(
+                f"Failed clicking search icon in Home action bar: {e}. Falling back to TabBar search."
+            )
+            return None
 
         return SearchView(self.device)
 
@@ -619,17 +625,35 @@ class SearchView:
             search_edit_text = self._getSearchEditText()
             if search_edit_text is not None:
                 logger.debug("Pressing on searchbar.")
-                search_edit_text.click(sleep=SleepTime.SHORT)
+                try:
+                    search_edit_text.click(sleep=SleepTime.SHORT)
+                except (DeviceFacade.JsonRpcError, Exception) as e:
+                    logger.warning(
+                        f"Transient error pressing searchbar: {e}. Retrying after searchbar refresh..."
+                    )
+                    search_edit_text = self._getSearchEditText()
+                    if search_edit_text is not None:
+                        try:
+                            search_edit_text.click(sleep=SleepTime.SHORT)
+                        except Exception as e2:
+                            logger.error(f"Cannot click searchbar on retry: {e2}")
+                            return False
+                    else:
+                        return False
             else:
                 logger.debug("There is no searchbar!")
                 return False
             if self._check_current_view(target, job):
                 logger.info(f"{target} is in recent history.")
                 return True
-            search_edit_text.set_text(
-                target,
-                Mode.PASTE,
-            )
+            try:
+                search_edit_text.set_text(
+                    target,
+                    Mode.PASTE,
+                )
+            except (DeviceFacade.JsonRpcError, Exception) as e:
+                logger.warning(f"Error pasting search text for {target}: {e}")
+                return False
             if self._check_current_view(target, job):
                 logger.info(f"{target} is in top view.")
                 return True

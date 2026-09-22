@@ -862,3 +862,39 @@ carryovers:
       - InstaAddict/core/bot_flow.py
       - InstaAddict/core/dogfood.py
       - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-067
+    audit_report: agent/reports/audit-115-dogfood-optimizer-tuning-and-crash-analysis.md
+    date_raised: 2026-09-23
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: agent/reports/audit-117-post-impl-crash-remediation-and-dogfood-modernization.md
+    summary: "Harden HomeView.navigateToSearch and SearchView.navigate_to_target against transient JsonRpcError/UiObjectNotFoundException on action bar search button clicks and input focus."
+    affected_files:
+      - InstaAddict/core/views.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-068
+    audit_report: agent/reports/audit-115-dogfood-optimizer-tuning-and-crash-analysis.md
+    date_raised: 2026-09-23
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: agent/reports/audit-117-post-impl-crash-remediation-and-dogfood-modernization.md
+    summary: "Remove EmptyList from decorators.py restart tuple so that empty/restricted user lists do not trigger false-positive crash restarts, crash dumps, and Instagram relaunch."
+    affected_files:
+      - InstaAddict/core/decorators.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-069
+    audit_report: agent/reports/audit-115-dogfood-optimizer-tuning-and-crash-analysis.md
+    date_raised: 2026-09-23
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: agent/reports/audit-117-post-impl-crash-remediation-and-dogfood-modernization.md
+    summary: "Modernize DogfoodOptimizer with sliding session window (last 5 sessions) and structured traceback parsing to eradicate historical baggage and delay-mean placebo recommendations."
+    affected_files:
+      - InstaAddict/core/dogfood.py
+      - test/test_tuning_and_operational_fixes.py

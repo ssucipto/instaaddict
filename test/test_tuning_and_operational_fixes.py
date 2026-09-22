@@ -659,5 +659,158 @@ def test_dogfood_optimizer_analyzes_job_performance_standards(tmp_path, monkeypa
     assert "interact_hashtag" in recs[0]["issue"]
 
 
+def test_home_view_navigate_to_search_handles_json_rpc_error():
+    """Verify HomeView.navigateToSearch gracefully handles JsonRpcError and returns None (CO-067)."""
+    from InstaAddict.core.views import HomeView
+
+    mock_device = MagicMock()
+    home_view = HomeView(mock_device)
+
+    mock_action_bar = MagicMock()
+    mock_search_btn = MagicMock()
+    mock_search_btn.exists.return_value = True
+    mock_search_btn.click.side_effect = DeviceFacade.JsonRpcError("-32002: UiObjectNotFound")
+    mock_action_bar.child.return_value = mock_search_btn
+    home_view.action_bar = mock_action_bar
+
+    # Should not raise JsonRpcError, but return None gracefully
+    result = home_view.navigateToSearch()
+    assert result is None
 
 
+def test_search_view_navigate_to_target_handles_search_bar_click_error():
+    """Verify SearchView.navigate_to_target handles transient click errors defensively (CO-067)."""
+    from InstaAddict.core.views import SearchView
+
+    mock_device = MagicMock()
+    search_view = SearchView(mock_device)
+
+    mock_search_edit = MagicMock()
+    mock_search_edit.click.side_effect = DeviceFacade.JsonRpcError("-32002: Client error")
+    search_view._getSearchEditText = MagicMock(return_value=mock_search_edit)
+
+    result = search_view.navigate_to_target("test_target", "hashtag")
+    assert result is False
+
+
+def test_run_safely_handles_empty_list_without_crash_or_restart():
+    """Verify @run_safely treats EmptyList as non-fatal without calling restart() or incrementing crashes (CO-068)."""
+    from InstaAddict.core.decorators import run_safely
+
+    mock_device = MagicMock()
+    mock_session_state = MagicMock()
+    mock_session_state.totalCrashes = 0
+    mock_sessions = [mock_session_state]
+    mock_configs = MagicMock()
+
+    @run_safely(
+        device=mock_device,
+        device_id="dummy_id",
+        sessions=mock_sessions,
+        session_state=mock_session_state,
+        screen_record=None,
+        configs=mock_configs,
+    )
+    def dummy_task():
+        raise EmptyList()
+
+    with patch("InstaAddict.core.decorators.restart") as mock_restart:
+        # Calling dummy_task should catch EmptyList, not call restart, and not increment totalCrashes
+        dummy_task()
+        mock_restart.assert_not_called()
+        assert mock_session_state.totalCrashes == 0
+
+
+def test_dogfood_optimizer_sliding_window_separates_active_and_lifetime(tmp_path, monkeypatch):
+    """Verify DogfoodOptimizer evaluates sliding window while maintaining lifetime metrics (CO-069)."""
+    import json
+    from InstaAddict.core.dogfood import DogfoodOptimizer
+
+    monkeypatch.chdir(tmp_path)
+    acc_dir = tmp_path / "accounts" / "testuser"
+    acc_dir.mkdir(parents=True)
+
+    # Create 8 sessions: first 3 have crashes, last 5 have 0 crashes
+    sessions = []
+    for i in range(8):
+        crashes = 2 if i < 3 else 0
+        sessions.append(
+            {
+                "id": f"s{i}",
+                "total_interactions": 20,
+                "successful_interactions": 15,
+                "total_likes": 10,
+                "total_followed": 2,
+                "total_crashes": crashes,
+                "total_subscreen_escapes": 0,
+                "total_uploads_success": 0,
+                "total_uploads_failed": 0,
+            }
+        )
+
+    with open(acc_dir / "sessions.json", "w") as f:
+        json.dump(sessions, f)
+
+    optimizer = DogfoodOptimizer("testuser", window_sessions=5)
+    report = optimizer.analyze()
+
+    # Active window metrics (last 5 sessions)
+    assert report["metrics"]["total_sessions"] == 5
+    assert report["metrics"]["total_crashes"] == 0
+
+    # Lifetime metrics (all 8 sessions)
+    assert report["lifetime_metrics"]["total_sessions"] == 8
+    assert report["lifetime_metrics"]["total_crashes"] == 6
+
+
+def test_dogfood_optimizer_error_log_accurate_fatal_crash_counting(tmp_path, monkeypatch):
+    """Verify DogfoodOptimizer accurately counts uncaught fatal crashes and ignores handled error traces (CO-069)."""
+    from InstaAddict.core.dogfood import DogfoodOptimizer
+
+    monkeypatch.chdir(tmp_path)
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir(parents=True)
+
+    log_content = (
+        "[09/13 10:00:00] ERROR | Handled network error (views.py:100)\n"
+        "Traceback (most recent call last):\n"
+        "  File 'views.py', line 100, in foo\n"
+        "    bar()\n"
+        "[09/13 10:05:00] CRITICAL | Uncaught fatal exception: (log.py:158)\n"
+        "Traceback (most recent call last):\n"
+        "  File 'run.py', line 20, in <module>\n"
+        "    crash()\n"
+    )
+    with open(logs_dir / "testuser_error_trace.log", "w", encoding="utf-8") as f:
+        f.write(log_content)
+
+    optimizer = DogfoodOptimizer("testuser")
+    diag = optimizer._analyze_error_log()
+
+    assert diag["total_errors"] == 1
+    assert diag["total_criticals"] == 1
+    # Only the uncaught fatal exception should be counted as fatal crash
+    assert diag["fatal_crashes"] == 1
+
+
+def test_dogfood_optimizer_recommendation_stability_root_cause_not_placebo_delay(tmp_path, monkeypatch):
+    """Verify crash recommendation provides root-cause investigation parameter instead of placebo delay-mean (CO-069)."""
+    import json
+    from InstaAddict.core.dogfood import DogfoodOptimizer
+
+    monkeypatch.chdir(tmp_path)
+    acc_dir = tmp_path / "accounts" / "testuser"
+    acc_dir.mkdir(parents=True)
+
+    with open(acc_dir / "sessions.json", "w") as f:
+        json.dump([{"total_interactions": 10, "successful_interactions": 8, "total_crashes": 2}], f)
+
+    optimizer = DogfoodOptimizer("testuser")
+    report = optimizer.analyze()
+
+    stab_recs = [r for r in report["recommendations"] if r["category"] == "Stability & Timing"]
+    assert len(stab_recs) == 1
+    rec = stab_recs[0]
+    # Parameter should NOT be delay-mean for crash issues
+    assert rec["parameter"] == "stability_investigation"
+    assert "crash traces" in rec["action"]

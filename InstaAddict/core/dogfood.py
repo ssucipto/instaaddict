@@ -17,8 +17,9 @@ class DogfoodOptimizer:
     tuning recommendations.
     """
 
-    def __init__(self, username: str):
+    def __init__(self, username: str, window_sessions: int = 5):
         self.username = username
+        self.window_sessions = window_sessions
         self.account_dir = os.path.join("accounts", username)
         self.sessions_path = os.path.join(self.account_dir, "sessions.json")
         self.history_path = os.path.join(self.account_dir, "history.md")
@@ -32,10 +33,39 @@ class DogfoodOptimizer:
         self.config_path = os.path.join(self.account_dir, "config.yml")
         self.filters_path = os.path.join(self.account_dir, "filters.yml")
 
-    def analyze(self) -> Dict[str, Any]:
-        """Runs the dog-feeding diagnostic and outputs tuning suggestions."""
-        sessions = self._load_sessions()
+    def analyze(self, window_sessions: Optional[int] = None) -> Dict[str, Any]:
+        """Runs the dog-feeding diagnostic and outputs tuning suggestions.
+        
+        Evaluates active recommendations over a sliding window of recent sessions,
+        while maintaining cumulative lifetime metrics for longitudinal tracking.
+        """
+        effective_window = (
+            window_sessions if window_sessions is not None else self.window_sessions
+        )
+        all_sessions = self._load_sessions()
         error_diagnostics = self._analyze_error_log()
+
+        # Cumulative lifetime metrics across all historical sessions
+        lifetime_sessions_count = len(all_sessions)
+        lifetime_interactions = sum(s.get("total_interactions", 0) for s in all_sessions)
+        lifetime_successful = sum(s.get("successful_interactions", 0) for s in all_sessions)
+        lifetime_likes = sum(s.get("total_likes", 0) for s in all_sessions)
+        lifetime_followed = sum(s.get("total_followed", 0) for s in all_sessions)
+        lifetime_crashes = sum(s.get("total_crashes", 0) for s in all_sessions)
+        lifetime_subscreen_escapes = sum(s.get("total_subscreen_escapes", 0) for s in all_sessions)
+        lifetime_uploads_success = sum(s.get("total_uploads_success", 0) for s in all_sessions)
+        lifetime_uploads_failed = sum(s.get("total_uploads_failed", 0) for s in all_sessions)
+        lifetime_success_rate = (
+            round((lifetime_successful / lifetime_interactions) * 100, 1)
+            if lifetime_interactions > 0
+            else 0.0
+        )
+
+        # Active evaluation window (default: last N sessions)
+        if effective_window and effective_window > 0 and len(all_sessions) > effective_window:
+            sessions = all_sessions[-effective_window:]
+        else:
+            sessions = all_sessions
 
         total_sessions = len(sessions)
         total_interactions = sum(s.get("total_interactions", 0) for s in sessions)
@@ -112,19 +142,24 @@ class DogfoodOptimizer:
                 }
             )
 
-        # 2. Evaluate Crash Frequency
+        # 2. Evaluate Crash Frequency (Root-Cause Guidance, not placebo delays)
         if total_crashes > 0 or error_diagnostics.get("fatal_crashes", 0) > 0:
+            fatal_count = error_diagnostics.get("fatal_crashes", 0)
             recommendations.append(
                 {
                     "category": "Stability & Timing",
-                    "severity": "MEDIUM",
+                    "severity": "HIGH" if total_crashes >= 3 else "MEDIUM",
                     "issue": (
-                        f"Recorded {total_crashes} session crashes and "
-                        f"{error_diagnostics.get('fatal_crashes', 0)} fatal exceptions."
+                        f"Recorded {total_crashes} crash(es) in active evaluation window ({lifetime_crashes} lifetime) and "
+                        f"{fatal_count} fatal exception event(s)."
                     ),
-                    "action": "Increase inter-interaction delays to allow slow network rendering and avoid UI timeouts.",
-                    "parameter": "delay-mean",
-                    "suggested_value": "increase by 2.0s",
+                    "action": (
+                        "Inspect recent crash traces in crash_history or error_trace.log for "
+                        "UI element changes, device disconnection, or unhandled exceptions. "
+                        "Verify emulator stability and app version compatibility."
+                    ),
+                    "parameter": "stability_investigation",
+                    "suggested_value": "inspect crash traces & UI compatibility",
                 }
             )
 
@@ -277,11 +312,11 @@ class DogfoodOptimizer:
                     "severity": "HIGH",
                     "issue": f"Detected {error_diagnostics['subscreen_escape_failures']} failure(s) escaping deep subscreens.",
                     "action": (
-                        "Increase inter-interaction delays to allow screen settles and "
-                        "inspect for unhandled modal popups."
+                        "Deep subscreen escape failed after maximum back attempts. "
+                        "Inspect for unhandled modal popups, in-app browser changes, or UI freezes."
                     ),
-                    "parameter": "delay-mean",
-                    "suggested_value": "increase by 1.5s",
+                    "parameter": "subscreen_recovery",
+                    "suggested_value": "verify subscreen back navigation",
                 }
             )
 
@@ -376,6 +411,7 @@ class DogfoodOptimizer:
         report_data = {
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "username": self.username,
+            "window_sessions": effective_window,
             "metrics": {
                 "total_sessions": total_sessions,
                 "total_interactions": total_interactions,
@@ -388,6 +424,18 @@ class DogfoodOptimizer:
                 "total_uploads_success": total_uploads_success,
                 "total_uploads_failed": total_uploads_failed,
                 "total_skips": total_skips,
+            },
+            "lifetime_metrics": {
+                "total_sessions": lifetime_sessions_count,
+                "total_interactions": lifetime_interactions,
+                "successful_interactions": lifetime_successful,
+                "success_rate_percent": lifetime_success_rate,
+                "total_likes": lifetime_likes,
+                "total_followed": lifetime_followed,
+                "total_crashes": lifetime_crashes,
+                "total_subscreen_escapes": lifetime_subscreen_escapes,
+                "total_uploads_success": lifetime_uploads_success,
+                "total_uploads_failed": lifetime_uploads_failed,
             },
             "skip_reasons": total_skip_reasons,
             "job_performance": aggregated_jobs,
@@ -439,8 +487,11 @@ class DogfoodOptimizer:
                         stats["quota_429_errors"] += 1
                     if "UiObjectNotFoundError" in line or "Cannot find" in line:
                         stats["ui_not_found_errors"] += 1
-                    if "Uncaught fatal exception" in line or "Traceback" in line:
+
+                    # Accurate fatal crash detection: count true uncaught fatal exceptions, not handled error traces
+                    if "Uncaught fatal exception" in line:
                         stats["fatal_crashes"] += 1
+
                     if "Tab bar not visible (screen in subscreen)" in line:
                         stats["subscreen_escapes"] += 1
                     if "Could not restore tab bar after" in line:
@@ -466,17 +517,26 @@ class DogfoodOptimizer:
                 f.write(f"Generated on: `{data['generated_at']}`\n\n")
                 f.write("## 1. Performance Overview\n")
                 metrics = data["metrics"]
-                f.write(f"- **Total Sessions Analyzed**: {metrics['total_sessions']}\n")
+                lifetime = data.get("lifetime_metrics", metrics)
+                f.write(
+                    f"- **Sessions Analyzed (Active Window)**: {metrics['total_sessions']} "
+                    f"(Lifetime: {lifetime.get('total_sessions', metrics['total_sessions'])})\n"
+                )
                 rate_str = (
                     f"{metrics['success_rate_percent']}% "
                     f"({metrics['successful_interactions']}/{metrics['total_interactions']})"
                 )
-                f.write(f"- **Success Rate**: {rate_str}\n")
-                f.write(f"- **Total Likes**: {metrics['total_likes']}\n")
-                f.write(f"- **Total Follows**: {metrics['total_followed']}\n")
-                f.write(f"- **Total Crashes**: {metrics['total_crashes']}\n")
+                lifetime_rate_str = (
+                    f"{lifetime.get('success_rate_percent', 0.0)}% "
+                    f"({lifetime.get('successful_interactions', 0)}/{lifetime.get('total_interactions', 0)})"
+                )
+                f.write(f"- **Success Rate**: {rate_str} (Lifetime: {lifetime_rate_str})\n")
+                f.write(f"- **Total Likes**: {metrics['total_likes']} (Lifetime: {lifetime.get('total_likes', metrics['total_likes'])})\n")
+                f.write(f"- **Total Follows**: {metrics['total_followed']} (Lifetime: {lifetime.get('total_followed', metrics['total_followed'])})\n")
+                f.write(f"- **Total Crashes**: {metrics['total_crashes']} (Lifetime: {lifetime.get('total_crashes', metrics['total_crashes'])})\n")
                 f.write(
-                    f"- **Total Subscreen Escapes**: {metrics.get('total_subscreen_escapes', 0)}\n"
+                    f"- **Total Subscreen Escapes**: {metrics.get('total_subscreen_escapes', 0)} "
+                    f"(Lifetime: {lifetime.get('total_subscreen_escapes', 0)})\n"
                 )
                 f.write(
                     f"- **Uploaded Posts**: {metrics['total_uploads_success']} succeeded, "
@@ -747,12 +807,12 @@ class DogfoodOptimizer:
 
 
 def run_dogfood_optimization(
-    username: str, auto_tune: bool = False
+    username: str, auto_tune: bool = False, window_sessions: int = 5
 ) -> Optional[Dict[str, Any]]:
     """Helper entry point to trigger dogfood analysis for an account."""
     if not username:
         return None
-    optimizer = DogfoodOptimizer(username)
+    optimizer = DogfoodOptimizer(username, window_sessions=window_sessions)
     report = optimizer.analyze()
     if auto_tune:
         tune_res = optimizer.apply_tuning()
