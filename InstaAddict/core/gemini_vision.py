@@ -22,6 +22,15 @@ MAX_API_CALLS_PER_SESSION = 400
 UNIVERSAL_PERSONA = (
     "A friendly and engaging Instagram creator sharing daily life moments, adventures, and insights."
 )
+
+def _track_vision():
+    try:
+        from InstaAddict.core.telemetry import PerformanceTracker
+        return PerformanceTracker.get_instance().measure("api", "gemini_vision")
+    except Exception:
+        from contextlib import nullcontext
+        return nullcontext()
+
 try:
     if "--config" in sys.argv:
         idx = sys.argv.index("--config")
@@ -100,6 +109,46 @@ def _safe_extract_text(response, default: str = "") -> str:
         logger.warning(f"Failed to parse response text (Safety blocked or empty): {e}")
         return default
 
+
+def _safe_rate_limit_sleep(
+    wait_time: int, attempt: int, max_retries: int, context: str = "Vision AI"
+) -> None:
+    """Sleeps safely during API rate limits without triggering BotWatchdog inactivity timeouts."""
+    logger.warning(
+        f"Rate Limit Hit ({context}). Sleeping for {wait_time}s before resuming (attempt {attempt + 1}/{max_retries})..."
+    )
+    watchdog = None
+    try:
+        from InstaAddict.core.watchdog import BotWatchdog
+
+        watchdog = BotWatchdog.get_instance()
+        watchdog.pause()
+    except Exception:
+        pass
+
+    try:
+        remaining = wait_time
+        while remaining > 0:
+            chunk = min(5, remaining)
+            time.sleep(chunk)
+            remaining -= chunk
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat(
+                    "gemini_vision",
+                    f"Rate limit backoff ({wait_time - remaining}/{wait_time}s)",
+                )
+            except Exception:
+                pass
+    finally:
+        if watchdog:
+            try:
+                watchdog.resume()
+            except Exception:
+                pass
+
+
 def get_vision_comment(device, _reserved: str = '') -> str:
     global VISION_API_DEAD, SESSION_API_CALLS
     
@@ -162,11 +211,12 @@ def get_vision_comment(device, _reserved: str = '') -> str:
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
             ]
             
-            response = model.generate_content(
-                img,
-                safety_settings=safety_settings,
-                request_options={"timeout": 30.0}
-            )
+            with _track_vision():
+                response = model.generate_content(
+                    img,
+                    safety_settings=safety_settings,
+                    request_options={"timeout": 30.0}
+                )
             
             comment = _safe_extract_text(response)
             if not comment:
@@ -176,22 +226,25 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Gemini Vision API Exception: {error_msg}")
-            if "401" in error_msg:
-                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-                VISION_API_DEAD = True
-                break
-            elif "429" in error_msg or "Quota exceeded" in error_msg:
+            if "429" in error_msg or "Quota exceeded" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                if re.search(r"GenerateRequestsPerDay|daily|limit:\s*20\b", error_msg, re.IGNORECASE):
+                    logger.warning(
+                        "Daily Gemini Vision free-tier quota exhausted. Tripping circuit breaker for session."
+                    )
+                    VISION_API_DEAD = True
+                    break
                 wait_time = 60
-                import re
                 m = re.search(r"retry in ([\d\.]+)s", error_msg)
                 if not m:
                     m = re.search(r"seconds:\s*(\d+)", error_msg)
                 if m:
                     wait_time = int(float(m.group(1))) + 5
-                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
-                import time
-                time.sleep(wait_time)
+                _safe_rate_limit_sleep(wait_time, attempt, 3, context="Post Comment")
                 continue
+            elif re.search(r"\b401\b", error_msg) or "UNAUTHENTICATED" in error_msg or "API_KEY_INVALID" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
             break
     return ""
 
@@ -294,11 +347,12 @@ def get_vision_caption(
             ]
             
             logger.info(f"Executing Vision-AI Caption Generation (attempt {attempt + 1}/{max_retries})...")
-            response = model.generate_content(
-                media_item,
-                safety_settings=safety_settings,
-                request_options={"timeout": 60.0} # Sufficient timeout for video chunking
-            )
+            with _track_vision():
+                response = model.generate_content(
+                    media_item,
+                    safety_settings=safety_settings,
+                    request_options={"timeout": 60.0} # Sufficient timeout for video chunking
+                )
             
             caption = _safe_extract_text(response)
             if not caption:
@@ -316,20 +370,25 @@ def get_vision_caption(
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Gemini Vision Caption API Exception (attempt {attempt + 1}/{max_retries}): {error_msg}")
-            if "401" in error_msg:
-                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-                VISION_API_DEAD = True
-                break
-            elif "429" in error_msg or "Quota exceeded" in error_msg:
+            if "429" in error_msg or "Quota exceeded" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                if re.search(r"GenerateRequestsPerDay|daily|limit:\s*20\b", error_msg, re.IGNORECASE):
+                    logger.warning(
+                        "Daily Gemini Vision free-tier quota exhausted. Tripping circuit breaker for session."
+                    )
+                    VISION_API_DEAD = True
+                    break
                 wait_time = 30
                 m = re.search(r"retry in ([\d\.]+)s", error_msg)
                 if not m:
                     m = re.search(r"seconds:\s*(\d+)", error_msg)
                 if m:
                     wait_time = int(float(m.group(1))) + 2
-                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt + 1}/{max_retries})...")
-                time.sleep(wait_time)
+                _safe_rate_limit_sleep(wait_time, attempt, max_retries, context="Caption Gen")
                 continue
+            elif re.search(r"\b401\b", error_msg) or "UNAUTHENTICATED" in error_msg or "API_KEY_INVALID" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
             else:
                 # Short interval retry for transient errors (504, 503, connection drops, etc.)
                 if attempt < max_retries - 1:
@@ -395,11 +454,12 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
             ]
             
-            response = model.generate_content(
-                img,
-                safety_settings=safety_settings,
-                request_options={"timeout": 30.0}
-            )
+            with _track_vision():
+                response = model.generate_content(
+                    img,
+                    safety_settings=safety_settings,
+                    request_options={"timeout": 30.0}
+                )
             
             answer = _safe_extract_text(response).strip()
             if not answer or answer.upper() == "NO":
@@ -409,21 +469,24 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Reel Vision Evaluation Failed: {error_msg}")
-            if "401" in error_msg:
-                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
-                VISION_API_DEAD = True
-                break
-            elif "429" in error_msg or "Quota exceeded" in error_msg:
+            if "429" in error_msg or "Quota exceeded" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                if re.search(r"GenerateRequestsPerDay|daily|limit:\s*20\b", error_msg, re.IGNORECASE):
+                    logger.warning(
+                        "Daily Gemini Vision free-tier quota exhausted. Tripping circuit breaker for session."
+                    )
+                    VISION_API_DEAD = True
+                    break
                 wait_time = 60
-                import re
                 m = re.search(r"retry in ([\d\.]+)s", error_msg)
                 if not m:
                     m = re.search(r"seconds:\s*(\d+)", error_msg)
                 if m:
                     wait_time = int(float(m.group(1))) + 5
-                logger.warning(f"Rate Limit Hit. Sleeping for {wait_time}s before resuming (attempt {attempt+1}/3)...")
-                import time
-                time.sleep(wait_time)
+                _safe_rate_limit_sleep(wait_time, attempt, 3, context="Reel Comment")
                 continue
+            elif re.search(r"\b401\b", error_msg) or "UNAUTHENTICATED" in error_msg or "API_KEY_INVALID" in error_msg:
+                logger.error("Circuit Breaker Activated (Invalid Auth). Disabling Vision AI for session.")
+                VISION_API_DEAD = True
+                break
             break
     return ""

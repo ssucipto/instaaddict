@@ -429,4 +429,10 @@ class CoreArguments(Plugin):
                 "action": "store_true",
                 "default": False,
             },
+            {
+                "arg": "--auto-tune",
+                "help": "automatically apply closed-loop performance and reliability tuning to config.yml with backup",
+                "action": "store_true",
+                "default": False,
+            },
         ]

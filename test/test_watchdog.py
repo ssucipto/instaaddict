@@ -251,7 +251,9 @@ def test_tui_render_header_with_blinking_led():
     assert panel is not None
     assert panel.title is not None
     title_text = str(panel.title)
-    assert "LIVE" in title_text
+    # In the new 2-row header, panel title shows watchdog LED status
+    # Healthy watchdog shows "WATCHDOG HEALTHY"; fallback shows "LIVE"
+    assert "WATCHDOG HEALTHY" in title_text or "LIVE" in title_text
 
     # Test Stalled LED
     wd.soft_timeout = 60.0

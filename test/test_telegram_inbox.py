@@ -70,7 +70,7 @@ def test_telegram_inbox_authorizes_correct_chat_id(temp_account_dir):
         assert mock_send_text.call_count == 1
         args, _ = mock_send_text.call_args
         assert args[1] == "99887766"
-        assert "InstaAddict Telegram Assistant" in args[2]
+        assert "InstaAddict-AI Telegram Assistant" in args[2]
 
 
 def test_telegram_inbox_photo_download_and_caption_sidecar(temp_account_dir):
@@ -163,7 +163,7 @@ def test_telegram_inbox_queue_and_status_commands(temp_account_dir):
         assert "20260914_001.jpg" in queue_call
         assert "A test caption" in queue_call
 
-        assert "InstaAddict Bot Status" in status_call
+        assert "InstaAddict-AI Bot Status" in status_call
         assert "1 pending" in status_call
 
 

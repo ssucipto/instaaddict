@@ -452,7 +452,11 @@ def handle_likers(
             if user_container is None:
                 logger.warning("Likers list didn't load :(")
                 return
-            row_height, n_users = inspect_current_view(user_container)
+            try:
+                row_height, n_users = inspect_current_view(user_container)
+            except EmptyList:
+                logger.info("Likers list is empty or reached the end of list.")
+                break
             try:
                 for item in user_container:
                     cur_row_height = item.get_height()
@@ -658,6 +662,16 @@ def handle_posts(
             )
             random_sleep(inf=1, sup=3)
             continue
+
+        if UniversalActions.dismiss_peek_if_open(device):
+            logger.info(
+                "Escaped lingering Peek Preview popup overlay in feed; swiping past."
+            )
+            UniversalActions(device)._swipe_points(
+                direction=Direction.DOWN, delta_y=randint(450, 700)
+            )
+            random_sleep(inf=1, sup=3)
+            continue
         (
             is_same_post,
             post_description,
@@ -729,6 +743,7 @@ def handle_posts(
                     "No valid username found for post (unidentifiable author or ad). Skip.",
                     extra={"color": f"{Fore.YELLOW}"},
                 )
+                UniversalActions.dismiss_peek_if_open(device)
                 post_view_list.swipe_to_fit_posts(SwipeTo.NEXT_POST)
                 continue
             if already_liked_count == already_liked_count_limit:
@@ -800,6 +815,16 @@ def handle_posts(
                         f"Reached the limit of already interacted {skipped_posts_limit}. Going to the next source/job!"
                     )
                     break
+                try:
+                    from InstaAddict.core.tui import DashboardManager
+                    if DashboardManager.is_active() and DashboardManager.get_instance().state.is_skip_task_requested():
+                        logger.warning(
+                            f"[TUI] Task skip requested by user ([CTRL+S]). Breaking out of {current_job} ({target})...",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        break
+                except Exception:
+                    pass
                 if can_interact and (likes_in_range or not has_likers):
                     logger.info(
                         f"@{username}: interact", extra={"color": f"{Fore.YELLOW}"}
@@ -1076,7 +1101,27 @@ def iterate_over_followers(
         return row_search.exists()
 
     while True:
+        try:
+            from InstaAddict.core.tui import DashboardManager
+            if DashboardManager.is_active():
+                dm = DashboardManager.get_instance()
+                if dm.state.is_skip_task_requested():
+                    logger.warning(
+                        f"[TUI] Task skip requested by user ([CTRL+S]). Breaking out of followers for @{target}...",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    break
+        except Exception:
+            pass
         logger.info("Iterate over visible followers.")
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+
+            record_heartbeat(
+                "blogger-followers", f"Iterating followers for @{target}"
+            )
+        except Exception:
+            pass
         screen_iterated_followers = []
         screen_skipped_followers_count = 0
         scroll_end_detector.notify_new_page()
@@ -1097,9 +1142,28 @@ def iterate_over_followers(
                 device.back()
                 device.back()
                 return
-            raise
+            logger.warning(
+                f"Followers list for @{target} is empty, restricted, or un-rendered. Skipping this account.",
+                extra={"color": f"{Fore.YELLOW}"},
+            )
+            logger.info("Back to blogger profile")
+            device.back()
+            random_sleep(1, 2, modulable=False)
+            device.back()
+            device.back()
+            return
         try:
             for item in user_list:
+                try:
+                    from InstaAddict.core.tui import DashboardManager
+                    if DashboardManager.is_active() and DashboardManager.get_instance().state.is_skip_task_requested():
+                        logger.warning(
+                            f"[TUI] Task skip requested by user ([CTRL+S]). Breaking out of followers list for @{target}...",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        break
+                except Exception:
+                    pass
                 try:
                     cur_row_height = item.get_height()
                 except DeviceFacade.JsonRpcError:
@@ -1247,9 +1311,25 @@ def iterate_over_followers(
                     className=ClassName.LIST_VIEW,
                 )
 
+            def _scroll_or_swipe(down: bool = True, fling_mode: bool = False):
+                try:
+                    if list_view.exists():
+                        direction = Direction.DOWN if down else Direction.UP
+                        if fling_mode and hasattr(list_view, "fling"):
+                            list_view.fling(direction)
+                            return
+                        list_view.scroll(direction)
+                        return
+                except Exception as ex:
+                    logger.debug(
+                        f"list_view scroll failed ({ex}), using gesture swipe."
+                    )
+                swipe_dir = Direction.UP if down else Direction.DOWN
+                device.swipe(swipe_dir)
+
             if is_myself:
                 logger.info("Need to scroll now", extra={"color": f"{Fore.GREEN}"})
-                list_view.scroll(Direction.UP)
+                _scroll_or_swipe(down=False)
             else:
                 pressed_retry = False
                 if load_more_button_exists:
@@ -1275,16 +1355,25 @@ def iterate_over_followers(
                             "Limit of all followers skipped reached, let's fling.",
                             extra={"color": f"{Fore.GREEN}"},
                         )
-                        list_view.fling(Direction.DOWN)
+                        _scroll_or_swipe(down=True, fling_mode=True)
                     else:
                         logger.info(
                             "All followers skipped, let's scroll.",
                             extra={"color": f"{Fore.GREEN}"},
                         )
-                        list_view.scroll(Direction.DOWN)
+                        _scroll_or_swipe(down=True)
                 else:
                     logger.info("Need to scroll now", extra={"color": f"{Fore.GREEN}"})
-                    list_view.scroll(Direction.DOWN)
+                    _scroll_or_swipe(down=True)
+
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat(
+                    "blogger-followers", f"Scrolled followers list for @{target}"
+                )
+            except Exception:
+                pass
         else:
             logger.info(
                 "No followers were iterated, finish.",

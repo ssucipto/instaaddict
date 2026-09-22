@@ -340,8 +340,53 @@ def check_telegram_inbox(
             arg = parts[1].strip() if len(parts) > 1 else ""
 
             if cmd in ["/start", "/help"]:
+                if arg.lower() in ["instagram", "ig", "bot", "run", "now", "app"]:
+                    # Provide immediate status of Instagram and bot schedule
+                    adb_status = get_adb_device_status()
+                    cfg_path = os.path.join("accounts", username, "config.yml")
+                    wh_str = "00.00-23.59"
+                    app_pkg = "com.instagram.android"
+                    if os.path.exists(cfg_path):
+                        try:
+                            with open(cfg_path, "r", encoding="utf-8") as f:
+                                loaded = yaml.safe_load(f) or {}
+                                wh_str = str(loaded.get("working-hours", "00.00-23.59"))
+                                app_pkg = str(loaded.get("app-id", "com.instagram.android"))
+                        except Exception:
+                            pass
+
+                    from InstaAddict.core.session_state import SessionState
+                    active_sess = SessionState.get_active()
+                    if active_sess:
+                        bot_status_str = "🟢 *Active & Running Session*"
+                    else:
+                        inside_wh, time_left = SessionState.inside_working_hours(wh_str, 0)
+                        if inside_wh:
+                            bot_status_str = "🟡 *Ready / Starting Up*"
+                        else:
+                            hours, rem = divmod(time_left.seconds, 3600)
+                            mins, _ = divmod(rem, 60)
+                            next_start = (datetime.now() + time_left).strftime("%H:%M:%S")
+                            bot_status_str = f"🌙 *Scheduled Sleep* (Outside working hours)\n• Next session at: *{next_start}* (in {hours}h {mins}m)"
+
+                    ig_msg = (
+                        "📱 *Instagram Bot Status*\n\n"
+                        f"• *Status*: {bot_status_str}\n"
+                        f"• *Working Hours*: `{wh_str}`\n"
+                        f"• *Android Device*: {adb_status}\n"
+                        f"• *Target App*: `{app_pkg}`\n\n"
+                        "💡 *Why Instagram hasn't opened yet?*\n"
+                        "The bot strictly respects your configured `working-hours`. Outside those hours, the bot sleeps to protect your account.\n\n"
+                        "⚡ *To run 24/7 or adjust hours*:\n"
+                        f"Update `working-hours: 00.00-23.59` in `accounts/{username}/config.yml`.\n\n"
+                        "🚀 *To upload a queued post immediately regardless of sleep*:\n"
+                        "Send `/post now` or `/post_force`."
+                    )
+                    telegram_bot_send_text(token, auth_chat_id, ig_msg)
+                    continue
+
                 help_msg = (
-                    "🤖 *InstaAddict Telegram Assistant*\n\n"
+                    "🤖 *InstaAddict-AI Telegram Assistant*\n\n"
                     "📸 *To Queue a Post*:\n"
                     "Send any photo or video with a caption! It will be added to your upload queue and published automatically.\n\n"
                     "💬 *Companion Comments*:\n"
@@ -546,9 +591,37 @@ def check_telegram_inbox(
                 continue
 
             elif cmd == "/status":
-                status_lines = ["🤖 *InstaAddict Bot Status*:"]
+                status_lines = ["🤖 *InstaAddict-AI Bot Status*:"]
                 adb_status = get_adb_device_status()
                 status_lines.append(f"• *Android Device*: {adb_status}")
+
+                cfg_path = os.path.join("accounts", username, "config.yml")
+                wh_str = "00.00-23.59"
+                if os.path.exists(cfg_path):
+                    try:
+                        with open(cfg_path, "r", encoding="utf-8") as f:
+                            loaded = yaml.safe_load(f) or {}
+                            wh_str = str(loaded.get("working-hours", "00.00-23.59"))
+                    except Exception:
+                        pass
+
+                from InstaAddict.core.session_state import SessionState
+                active_sess = SessionState.get_active()
+                if active_sess:
+                    status_lines.append("• *Session State*: 🟢 Running")
+                else:
+                    inside_wh, time_left = SessionState.inside_working_hours(wh_str, 0)
+                    if inside_wh:
+                        status_lines.append("• *Session State*: 🟡 Ready / Starting Up")
+                    else:
+                        hours, rem = divmod(time_left.seconds, 3600)
+                        mins, _ = divmod(rem, 60)
+                        next_start = (datetime.now() + time_left).strftime("%H:%M:%S")
+                        status_lines.append(
+                            f"• *Session State*: 🌙 Sleeping until {next_start} ({hours}h {mins}m left)"
+                        )
+                status_lines.append(f"• *Working Hours*: `{wh_str}`")
+
                 sessions = load_sessions(username)
                 if sessions and len(sessions) > 0:
                     last_s = sessions[-1]
@@ -912,17 +985,34 @@ def _initialize_aggregated_data():
 
 
 def _calculate_session_duration(session):
+    start_time_str = session.get("start_time")
+    finish_time_str = session.get("finish_time")
+    if not start_time_str or not finish_time_str or finish_time_str == "None":
+        return 0
+
     try:
-        start_datetime = datetime.strptime(
-            session["start_time"], "%Y-%m-%d %H:%M:%S.%f"
-        )
-        finish_datetime = datetime.strptime(
-            session["finish_time"], "%Y-%m-%d %H:%M:%S.%f"
-        )
-        return int((finish_datetime - start_datetime).total_seconds() / 60)
-    except ValueError:
+        start_datetime = None
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+            try:
+                start_datetime = datetime.strptime(str(start_time_str), fmt)
+                break
+            except ValueError:
+                pass
+
+        finish_datetime = None
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+            try:
+                finish_datetime = datetime.strptime(str(finish_time_str), fmt)
+                break
+            except ValueError:
+                pass
+
+        if start_datetime and finish_datetime:
+            return int((finish_datetime - start_datetime).total_seconds() / 60)
+        return 0
+    except Exception as e:
         logger.debug(
-            f"{session['id']} has no finish_time. Skipping duration calculation."
+            f"{session.get('id', 'unknown')} duration calculation skipped: {e}"
         )
         return 0
 
@@ -930,7 +1020,10 @@ def _calculate_session_duration(session):
 def daily_summary(sessions):
     daily_aggregated_data = {}
     for session in sessions:
-        date = session["start_time"][:10]
+        start_raw = session.get("start_time")
+        if not start_raw or len(str(start_raw)) < 10:
+            continue
+        date = str(start_raw)[:10]
         daily_aggregated_data.setdefault(date, _initialize_aggregated_data())
         duration = _calculate_session_duration(session)
         daily_aggregated_data[date]["duration"] += duration

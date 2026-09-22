@@ -153,4 +153,16 @@ def restart(
         print_full_report(sessions, configs.args.scrape_to_file)
         sessions.persist(directory=session_state.my_username)
         sys.exit(2)
-    TabBarView(device).navigateToProfile()
+    try:
+        TabBarView(device).navigateToProfile()
+    except Exception as e:
+        logger.warning(
+            f"Unable to navigate to profile immediately after restart ({e}). Retrying after brief settle..."
+        )
+        random_sleep(2, 4, modulable=False)
+        try:
+            TabBarView(device).navigateToProfile()
+        except Exception as e2:
+            logger.error(
+                f"Failed to navigate to profile after restart: {e2}. Proceeding with recovery."
+            )

@@ -128,7 +128,7 @@ def main() -> None:
         sys.argv.insert(1, "run")
 
     parser = argparse.ArgumentParser(
-        prog="InstaAddict",
+        prog="InstaAddict-AI",
         description="free human-like Instagram bot",
     )
     parser.add_argument(

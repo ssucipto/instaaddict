@@ -11,6 +11,7 @@ from InstaAddict.core.resources import ResourceID as resources
 from InstaAddict.core.scroll_end_detector import ScrollEndDetector
 from InstaAddict.core.storage import FollowingStatus
 from InstaAddict.core.utils import (
+    EmptyList,
     get_value,
     inspect_current_view,
     random_sleep,
@@ -467,11 +468,37 @@ class ActionUnfollowFollowers(Plugin):
 
             screen_iterated_followings = []
             logger.info("Iterate over visible followings.")
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat(
+                    "unfollow-followers",
+                    f"Iterating visible followings (checked: {len(checked)})",
+                )
+            except Exception:
+                pass
             user_list = device.find(
                 resourceIdMatches=self.ResourceID.USER_LIST_CONTAINER,
             )
-            row_height, n_users = inspect_current_view(user_list)
+            try:
+                row_height, n_users = inspect_current_view(user_list)
+            except EmptyList:
+                logger.info(
+                    "Followings list is empty or reached the end of list.",
+                    extra={"color": f"{Fore.GREEN}"},
+                )
+                break
             for item in user_list:
+                try:
+                    from InstaAddict.core.tui import DashboardManager
+                    if DashboardManager.is_active() and DashboardManager.get_instance().state.is_skip_task_requested():
+                        logger.warning(
+                            "[TUI] Task skip requested by user ([CTRL+S]). Breaking out of unfollow items...",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        break
+                except Exception:
+                    pass
                 cur_row_height = item.get_height()
                 if cur_row_height < row_height:
                     continue
@@ -500,7 +527,11 @@ class ActionUnfollowFollowers(Plugin):
                     )
                     continue
 
-                username = user_name_view.get_text()
+                try:
+                    username = user_name_view.get_text()
+                except Exception as e:
+                    logger.debug(f"Transient error reading username view: {e}")
+                    continue
                 screen_iterated_followings.append(username)
                 username_key = username.casefold() if username else ""
                 if username_key not in checked:
@@ -635,7 +666,25 @@ class ActionUnfollowFollowers(Plugin):
                 list_view = device.find(
                     resourceId=self.ResourceID.LIST,
                 )
-                list_view.scroll(Direction.DOWN)
+                try:
+                    if list_view.exists():
+                        list_view.scroll(Direction.DOWN)
+                    else:
+                        device.swipe(Direction.UP)
+                except Exception as e:
+                    logger.debug(
+                        f"List view scroll failed ({e}), falling back to gesture swipe."
+                    )
+                    device.swipe(Direction.UP)
+                try:
+                    from InstaAddict.core.watchdog import record_heartbeat
+
+                    record_heartbeat(
+                        "unfollow-followers",
+                        f"Scrolled followings (checked: {len(checked)})",
+                    )
+                except Exception:
+                    pass
             else:
                 load_more_button = device.find(
                     resourceId=self.ResourceID.ROW_LOAD_MORE_BUTTON

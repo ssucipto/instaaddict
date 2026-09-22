@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "InstaAddict"
+name = "InstaAddict-AI"
 authors = [
     { name = "ssucipto" }
 ]
@@ -43,6 +43,7 @@ Source = "https://github.com/ssucipto/instaaddict"
 
 [project.scripts]
 instaaddict = "InstaAddict.__main__:main"
+instaaddict-ai = "InstaAddict.__main__:main"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

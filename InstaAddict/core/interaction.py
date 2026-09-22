@@ -315,6 +315,7 @@ def interact_with_user(
             if opened_post_view is None:
                 save_crash(device)
                 consecutive_open_failures += 1
+                UniversalActions.dismiss_peek_if_open(device)
                 for _ in range(3):
                     if post_grid_view._is_still_on_profile():
                         break
@@ -329,6 +330,15 @@ def interact_with_user(
                 continue
 
             consecutive_open_failures = 0
+
+            # Dynamic check: If is_peek is not yet set on opened_post_view, but Peek Preview is actually open
+            if (
+                not getattr(opened_post_view, "is_peek", False)
+                and hasattr(opened_post_view, "is_peek_preview_opened")
+                and opened_post_view.is_peek_preview_opened() is True
+            ):
+                logger.info("Peek Preview detected during post inspection.")
+                opened_post_view.is_peek = True
 
             # Handle Peek Preview if triggered
             if getattr(opened_post_view, "is_peek", False):
@@ -411,6 +421,7 @@ def interact_with_user(
             for _ in range(3):
                 if post_grid_view._is_still_on_profile():
                     break
+                UniversalActions.dismiss_peek_if_open(device)
                 logger.debug("Exiting post view to profile grid...")
                 device.back()
                 random_sleep(0.5, 1.0, modulable=False)

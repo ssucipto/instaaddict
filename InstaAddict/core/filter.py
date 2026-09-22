@@ -222,6 +222,12 @@ class Filter:
                 active_ss.increment_profiles_checked()
                 if skip_reason is not None:
                     active_ss.increment_profiles_skipped()
+                    reason_name = (
+                        skip_reason.name
+                        if hasattr(skip_reason, "name")
+                        else str(skip_reason)
+                    )
+                    active_ss.record_skip_reason(reason_name)
 
             from InstaAddict.core.tui import DashboardManager
 
@@ -232,6 +238,12 @@ class Filter:
                         dm.bound_session_state.increment_profiles_checked()
                         if skip_reason is not None:
                             dm.bound_session_state.increment_profiles_skipped()
+                            reason_name = (
+                                skip_reason.name
+                                if hasattr(skip_reason, "name")
+                                else str(skip_reason)
+                            )
+                            dm.bound_session_state.record_skip_reason(reason_name)
                     else:
                         dm.state.profiles_checked += 1
                         if skip_reason is not None:

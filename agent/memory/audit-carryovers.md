@@ -792,3 +792,73 @@ carryovers:
       - InstaAddict/core/views.py
       - InstaAddict/plugins/action_unfollow_followers.py
 
+  - id: CO-062
+    audit_report: agent/reports/audit-101-ctrl-s-task-skipping-and-visual-feedback.md
+    date_raised: 2026-09-20
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-20'
+    verified_in_audit: agent/reports/audit-101-ctrl-s-task-skipping-and-visual-feedback.md
+    summary: "Hardened Windows console mode to clear ENABLE_PROCESSED_INPUT on CONIN$, promoted single-key shortcuts [S]/[N] to prevent conhost XOFF and IDE key intercept, added full Job Queue Pipeline visualization in TUI activity panel, and clarified Level 2 Task Type skip semantics."
+    affected_files:
+      - InstaAddict/core/tui.py
+      - InstaAddict/core/bot_flow.py
+      - test/test_tui_dashboard.py
+
+  - id: CO-063
+    audit_report: agent/reports/audit-103-pre-implementation-tuning-gaps-and-hardening.md
+    date_raised: 2026-09-20
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-20'
+    verified_in_audit: agent/reports/audit-104-operational-hardening-verification.md
+    summary: "Add defensive EmptyList exception handling in views.py:3129 (harvest_visible_followers) and handle_sources.py:455 (handle_likers), update @lolatheozjack configuration to eliminate business-profile starvation (skip_business: false), adjust AI evaluation quota (evaluate-percentage: 20), and expand blogger rotation list."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/handle_sources.py
+      - accounts/lolatheozjack/filters.yml
+      - accounts/lolatheozjack/config.yml
+
+  - id: CO-064
+    audit_report: agent/reports/audit-111-early-session-termination-and-watchdog-race.md
+    date_raised: 2026-09-22
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-22'
+    verified_in_audit: agent/reports/audit-111-early-session-termination-and-watchdog-race.md
+    summary: "Resolve early session termination and drop to shell prompt caused by BotWatchdog 90s inactivity timeout triggering Tier 1 KEYCODE_BACK recovery during emulator cold launch, displacing Instagram from Profile to Home feed and causing getProfileInfo() to return None which bot_flow.py misclassified as an account soft-ban."
+    affected_files:
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/bot_flow.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-065
+    audit_report: agent/reports/audit-112-anr-app-has-crashed-and-startup-retry-resilience.md
+    date_raised: 2026-09-22
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-22'
+    verified_in_audit: agent/reports/audit-112-anr-app-has-crashed-and-startup-retry-resilience.md
+    summary: "Harden bot against AppHasCrashed during ProfileView/ActionBarView initialization after sleep wake-up by safely initializing action_bar in try/except AppHasCrashed, verifying foreground status at open_instagram conclusion, emitting watchdog heartbeats when tapping Wait on Android system ANR dialogs, guarding choose_cloned_app against None configs/ResourceID, and wrapping startup profile initialization in a 3-attempt self-healing retry loop in start_bot()."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/bot_flow.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-066
+    audit_report: agent/reports/audit-113-log-data-sufficiency-and-dogfood-system-audit.md
+    date_raised: 2026-09-22
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-22'
+    verified_in_audit: agent/reports/audit-113-log-data-sufficiency-and-dogfood-system-audit.md
+    summary: "Enriched telemetry and logging infrastructure across SessionState, Filter, save_crash, and DogfoodOptimizer to record granular SkipReason distributions, machine-readable crash_context.json metadata, task lifecycle/yield metrics, and automated filters.yml starvation tuning."
+    affected_files:
+      - InstaAddict/core/session_state.py
+      - InstaAddict/core/filter.py
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/dogfood.py
+      - test/test_tuning_and_operational_fixes.py

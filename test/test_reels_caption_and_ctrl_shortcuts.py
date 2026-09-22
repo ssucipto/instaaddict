@@ -230,11 +230,14 @@ class TestCtrlShortcutsAndTui(unittest.TestCase):
         from datetime import timedelta
         with patch.object(DashboardManager, "is_active", return_value=True):
             self.mgr.state.upload_requested = True
-            device = MagicMock()
-            session_state = MagicMock()
-            sessions = [session_state]
-            wait_for_next_session(timedelta(seconds=60), session_state, sessions, device)
-            self.assertEqual(mock_sleep.call_count, 1)
+            try:
+                device = MagicMock()
+                session_state = MagicMock()
+                sessions = [session_state]
+                wait_for_next_session(timedelta(seconds=60), session_state, sessions, device)
+                self.assertEqual(mock_sleep.call_count, 1)
+            finally:
+                self.mgr.state.upload_requested = False
 
     @patch("InstaAddict.plugins.interact_reels.TabBarView")
     @patch("InstaAddict.plugins.interact_reels.UniversalActions")

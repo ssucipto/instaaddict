@@ -193,6 +193,13 @@ def print_full_report(sessions, scrape_mode):
 
     save_markdown_history(sessions, scrape_mode)
 
+    # Interface #3: Render the Rich post-session summary screen
+    try:
+        from InstaAddict.core.rich_summary import print_rich_session_summary
+        print_rich_session_summary(sessions, scrape_mode)
+    except Exception as _rich_err:
+        logger.debug(f"Rich summary skipped: {_rich_err}")
+
 
 def save_markdown_history(sessions, scrape_mode):
     """Automatically writes a persistent session summary and appends to history.md (never overwritten)."""
@@ -325,14 +332,25 @@ def save_markdown_history(sessions, scrape_mode):
     # 3. Trigger Dogfooding Optimizer for automated parameter tuning
     try:
         from InstaAddict.core.dogfood import run_dogfood_optimization
+        import InstaAddict.core.config as configs
 
-        tuning_results = run_dogfood_optimization(username)
+        auto_tune_flag = (
+            getattr(configs.args, "auto_tune", False)
+            if hasattr(configs, "args")
+            else False
+        )
+        tuning_results = run_dogfood_optimization(username, auto_tune=auto_tune_flag)
         if tuning_results and tuning_results.get("recommendations"):
             recs = tuning_results["recommendations"]
             if any(r["severity"] in ["HIGH", "CRITICAL"] for r in recs):
                 logger.info(
                     f"Dogfood Optimizer identified tuning recommendations in accounts/{username}/tuning_suggestions.md",
                     extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
+                )
+            if tuning_results.get("auto_tune_result", {}).get("applied"):
+                logger.info(
+                    f"[AUTOTUNE] Applied parameter adjustments: {tuning_results['auto_tune_result']['applied']}",
+                    extra={"color": f"{Style.BRIGHT}{Fore.CYAN}"},
                 )
     except Exception as e:
         logger.debug(f"Dogfood optimization skipped or encountered error: {e}")

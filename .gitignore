@@ -2,6 +2,8 @@
 /dump
 /dist
 /InstaAddict.egg-info
+/InstaAddict_AI.egg-info
+/InstaAddict-AI.egg-info
 /.idea
 /.vscode
 *.pyc

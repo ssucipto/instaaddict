@@ -2,6 +2,30 @@
 # Populated automatically when developer says "log it" or "wrong, log this"
 # Max 5 entries loaded per session, filtered to current task_type + priority:high
 
+- date: 2026-09-22
+  task_type: audit
+  mistake: Discarding granular SkipReason enums into a scalar counter blinded closed-loop autotuning engines from diagnosing parameter starvation (e.g. min_followers, potency_ratio, business accounts). Furthermore, saving crash dumps without machine-readable JSON context (active job, current target, foreground package, uptime) slowed post-mortem diagnosis.
+  correction: Capture exact SkipReason enum distributions in SessionState, record machine-readable crash_context.json in save_crash(), instrument task lifecycle and yield metrics in job_metrics, and empower DogfoodOptimizer to diagnose starvation and autotune filters.yml.
+  priority: high
+
+- date: 2026-09-21
+  task_type: bugfix
+  mistake: Peek Preview detection included Comment and Share in context_opt, falsely matching standard Reels and Posts and causing repeated device.back() dismissals that exited Instagram to the launcher. Additionally, is_tab_bar_visible() and bot_flow.py recovery loop lacked AppHasCrashed handling, causing fatal unhandled exceptions when querying closed app states.
+  correction: Strictly require (Repost|Report) in is_peek_preview_opened(), catch AppHasCrashed in is_tab_bar_visible() returning False, and wrap profile recovery in try-except AppHasCrashed with self-healing open_instagram() relaunch and crash metric tracking.
+  priority: high
+
+- date: 2026-09-20
+  task_type: bugfix
+  mistake: Checking for "401" substring in error messages falsely matched retry delay floating-point seconds like 7.924074016s in rate limit errors, permanently tripping the Vision AI circuit breaker. Additionally, inspect_current_view raised EmptyList crashing follower harvest and likers loops.
+  correction: Check for 429/quota first, use word-boundary regex r"\b401\b" to prevent false-positive auth circuit breaker trips, and wrap all inspect_current_view call sites in try-except EmptyList.
+  priority: high
+
+- date: 2026-09-20
+  task_type: bugfix
+  mistake: On Instagram search/subscreens the bottom tab bar is hidden; legacy fallback jumped to HomeView.navigateToSearch() which called unchecked .click() on missing action bar search buttons, crashing with UiObjectNotFoundError. The subsequent @run_safely restart() triggered an atx-agent uiautomator2 server restart, and calling navigateToProfile() without exception guards while on the splash screen crashed the entire process.
+  correction: Implement TabBarView._escape_subscreens() with dialog dismissals and back navigation before declaring tabs missing, guard HomeView.navigateToSearch() with exists() checks, and wrap post-restart navigateToProfile() in retry/try-except handlers to absorb transient RPC restarts.
+  priority: high
+
 - date: 2026-09-19
   task_type: bugfix
   mistake: Double-tap likes and creator follows in interact_reels.py were strictly nested inside if comment_text:, causing likes and follows to be discarded when Gemini Vision was safety-blocked, rate-limited, or empty. Furthermore, pytest collected ad-hoc scripts from scratch/ trying to connect to offline emulators.
@@ -79,4 +103,46 @@
   mistake: In handle_sources.py, handle_posts lacked post-commenting logic, rendering feed commenting dead code and leaving opened hashtag posts uncommented. In addition, caller duplicating session_state.totalComments += 1 double-counted comments because _comment() already increments it, and top hashtag posts were saturated with already-followed accounts.
   correction: Integrate post-view commenting directly into handle_posts with MediaType detection, respect profile_filter.can_comment(current_job) and comment_percentage with get_value range parsing, let _comment() be the single source of truth for totalComments, record feed interactions via storage.add_interacted_user, and drive follower discovery via blogger-followers and interact-reels with end-if-likes-limit-reached set to false.
   priority: high
+- date: 2026-09-20
+  task_type: bugfix
+  mistake: Bot sessions terminated prematurely at 44 minutes because external rate limit backoffs (60s sleep) and cached non-bot skips lacked watchdog heartbeats, triggering false-positive KEYCODE_BACK alarms that reached total-crashes-limit (5/5). Additionally, EmptyList was erroneously raised as an unhandled exception in iterate_over_followers, list_view.scroll crashed on IG v447 UI, Direction.BOTTOM was referenced despite Direction only containing UP/DOWN/LEFT/RIGHT, and stop_bot() failed to stamp finishTime or guard against None args/configs.
+  correction: Wrap API rate-limit sleeps in _safe_rate_limit_sleep() with watchdog pause/resume and 5s chunked heartbeats, emit heartbeats during list iterations, catch and handle EmptyList gracefully in iterate_over_followers, fall back to device.swipe(Direction.UP) on list scroll failures, stamp session_state.finishTime on bot exit, and defensively guard args and configs against NoneType in utils.py.
+  priority: high
+
+- date: 2026-09-20
+  task_type: bugfix
+  mistake: SessionStateEncoder omitted finish_time during JSON serialization of SessionState, causing saved sessions in accounts/<user>/sessions.json to lack finish_time; when data_analytics.py ran on startup, raw dictionary indexing session["finish_time"] crashed with KeyError, and telegram.py caught only ValueError rather than (ValueError, KeyError, TypeError).
+  correction: Serialize finish_time in SessionStateEncoder.default(), defensively use session.get("finish_time") and session.get("start_time") with multi-format parsing (%Y-%m-%d %H:%M:%S.%f and %Y-%m-%d %H:%M:%S) in data_analytics.py returning None, add null guards in duration and growth plots, and expand telegram.py duration calculation exception guards.
+  priority: high
+
+- date: 2026-09-20
+  task_type: bugfix
+  mistake: Task skip shortcuts (CTRL+S, 's', 'S', 'n', 'N') appeared non-functional to users because there was zero on-screen acknowledgment or audio feedback when pressed, while background tasks remained trapped in uninterruptible random_sleep delays (up to 15-25s) or dense inner loops without per-item skip checks.
+  correction: Provide immediate visual acknowledgement via high-visibility header badges ("⚡ [SKIP PENDING]"), activity panel alerts ("🚨 [CTRL+S RECEIVED] Task Skip Pending"), flashing footer alerts ("⚡ SKIPPING TASK..."), terminal bell ("\a"), slice random_sleep into 0.1s interruptible steps gated by DashboardManager.is_active(), and place non-destructive is_skip_task_requested() checks inside item iteration loops.
+  priority: high
+
+- date: 2026-09-21
+  task_type: bugfix
+  mistake: In navigateToPost, checking if opened_post_view.is_post_opened() or not self._is_still_on_profile() ran before checking is_peek_preview_opened(). Because Peek Preview dims the profile tabs underneath, _is_still_on_profile() returned False, causing the bot to falsely conclude the post was opened normally and bypass Peek Preview interaction and dismissal. Furthermore, locator class restrictions (TextView|Button) failed on modern Jetpack Compose layouts where Repost/Report reside in contentDescription.
+  correction: Always check opened_post_view.is_peek_preview_opened() FIRST in navigateToPost before checking profile exit. Use unrestricted class queries checking both textMatches and descriptionMatches for Repost/Report and Like/Unlike. Add UniversalActions.dismiss_peek_if_open() to UniversalActions.dismiss_dialog() sweep pass 0 and check_micro_stall(), and defensively clear peek overlays on open failures, profile exit, and unidentifiable post authors in feed loops.
+  priority: high
+
+- date: 2026-09-21
+  task_type: bugfix
+  mistake: When launching outside configured working-hours, the bot immediately enters scheduled sleep without updating the TUI dashboard activity or providing feedback in Telegram commands (/start, /status), leading users to perceive a startup regression where Instagram fails to open. Furthermore, target_app resolution in open_instagram and dismiss_peek_if_open accepted non-string objects (like MagicMock in tests), and SessionState.inside_working_hours failed when passed a raw string interval rather than a list.
+  correction: Provide transparent Telegram feedback explaining working-hours sleep schedule on /start <arg> and /status, set dashboard_manager.state.status_message to 'SLEEPING' before entering wait_for_next_session, strictly enforce string type checking for target_app fallback ('com.instagram.android'), and auto-wrap string inputs to a list in SessionState.inside_working_hours.
+  priority: high
+
+- date: 2026-09-22
+  task_type: bugfix
+  mistake: BotWatchdog's 90s inactivity threshold fired Tier 1 recovery (2x KEYCODE_BACK) during lengthy emulator Instagram cold-starts and IME configuration (taking ~91s without heartbeats). The asynchronous back keys displaced Instagram from the Profile screen to the Home feed, causing ProfileView.getProfileInfo() to return None for all counters, which bot_flow.py immediately misclassified as an account soft-ban and aborted via sys.exit(2) after only 2m31s.
+  correction: Instrument open_instagram() wait loops, IME config, AccountView.refresh_account(), and ProfileView.getProfileInfo() with record_heartbeat() checkpoints. Before aborting on None profile counters, execute a self-healing recovery in bot_flow.py that dismisses dialogs, re-navigates to Profile via TabBarView.navigateToProfile(), and retries getProfileInfo() before declaring a fatal soft-ban. Defensively guard configs.args and configs.device_id accesses against NoneType in utils.py.
+  priority: high
+
+- date: 2026-09-22
+  task_type: bugfix
+  mistake: Following scheduled sleep, emulator CPU spikes triggered an Android system ANR dialog ("Instagram isn't responding"). Watchdog inactivity fired KEYCODE_BACK during ANR resolution, displacing Instagram to the background. open_instagram() exited without confirming foreground status, and ProfileView(device) crashed unhandled with AppHasCrashed because ActionBarView.__init__ eagerly queried device.find() outside any try/except retry loop in start_bot().
+  correction: Wrap ActionBarView._getActionBar() and __init__ in try/except AppHasCrashed setting self.action_bar = None; verify device._ig_is_opened() at conclusion of open_instagram(); emit watchdog heartbeats when tapping Wait on system ANR dialogs; guard choose_cloned_app against None configs/ResourceID; and wrap startup profile initialization in a 3-attempt retry loop in start_bot() with AppHasCrashed catching and open_instagram() relaunch.
+  priority: high
+
 

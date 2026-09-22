@@ -9,7 +9,8 @@ from colorama import Fore, Style
 
 from InstaAddict import __tested_ig_version__
 from InstaAddict.core.config import Config
-from InstaAddict.core.device_facade import create_device, get_device_info
+from InstaAddict.core.device_facade import DeviceFacade, create_device, get_device_info
+from InstaAddict.core.decorators import restart
 from InstaAddict.core.filter import Filter
 from InstaAddict.core.filter import load_config as load_filter
 from InstaAddict.core.interaction import load_config as load_interaction
@@ -154,6 +155,15 @@ def start_bot(**kwargs):
         )
         if not inside_working_hours:
             watchdog.pause()
+            if dashboard_manager.is_active():
+                dashboard_manager.state.status_message = "SLEEPING"
+                wh_str = getattr(configs.args, "working_hours", "configured hours")
+                dashboard_manager.state.update_activity(
+                    job="Scheduled Sleep",
+                    action=f"Outside working hours ({wh_str})",
+                    source="working-hours",
+                )
+                dashboard_manager.update_render()
             wait_for_next_session(time_left, session_state, sessions, device)
             watchdog.resume()
         pre_post_script(path=configs.args.pre_script)
@@ -202,9 +212,11 @@ def start_bot(**kwargs):
 
         logger.info("Device screen ON and unlocked.")
         if open_instagram(device):
+            watchdog.heartbeat("startup", "Instagram opened successfully")
             try:
                 running_ig_version = get_instagram_version()
                 logger.info(f"Instagram version: {running_ig_version}")
+                watchdog.heartbeat("startup", f"Instagram version {running_ig_version}")
                 if tuple(running_ig_version.split(".")) > tuple(
                     __tested_ig_version__.split(".")
                 ):
@@ -250,21 +262,74 @@ def start_bot(**kwargs):
             UniversalActions.close_keyboard(device)
         else:
             break
-        profile_view = ProfileView(device)
-        account_view = AccountView(device)
-        tab_bar_view = TabBarView(device)
-        try:
-            account_view.navigate_to_main_account()
-            check_if_english(device)
-            if configs.args.username is not None:
-                success = account_view.changeToUsername(configs.args.username)
-                if not success:
-                    logger.error(
-                        f"Not able to change to {configs.args.username}, abort!"
-                    )
-                    save_crash(device)
-                    device.back()
-                    break
+        startup_ok = False
+        for startup_attempt in range(3):
+            try:
+                watchdog.heartbeat("startup", f"Initializing profile views (attempt {startup_attempt + 1}/3)")
+                profile_view = ProfileView(device)
+                account_view = AccountView(device)
+                tab_bar_view = TabBarView(device)
+                watchdog.heartbeat("startup", "Navigating to main profile account")
+                account_view.navigate_to_main_account()
+                check_if_english(device)
+                if configs.args.username is not None:
+                    watchdog.heartbeat("startup", f"Verifying account username {configs.args.username}")
+                    success = account_view.changeToUsername(configs.args.username)
+                    if not success:
+                        logger.error(
+                            f"Not able to change to {configs.args.username}, abort!"
+                        )
+                        save_crash(device)
+                        device.back()
+                        break
+                watchdog.heartbeat("startup", "Refreshing profile account")
+                account_view.refresh_account()
+                watchdog.heartbeat("startup", "Reading profile counters")
+                (
+                    session_state.my_username,
+                    session_state.my_posts_count,
+                    session_state.my_followers_count,
+                    session_state.my_following_count,
+                ) = profile_view.getProfileInfo()
+                if dashboard_manager.is_active():
+                    dashboard_manager.state.username = session_state.my_username
+                    dashboard_manager.state.followers_count = str(session_state.my_followers_count or 0)
+                    dashboard_manager.state.following_count = str(session_state.my_following_count or 0)
+                    dashboard_manager.state.posts_count = str(session_state.my_posts_count or 0)
+                    dashboard_manager.update_render()
+                startup_ok = True
+                break
+            except DeviceFacade.AppHasCrashed:
+                logger.warning(
+                    f"AppHasCrashed during startup (attempt {startup_attempt + 1}/3). Relaunching Instagram via open_instagram()...",
+                    extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                )
+                session_state.totalCrashes += 1
+                open_instagram(device)
+                random_sleep(2, 4, modulable=False)
+            except Exception as e:
+                logger.error(f"Exception during startup (attempt {startup_attempt + 1}/3): {e}")
+                save_crash(device)
+                break
+
+        if not startup_ok:
+            logger.error("Startup sequence failed after retries. Aborting session.")
+            save_crash(device)
+            break
+
+        if (
+            session_state.my_username is None
+            or session_state.my_posts_count is None
+            or session_state.my_followers_count is None
+            or session_state.my_following_count is None
+        ):
+            logger.warning(
+                "Could not get profile info on first attempt. Attempting self-healing recovery to navigate to profile..."
+            )
+            watchdog.heartbeat("recovery", "Recovering profile navigation")
+            UniversalActions.dismiss_dialog(device)
+            tab_bar_view.navigateToProfile()
+            random_sleep(1.5, 2.5, modulable=False)
             account_view.refresh_account()
             (
                 session_state.my_username,
@@ -278,10 +343,6 @@ def start_bot(**kwargs):
                 dashboard_manager.state.following_count = str(session_state.my_following_count or 0)
                 dashboard_manager.state.posts_count = str(session_state.my_posts_count or 0)
                 dashboard_manager.update_render()
-        except Exception as e:
-            logger.error(f"Exception: {e}")
-            save_crash(device)
-            break
 
         if (
             session_state.my_username is None
@@ -348,12 +409,17 @@ def start_bot(**kwargs):
         logger.info(
             f"There is/are {len(jobs_list)-len(unfollow_jobs)} active-job(s) and {len(unfollow_jobs)} unfollow-job(s) scheduled for this session."
         )
+        if dashboard_manager and dashboard_manager.is_active():
+            dashboard_manager.state.set_pipeline(jobs_list, 0)
+            dashboard_manager.update_render()
         storage = Storage(session_state.my_username)
         filters = Filter(storage)
         show_ending_conditions()
         if not configs.args.debug and not only_upload_requested:
             countdown(10, "Bot will start in: ")
         for plugin in jobs_list:
+            if dashboard_manager and dashboard_manager.is_active():
+                dashboard_manager.state.set_pipeline(jobs_list, jobs_list.index(plugin))
             watchdog.heartbeat(f"job:{plugin}", f"Starting {plugin}")
             inside_working_hours, time_left = SessionState.inside_working_hours(
                 configs.args.working_hours, configs.args.time_delta_session
@@ -377,7 +443,14 @@ def start_bot(**kwargs):
                     extra={"color": f"{Fore.CYAN}"},
                 )
                 break
-            if profile_view.getUsername(error=False) != session_state.my_username:
+            try:
+                curr_user = profile_view.getUsername(error=False)
+            except DeviceFacade.AppHasCrashed:
+                curr_user = None
+            except Exception:
+                curr_user = None
+
+            if curr_user != session_state.my_username:
                 logger.debug("Not in your main profile. Initiating recovery...")
                 # Immediate pre-recovery popup sweep (CO-028 / CO-030)
                 UniversalActions.dismiss_dialog(device)
@@ -394,55 +467,72 @@ def start_bot(**kwargs):
 
                 on_profile = False
                 for attempt in range(4):
-                    # Sweep any blocking dialogs before tab navigation
-                    UniversalActions.dismiss_dialog(device)
-
-                    # Back up to 3 times if tab bar is not visible
-                    for _ in range(3):
-                        if tab_bar_view.is_tab_bar_visible():
-                            break
-                        back_btn = device.find(resourceIdMatches=action_bar_back)
-                        if back_btn.exists():
-                            logger.debug("Tapping action_bar_button_back to exit search/subscreen.")
-                            back_btn.click()
-                        else:
-                            logger.debug("Tab bar not visible, go back.")
-                            device.back()
-                        random_sleep(1, 2, modulable=False)
+                    try:
+                        # Sweep any blocking dialogs before tab navigation
                         UniversalActions.dismiss_dialog(device)
 
-                    tab_bar_view.navigateToProfile()
-                    if profile_view.getUsername(error=False) == session_state.my_username:
-                        on_profile = True
-                        break
+                        # Back up to 3 times if tab bar is not visible
+                        for _ in range(3):
+                            if tab_bar_view.is_tab_bar_visible():
+                                break
+                            back_btn = device.find(resourceIdMatches=action_bar_back)
+                            if back_btn.exists():
+                                logger.debug("Tapping action_bar_button_back to exit search/subscreen.")
+                                back_btn.click()
+                            else:
+                                logger.debug("Tab bar not visible, go back.")
+                                device.back()
+                            random_sleep(1, 2, modulable=False)
+                            UniversalActions.dismiss_dialog(device)
 
-                    logger.debug(f"Profile recovery attempt {attempt + 1}/4 did not reach profile.")
-
-                    # Escalated recovery tiers (CO-031 / CO-033)
-                    if attempt == 0:
-                        device.back()
-                        random_sleep(1, 2, modulable=False)
-                        UniversalActions.dismiss_dialog(device)
-                    elif attempt == 1:
-                        # Try navigating to Home first, then Profile
-                        tab_bar_view.navigateToHome()
-                        random_sleep(1, 2, modulable=False)
-                        UniversalActions.dismiss_dialog(device)
                         tab_bar_view.navigateToProfile()
                         if profile_view.getUsername(error=False) == session_state.my_username:
                             on_profile = True
                             break
-                    elif attempt == 2:
-                        # Nuclear / Self-healing recovery: Clean restart of Instagram!
+
+                        logger.debug(f"Profile recovery attempt {attempt + 1}/4 did not reach profile.")
+
+                        # Escalated recovery tiers (CO-031 / CO-033)
+                        if attempt == 0:
+                            device.back()
+                            random_sleep(1, 2, modulable=False)
+                            UniversalActions.dismiss_dialog(device)
+                        elif attempt == 1:
+                            # Try navigating to Home first, then Profile
+                            tab_bar_view.navigateToHome()
+                            random_sleep(1, 2, modulable=False)
+                            UniversalActions.dismiss_dialog(device)
+                            tab_bar_view.navigateToProfile()
+                            if profile_view.getUsername(error=False) == session_state.my_username:
+                                on_profile = True
+                                break
+                        elif attempt == 2:
+                            # Nuclear / Self-healing recovery: Clean restart of Instagram!
+                            logger.warning(
+                                "Persistent navigation deadlock detected. Executing self-healing app restart...",
+                                extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                            )
+                            UniversalActions.recover_stuck_screen(device, configs.args.app_id)
+                            tab_bar_view.navigateToProfile()
+                            if profile_view.getUsername(error=False) == session_state.my_username:
+                                on_profile = True
+                                break
+                    except DeviceFacade.AppHasCrashed:
                         logger.warning(
-                            "Persistent navigation deadlock detected. Executing self-healing app restart...",
+                            f"AppHasCrashed caught during profile recovery attempt {attempt + 1}/4. Executing self-healing relaunch...",
                             extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                         )
-                        UniversalActions.recover_stuck_screen(device, configs.args.app_id)
-                        tab_bar_view.navigateToProfile()
-                        if profile_view.getUsername(error=False) == session_state.my_username:
-                            on_profile = True
-                            break
+                        session_state.totalCrashes += 1
+                        open_instagram(device)
+                        random_sleep(2, 4, modulable=False)
+                        UniversalActions.dismiss_dialog(device)
+                        try:
+                            tab_bar_view.navigateToProfile()
+                            if profile_view.getUsername(error=False) == session_state.my_username:
+                                on_profile = True
+                                break
+                        except Exception as e:
+                            logger.debug(f"Post-relaunch navigateToProfile error: {e}")
 
                 if not on_profile:
                     logger.warning(
@@ -451,13 +541,14 @@ def start_bot(**kwargs):
                     )
                     continue
 
-            # Check for user-triggered task skip request via TUI hotkey [S]/[N]
+            # Check for user-triggered task skip request via TUI hotkey [S]/[N]/[CTRL+S]
             if (
-                dashboard_manager.is_active()
+                dashboard_manager
+                and dashboard_manager.is_active()
                 and dashboard_manager.state.consume_skip_task_request()
             ):
                 logger.warning(
-                    f"[TUI] Skipping job '{plugin}' triggered by user shortcut ([S]/[N]). Advancing to next task...",
+                    f"[TUI] Skipping job '{plugin}' triggered by user shortcut ([S]/[N]/[CTRL+S]). Advancing to next task...",
                     extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                 )
                 continue
@@ -511,11 +602,27 @@ def start_bot(**kwargs):
                     f"Current unfollow-job: {plugin}",
                     extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
                 )
-                configs.actions[plugin].run(
-                    device, configs, storage, sessions, filters, plugin
-                )
+                session_state.start_job(plugin)
+                try:
+                    from InstaAddict.core.telemetry import PerformanceTracker
+
+                    with PerformanceTracker.get_instance().measure("job", plugin):
+                        configs.actions[plugin].run(
+                            device, configs, storage, sessions, filters, plugin
+                        )
+                    session_state.end_job(plugin, "completed")
+                except DeviceFacade.AppHasCrashed:
+                    session_state.end_job(plugin, "app_has_crashed")
+                    logger.warning(
+                        f"Uncaught AppHasCrashed during {plugin}. Executing restart...",
+                        extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                    )
+                    restart(device, sessions, session_state, configs, normal_crash=False)
+                except Exception as e:
+                    session_state.end_job(plugin, f"error: {type(e).__name__}")
+                    raise
                 watchdog.heartbeat(f"job:{plugin}_done", f"Completed {plugin}")
-                if dashboard_manager.is_active():
+                if dashboard_manager and dashboard_manager.is_active():
                     dashboard_manager.state.consume_skip_task_request()
                 unfollow_jobs.remove(plugin)
                 print_limits = True
@@ -525,7 +632,7 @@ def start_bot(**kwargs):
                         f"Can't perform {plugin} job because a limit for active-jobs has been reached."
                     )
                     print_limits = None
-                    remaining_jobs = jobs_list[jobs_list.index(plugin) :]
+                    remaining_jobs = jobs_list[jobs_list.index(plugin):]
                     if unfollow_jobs or "upload-posts" in remaining_jobs:
                         continue
                     else:
@@ -539,19 +646,36 @@ def start_bot(**kwargs):
                     f"Current active-job: {plugin}",
                     extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
                 )
-                if dashboard_manager.is_active():
+                if dashboard_manager and dashboard_manager.is_active():
                     dashboard_manager.state.current_job = plugin
                     dashboard_manager.state.current_action = f"Running {plugin}..."
+                    dashboard_manager.state.set_pipeline(jobs_list, jobs_list.index(plugin))
                     dashboard_manager.update_render()
                 if configs.args.scrape_to_file is not None:
                     logger.warning(
                         "You're in scraping mode! That means you're only collection data without interacting!"
                     )
-                configs.actions[plugin].run(
-                    device, configs, storage, sessions, filters, plugin
-                )
+                session_state.start_job(plugin)
+                try:
+                    from InstaAddict.core.telemetry import PerformanceTracker
+
+                    with PerformanceTracker.get_instance().measure("job", plugin):
+                        configs.actions[plugin].run(
+                            device, configs, storage, sessions, filters, plugin
+                        )
+                    session_state.end_job(plugin, "completed")
+                except DeviceFacade.AppHasCrashed:
+                    session_state.end_job(plugin, "app_has_crashed")
+                    logger.warning(
+                        f"Uncaught AppHasCrashed during {plugin}. Executing restart...",
+                        extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
+                    )
+                    restart(device, sessions, session_state, configs, normal_crash=False)
+                except Exception as e:
+                    session_state.end_job(plugin, f"error: {type(e).__name__}")
+                    raise
                 watchdog.heartbeat(f"job:{plugin}_done", f"Completed {plugin}")
-                if dashboard_manager.is_active():
+                if dashboard_manager and dashboard_manager.is_active():
                     dashboard_manager.state.consume_skip_task_request()
                 print_limits = True
 

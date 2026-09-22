@@ -1,9 +1,9 @@
 # Design Document: Terminal User Interface (TUI) & Live Dashboard
 
 **Title**: Terminal User Interface (TUI) & Live Dashboard  
-**Status**: Planned  
+**Status**: Implemented  
 **Created**: 2026-09-17  
-**Last Updated**: 2026-09-17  
+**Last Updated**: 2026-09-22  
 **Author**: Antigravity  
 
 ---
@@ -11,7 +11,7 @@
 ## 1. Overview & Problem Statement
 
 ### 1.1 Context
-InstaAddict is a high-throughput, multi-threaded mobile automation engine that executes complex workflows:
+InstaAddict-AI is a high-throughput, multi-threaded mobile automation engine that executes complex workflows:
 - Reels watching and engagement
 - Multi-tier hashtag rotation and discovery
 - Multimodal Gemini Vision AI evaluation and contextual commenting
@@ -19,7 +19,7 @@ InstaAddict is a high-throughput, multi-threaded mobile automation engine that e
 - 4-tier navigation recovery and ad avoidance
 
 ### 1.2 Problem
-Currently, InstaAddict streams all runtime information linearly to `stdout` via `colorama`. While functional, this approach presents critical usability challenges during long bot sessions:
+Currently, InstaAddict-AI streams all runtime information linearly to `stdout` via `colorama`. While functional, this approach presents critical usability challenges during long bot sessions:
 1. **Console Scroll-Off**: Key metrics (likes count, follows count, session limits, crash counts) scroll off the terminal window within seconds as logs flow.
 2. **Lack of Visual Progress**: Users cannot observe at a glance how close the session is to configured safety limits or when the next action will occur.
 3. **Log Clutter**: Informational messages, countdown carriage returns (`\r`), and debug traces interleave and visually collide, making it difficult to discern current bot activity from historical background events.
@@ -32,6 +32,8 @@ Design and implement a modern, high-performance, live-updating Terminal User Int
 - **Active Context Panel**: Current job, current target post/user, current step (e.g. "Vision AI evaluating Reel..."), and live sleep countdown.
 - **Dedicated Rolling Log Window**: Real-time streaming log panel with color-coded level tags and timestamps, isolated from metric panels to eliminate screen flicker or layout corruption.
 - **Graceful Headless Fallback**: Automatic detection of non-interactive terminals (`not sys.stdout.isatty()`) or `--no-tui` flags with fallback to standard stream output.
+- **Multi-View Modes**: Toggle between Live Dashboard, KPI Statistics Charts, and Filter Intelligence via `[Ctrl+G]`.
+- **Post-Session Rich Summary**: Self-contained post-session summary renderer (`rich_summary.py`) with KPI grid, yield metrics, and health scores.
 
 ---
 
@@ -39,7 +41,7 @@ Design and implement a modern, high-performance, live-updating Terminal User Int
 
 ```text
 +------------------------------------------------------------------------------------------------------------------+
-|  [BOT] InstaAddict AI v1.2.1 | @account_name (1,452 followers) | Device: emulator-5554 (Online) | Session #1     |
+|  [BOT] InstaAddict-AI v1.4.1 | @account_name (1,452 followers) | Device: emulator-5554 (Online) | Session #1     |
 +------------------------------------------------------+-----------------------------------------------------------+
 | SESSION STATS & PROGRESS                             | LIVE LOGS & CONSOLE STREAM                                |
 |                                                      | [21:45:02] [INFO] Loaded hashtags pool (64 tags)          |

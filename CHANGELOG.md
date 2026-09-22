@@ -2,7 +2,19 @@
 
 ## v1.4.1 — Engagement Pipeline Hardening, Reels Ad Filtering & Invariant Robustness
 
-Patch release resolving false-positive Reels ad classification, inline follow button discovery in modern Instagram v446+, session state dictionary type invariants, range-safe percentage expression parsing, post-lifecycle comment decoupling for already-liked posts, and defensive profile filter null-guards.
+Patch release resolving false-positive Reels ad classification, inline follow button discovery in modern Instagram v446+, session state dictionary type invariants, range-safe percentage expression parsing, post-lifecycle comment decoupling for already-liked posts, and defensive profile filter null-guards. Also introduces InstaAddict-AI rebranding, dedicated CLI entrypoint, 3rd TUI view mode (Filter Intelligence), and post-session Rich terminal summary renderer.
+
+### Added
+- **InstaAddict-AI Rebranding & Dedicated CLI Entrypoint (`pyproject.toml`, `InstaAddict/__main__.py`, `InstaAddict/core/utils.py`)**:
+  - Rebranded distribution package to `InstaAddict-AI` with dedicated `instaaddict-ai` CLI script alongside legacy `instaaddict`.
+  - Updated startup banners, donation/starring prompts, and PyPI update URLs to `https://pypi.org/pypi/InstaAddict-AI/json`.
+  - Preserved internal Python import paths (`InstaAddict.*`) for syntactically valid module namespaces.
+- **TUI Filter Intelligence View & 2-Row Responsive Layout (`InstaAddict/core/tui.py`, `test/test_tui_dashboard.py`)**:
+  - Added 3rd ViewMode (`FILTER_INTELLIGENCE`) cycling via `[Ctrl+G]` displaying skip reason bar distribution, per-job lifecycle metrics, and crash timeline.
+  - Upgraded header to 2-row layout with device, working hours, and watchdog health status.
+  - Upgraded footer to 2-row layout with boxed shortcuts and view mode indicators.
+- **Post-Session Rich Summary Engine (`InstaAddict/core/rich_summary.py`, `InstaAddict/core/report.py`)**:
+  - Implemented terminal report renderer featuring hero banner, health scores, KPI grid, per-source skip reasons, job yield %, and dogfood recommendations.
 
 ### Fixed
 - **Reels False-Positive Ad Classification (`InstaAddict/plugins/interact_reels.py`, `test/test_reels_ad_and_follow_fix.py`)**:

@@ -1,9 +1,9 @@
 <p align="center">
   <img src="https://github.com/ssucipto/instaaddict/raw/master/res/logo.png" alt="logo">
   <br />
-  <h1 align="center">InstaAddict AI — Enhanced Edition</h1>
+  <h1 align="center">InstaAddict-AI — Enhanced Edition</h1>
   <br />
-  <p align="center">Looking for production-grade Instagram automation? I'm proud to present <b>InstaAddict AI (Enhanced Edition)</b>: a <b>100% free, open-source, human-like Instagram bot</b>. Grow your audience and engagement with automated liking, following, commenting, story watching, and autonomous posting on real Android devices or emulators. <b>No root required. No private APIs.</b></p>
+  <p align="center">Looking for production-grade Instagram automation? I'm proud to present <b>InstaAddict-AI (Enhanced Edition)</b>: a <b>100% free, open-source, human-like Instagram bot</b>. Grow your audience and engagement with automated liking, following, commenting, story watching, and autonomous posting on real Android devices or emulators. <b>No root required. No private APIs.</b></p>
   <p align="center">
     <a href="https://github.com/ssucipto/instaaddict/blob/master/LICENSE">
       <img src="https://img.shields.io/github/license/ssucipto/instaaddict?style=flat" alt="license"/>
@@ -34,7 +34,7 @@
 ## Table of Contents
 
 * [About This Project & Our Fork](#about-this-project--our-fork)
-* [What's New in This Fork (InstaAddict vs GramAddict)](#whats-new-in-this-fork-instaaddict-vs-gramaddict)
+* [What's New in This Fork (InstaAddict-AI vs GramAddict)](#whats-new-in-this-fork-instaaddict-ai-vs-gramaddict)
   * [1. Full-Screen Reels & Modern IG (v446+) Compatibility](#1-full-screen-reels--modern-ig-v446-compatibility)
   * [2. Tiered Masterlist & Dynamic Hashtag Discovery Engine](#2-tiered-masterlist--dynamic-hashtag-discovery-engine)
   * [3. Persistent Non-Bot Followings Cache](#3-persistent-non-bot-followings-cache)
@@ -46,7 +46,7 @@
   * [9. Production Telemetry & Self-Learning Dogfood Optimizer](#9-production-telemetry--self-learning-dogfood-optimizer)
   * [10. Android 14+ UIAutomator2 & FastInputIME Mode.PASTE](#10-android-14-uiautomator2--fastinputime-modepaste)
 * [Why Automate Your Instagram?](#why-automate-your-instagram)
-* [Why InstaAddict Over Other Bots?](#why-instaaddict-over-other-bots)
+* [Why InstaAddict-AI Over Other Bots?](#why-instaaddict-ai-over-other-bots)
 * [How It Works](#how-it-works)
 * [Compatibility & Known Working Versions](#compatibility--known-working-versions)
 * [Features & Interaction Jobs](#features--interaction-jobs)
@@ -60,10 +60,10 @@
 
 # About This Project & Lineage
 
-**InstaAddict AI (Enhanced Edition)** is an advanced fork and comprehensive architectural modernization maintained by [@ssucipto](https://github.com/ssucipto).
+**InstaAddict-AI (Enhanced Edition)** is an advanced fork and comprehensive architectural modernization maintained by [@ssucipto](https://github.com/ssucipto).
 
 ### Project Lineage & Credits
-1. **InstaAddict AI (Enhanced Edition)** — Maintained by [@ssucipto](https://github.com/ssucipto). Introduces modern IG v446+ Reels compatibility, multimodal Gemini Vision AI, tiered dynamic hashtag discovery, persistent non-bot caching, fluid 200ms ADB gestures, and in-app browser escape watchdogs.
+1. **InstaAddict-AI (Enhanced Edition)** — Maintained by [@ssucipto](https://github.com/ssucipto). Introduces modern IG v446+ Reels compatibility, multimodal Gemini Vision AI, tiered dynamic hashtag discovery, persistent non-bot caching, fluid 200ms ADB gestures, and in-app browser escape watchdogs.
 2. **InstaAddict (Upstream Fork)** — Maintained by [@joeahkim](https://github.com/joeahkim), which first rebranded from GramAddict and introduced initial UI locator updates for IG 438+.
 3. **GramAddict (Original Foundation)** — Originally created and architected by [mastrolube](https://github.com/mastrolube) and the open-source GramAddict community.
 
@@ -82,14 +82,14 @@
 
 <br />
 
-# What's New in This Fork (InstaAddict vs GramAddict)
+# What's New in This Fork (InstaAddict-AI vs GramAddict)
 
-InstaAddict introduces major architectural enhancements, new subsystems, and critical bug fixes that transform the bot into an autonomous, self-healing growth engine:
+InstaAddict-AI introduces major architectural enhancements, new subsystems, and critical bug fixes that transform the bot into an autonomous, self-healing growth engine:
 
 ---
 
 ### 1. Full-Screen Reels & Modern IG (v446+) Compatibility
-- **Modern Reels Viewer Support**: In Instagram v446+, opening video posts from hashtag grids launches the full-screen Reels viewer (`clips_viewer_view_pager`, `root_clips_layout`, `clips_viewer_container`). InstaAddict natively handles this layout.
+- **Modern Reels Viewer Support**: In Instagram v446+, opening video posts from hashtag grids launches the full-screen Reels viewer (`clips_viewer_view_pager`, `root_clips_layout`, `clips_viewer_container`). InstaAddict-AI natively handles this layout.
 - **Multi-Tier Author Resolution**: Post author discovery now gracefully cascades across feed locators (`ROW_FEED_PHOTO_PROFILE_NAME`), Clips text locators (`CLIPS_AUTHOR_USERNAME`), regex content description extraction (`CLIPS_AUTHOR_PROFILE_PIC` via `"Profile picture of ([\w.]+)"`), and header components (`ROW_FEED_PROFILE_HEADER`, `CLIPS_AUTHOR_INFO_COMPONENT`).
 - **Decoupled Ad Classification**: Fixed a longstanding bug where failing to click an author's header unconditionally returned `is_ad = True`. Missing author resolution now returns `(False, False, is_hashtag)`, completely eliminating false-positive ad skips on organic content.
 - **Native Reels Like Button**: Automatically recognizes and interacts with `ResourceID.LIKE_BUTTON` (`com.instagram.android:id/like_button`).
@@ -183,23 +183,23 @@ InstaAddict introduces major architectural enhancements, new subsystems, and cri
 
 Organic discovery on Instagram heavily favors accounts that already receive massive engagement. If you are starting fresh or growing a niche profile, your posts rarely appear in explore or hashtag feeds unless people interact with your profile first.
 
-InstaAddict automates the repetitive, time-consuming interaction work (liking targeted posts, following niche-relevant users, watching stories, and commenting) so real people are notified, check out your profile, and follow you back organically.
+InstaAddict-AI automates the repetitive, time-consuming interaction work (liking targeted posts, following niche-relevant users, watching stories, and commenting) so real people are notified, check out your profile, and follow you back organically.
 
 ## Does this replace quality content?
-**No.** Automation gets your profile discovered; your content determines whether they stay and follow. Pair InstaAddict with engaging posts, high-quality visuals, and a clear bio.
+**No.** Automation gets your profile discovered; your content determines whether they stay and follow. Pair InstaAddict-AI with engaging posts, high-quality visuals, and a clear bio.
 
 ## Will I get banned?
-InstaAddict avoids private API calls, making it vastly safer than cloud-based API bots. However, **Instagram enforces behavioral velocity limits**. If a bot (or human) follows 500 accounts in an hour, it will trigger soft-blocks. We strongly advise using modest, randomized session limits that mimic human routines.
+InstaAddict-AI avoids private API calls, making it vastly safer than cloud-based API bots. However, **Instagram enforces behavioral velocity limits**. If a bot (or human) follows 500 accounts in an hour, it will trigger soft-blocks. We strongly advise using modest, randomized session limits that mimic human routines.
 
 <br />
 
 # How It Works
 
-Unlike competing tools that send unauthorized HTTP requests directly to Instagram's private backend, InstaAddict controls the official Android Instagram app installed on your physical device or emulator using **Android Debug Bridge (ADB)** and **UIAutomator2**.
+Unlike competing tools that send unauthorized HTTP requests directly to Instagram's private backend, InstaAddict-AI controls the official Android Instagram app installed on your physical device or emulator using **Android Debug Bridge (ADB)** and **UIAutomator2**.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       InstaAddict                           │
+│                       InstaAddict-AI                        │
 │  (ConfigArgParse, HashtagManager, Gemini AI, DogfoodEngine) │
 └──────────────────────────────┬──────────────────────────────┘
                                │
@@ -337,7 +337,7 @@ python run.py --config accounts/my_instagram_user/config.yml --expand-hashtags
 
 # Configuration & CLI Reference
 
-InstaAddict features rich command-line flags and configuration files:
+InstaAddict-AI features rich command-line flags and configuration files:
 
 ### New Command-Line Flags
 
@@ -375,13 +375,13 @@ accounts/<your_username>/
 # Common Setup Issues & Troubleshooting
 
 ### 1. `Can't find the owner name, skip.` or Posts Skipped as Ads
-- **Resolution**: Update to InstaAddict v1.3.0+. Modern full-screen Reels viewer locators (`CLIPS_AUTHOR_USERNAME`, `CLIPS_AUTHOR_PROFILE_PIC`) are natively handled, and missing owner lookup is decoupled from ad detection.
+- **Resolution**: Update to InstaAddict-AI v1.3.0+. Modern full-screen Reels viewer locators (`CLIPS_AUTHOR_USERNAME`, `CLIPS_AUTHOR_PROFILE_PIC`) are natively handled, and missing owner lookup is decoupled from ad detection.
 
 ### 2. Jerky Scrolling or Multiple Swipes Per Post
-- **Resolution**: InstaAddict v1.3.0 uses calibrated 200ms native ADB swipe gestures and single-swipe Reels navigation. Ensure `speed-multiplier: 1` in `config.yml`.
+- **Resolution**: InstaAddict-AI v1.3.0 uses calibrated 200ms native ADB swipe gestures and single-swipe Reels navigation. Ensure `speed-multiplier: 1` in `config.yml`.
 
 ### 3. Stuck in In-App Browser Ad Overlay
-- **Resolution**: InstaAddict includes an automated browser escape watchdog (`escape_in_app_browser`) that detects `BrowserLiteInMainProcessIGActivity` and dismisses ad overlays automatically.
+- **Resolution**: InstaAddict-AI includes an automated browser escape watchdog (`escape_in_app_browser`) that detects `BrowserLiteInMainProcessIGActivity` and dismisses ad overlays automatically.
 
 ### 4. `ModuleNotFoundError: No module named 'pkg_resources'`
 ```bash
@@ -395,7 +395,7 @@ Ensure platform-tools is added to your Environment `PATH` variable, and restart 
 
 # Support This Project
 
-InstaAddict AI (Enhanced Edition) is 100% free and open-source. Maintaining compatibility against Instagram's rapid UI shifts requires continuous research and testing. If this bot has helped your workflow or account growth, please consider giving it a ⭐ on GitHub and sharing it with the community!
+InstaAddict-AI (Enhanced Edition) is 100% free and open-source. Maintaining compatibility against Instagram's rapid UI shifts requires continuous research and testing. If this bot has helped your workflow or account growth, please consider giving it a ⭐ on GitHub and sharing it with the community!
 
 <br />
 

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import random
@@ -19,7 +20,6 @@ from urllib.parse import urlparse
 
 import emoji
 import requests
-import uiautomator2.exceptions
 import urllib3
 from colorama import Fore, Style
 from packaging.version import parse as parse_version
@@ -54,7 +54,7 @@ def load_config(config: Config):
 def update_available():
     try:
         response = requests.get(
-            "https://pypi.python.org/pypi/InstaAddict/json", timeout=10
+            "https://pypi.python.org/pypi/InstaAddict-AI/json", timeout=10
         )
         if response.ok:
             data = response.json()
@@ -78,7 +78,7 @@ def check_if_updated(crash=False):
             f"Version {latest_version} has been released! Please update so that you can get all the latest features and bugfixes. Changelog here -> https://github.com/ssucipto/instaaddict/blob/master/CHANGELOG.md"
         )
         logger.warning("HOW TO UPDATE:")
-        logger.warning("If you installed with pip: pip3 install InstaAddict -U")
+        logger.warning("If you installed with pip: pip3 install InstaAddict-AI -U")
         logger.warning("If you installed with git: git pull")
         sleep(5)
     elif latest_version is None:
@@ -88,7 +88,7 @@ def check_if_updated(crash=False):
 
     if not crash:
         logger.info(
-            f"InstaAddict v.{__version__}",
+            f"InstaAddict-AI v.{__version__}",
             extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
         )
         logger.info(
@@ -99,7 +99,7 @@ def check_if_updated(crash=False):
 
 def ask_for_a_donation():
     logger.info(
-        "InstaAddict is free and open source. If you find it useful, consider starring the repo: https://github.com/ssucipto/instaaddict",
+        "InstaAddict-AI is free and open source. If you find it useful, consider starring the repo: https://github.com/ssucipto/instaaddict",
         extra={"color": f"{Style.BRIGHT}{Fore.MAGENTA}"},
     )
 
@@ -112,6 +112,7 @@ def move_usernames_to_accounts():
         "build",
         "accounts",
         "InstaAddict",
+        "InstaAddict-AI",
         "config-examples",
         ".git",
         ".venv",
@@ -153,7 +154,7 @@ def config_examples():
     else:
         logger.debug("Installed via pip.")
         logger.info(
-            "Do you want to update/create your config-examples folder in local? Do the following: \n\t\t\t\tpip3 install --user gitdir (only the first time)\n\t\t\t\tpython3 -m gitdir https://github.com/InstaAddict/bot/tree/master/config-examples (python on Windows)",
+            "Do you want to update/create your config-examples folder in local? Do the following: \n\t\t\t\tpip3 install --user gitdir (only the first time)\n\t\t\t\tpython3 -m gitdir https://github.com/ssucipto/instaaddict/tree/master/config-examples (python on Windows)",
             extra={"color": Fore.GREEN},
         )
         sleep(3)
@@ -227,7 +228,7 @@ def head_up_notifications(enabled: bool = False):
     Enable or disable head-up-notifications
     """
     cmd = ["adb"]
-    if configs.device_id is not None:
+    if configs is not None and getattr(configs, "device_id", None) is not None:
         cmd.extend(["-s", str(configs.device_id)])
     cmd.extend(["shell", "settings", "put", "global", "heads_up_notifications_enabled", "1" if enabled else "0"])
     try:
@@ -240,7 +241,7 @@ def head_up_notifications(enabled: bool = False):
 def check_screen_timeout():
     MIN_TIMEOUT = 5 * 6_000
     cmd = ["adb"]
-    if configs.device_id is not None:
+    if configs is not None and getattr(configs, "device_id", None) is not None:
         cmd.extend(["-s", str(configs.device_id)])
     cmd.extend(["shell", "settings", "get", "system", "screen_off_timeout"])
     try:
@@ -269,27 +270,57 @@ def check_screen_timeout():
 def open_instagram(device):
     nl = "\n"
     FastInputIME = "com.github.uiautomator/.FastInputIME"
-    logger.info("Open Instagram app.")
+    target_app = app_id
+    if not target_app and configs and hasattr(configs, "app_id") and isinstance(configs.app_id, str):
+        target_app = configs.app_id
+    if not target_app and isinstance(getattr(device, "app_id", None), str):
+        target_app = getattr(device, "app_id")
+    if not target_app:
+        target_app = "com.instagram.android"
+    logger.info(f"Open Instagram app ({target_app}).")
 
     def call_ig():
         try:
-            return device.deviceV2.app_start(app_id, use_monkey=True)
-        except uiautomator2.exceptions.BaseError as exc:
+            device.deviceV2.app_start(target_app, use_monkey=True)
+            return None
+        except Exception as exc:
             return exc
+
+    try:
+        from InstaAddict.core.watchdog import record_heartbeat
+        record_heartbeat("startup", f"Calling Instagram app ({target_app})")
+    except Exception:
+        pass
 
     err = call_ig()
     if err:
-        logger.error(err)
+        logger.error(f"Failed to call Instagram ({target_app}): {err}")
         return False
     else:
         logger.debug("Instagram called successfully.")
 
     max_tries = 3
     n = 0
-    while device.deviceV2.app_current()["package"] != app_id:
-        if n == max_tries:
+    while True:
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+            record_heartbeat("startup", f"Waiting for Instagram to open ({n}/{max_tries})")
+        except Exception:
+            pass
+        curr = {}
+        if hasattr(device, "deviceV2") and hasattr(device.deviceV2, "app_current"):
+            try:
+                raw_curr = device.deviceV2.app_current()
+                if isinstance(raw_curr, dict):
+                    curr = raw_curr
+            except Exception:
+                pass
+        curr_pkg = curr.get("package", "")
+        if curr_pkg == target_app:
+            break
+        if n >= max_tries:
             logger.critical(
-                f"Unable to open Instagram. Bot will stop. Current package name: {device.deviceV2.app_current()['package']} (Looking for {app_id})"
+                f"Unable to open Instagram. Bot will stop. Current package name: {curr_pkg or 'unknown'} (Looking for {target_app})"
             )
             return False
         n += 1
@@ -300,18 +331,54 @@ def open_instagram(device):
         choose_cloned_app(device)
         random_sleep(3, 3, modulable=False)
 
+    # Wait up to 8s for Instagram main UI to settle
+    try:
+        from InstaAddict.core.views import TabBarView, UniversalActions
+        tab_bar = TabBarView(device)
+        settle_timeout = 8
+        start_settle = time.time()
+        logger.debug("Waiting for Instagram main UI to settle...")
+        while time.time() - start_settle < settle_timeout:
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+                record_heartbeat("startup", "Waiting for Instagram main UI to settle")
+            except Exception:
+                pass
+            if check_if_crash_popup_is_there(device):
+                logger.info("Instagram crashed during startup, trying to open again...")
+                call_ig()
+            UniversalActions.dismiss_dialog(device)
+            if tab_bar.is_tab_bar_visible():
+                logger.debug("Instagram main UI detected (tab bar visible).")
+                break
+            random_sleep(0.8, 1.4, modulable=False)
+    except Exception as e:
+        logger.debug(f"UI settle check encountered: {e}")
+
+    try:
+        from InstaAddict.core.watchdog import record_heartbeat
+        record_heartbeat("startup", "Instagram main UI ready")
+    except Exception:
+        pass
+
     logger.info("Ready for botting!🤫", extra={"color": f"{Style.BRIGHT}{Fore.GREEN}"})
 
     random_sleep()
-    if configs.args.close_apps:
+    if configs and hasattr(configs, "args") and getattr(configs.args, "close_apps", False):
         logger.info("Close all the other apps, to avoid interferences...")
         device.deviceV2.app_stop_all(excludes=[app_id])
         random_sleep()
     logger.debug("Setting FastInputIME as default keyboard.")
+    try:
+        from InstaAddict.core.watchdog import record_heartbeat
+        record_heartbeat("startup", "Setting FastInputIME keyboard")
+    except Exception:
+        pass
     device.deviceV2.set_fastinput_ime(True)
     cmd = ["adb"]
-    if configs.device_id is not None:
-        cmd.extend(["-s", str(configs.device_id)])
+    dev_id = getattr(configs, "device_id", None) if configs else getattr(device, "device_id", None)
+    if dev_id is not None:
+        cmd.extend(["-s", str(dev_id)])
     cmd.extend(["shell", "settings", "get", "secure", "default_input_method"])
     try:
         cmd_res = subprocess.run(cmd, stdout=PIPE, stderr=PIPE, shell=False, encoding="utf8", timeout=10)
@@ -324,8 +391,8 @@ def open_instagram(device):
             f"FastInputIME is not the default keyboard! Default is: {cmd_res.stdout.replace(nl, '')}. Changing it via adb.."
         )
         set_cmd = ["adb"]
-        if configs.device_id is not None:
-            set_cmd.extend(["-s", str(configs.device_id)])
+        if dev_id is not None:
+            set_cmd.extend(["-s", str(dev_id)])
         set_cmd.extend(["shell", "ime", "set", FastInputIME])
         try:
             cmd_res = subprocess.run(
@@ -343,13 +410,22 @@ def open_instagram(device):
             logger.info("FastInputIME is the default keyboard.")
     else:
         logger.info("FastInputIME is the default keyboard.")
-    if configs.args.screen_record:
+    if configs and hasattr(configs, "args") and getattr(configs.args, "screen_record", False):
         try:
             device.start_screenrecord()
         except Exception as e:
             logger.error(
                 f"You can't use this feature without installing dependencies. Type that in console: 'pip3 install -U \"uiautomator2[image]\" -i https://pypi.doubanio.com/simple'. Exception: {e}"
             )
+    if hasattr(device, "_ig_is_opened") and not device._ig_is_opened():
+        logger.warning(
+            "Instagram is not in the foreground at conclusion of open_instagram(). Attempting final foreground bring-up..."
+        )
+        call_ig()
+        time.sleep(2)
+        if not device._ig_is_opened():
+            logger.error("Instagram failed to stay in foreground after open_instagram().")
+            return False
     return True
 
 
@@ -357,7 +433,7 @@ def close_instagram(device):
     logger.info("Close Instagram app.")
     device.deviceV2.app_stop(app_id)
     random_sleep(5, 5, modulable=False)
-    if configs.args.screen_record:
+    if configs and hasattr(configs, "args") and getattr(configs.args, "screen_record", False):
         try:
             device.stop_screenrecord(crash=False)
         except Exception as e:
@@ -421,7 +497,7 @@ def show_ending_conditions():
         extra={"color": f"{Style.BRIGHT}{Fore.GREEN}"},
     )
     logger.info(
-        "For more info -> https://github.com/InstaAddict/docs/blob/main/configuration.md#ending-session-conditions",
+        "For more info -> https://github.com/ssucipto/instaaddict/blob/master/README.md#ending-session-conditions",
         extra={"color": f"{Style.BRIGHT}{Fore.BLUE}"},
     )
     logger.info(
@@ -466,8 +542,12 @@ def countdown(seconds: int = 10, waiting_message: str = "") -> None:
 
 def choose_cloned_app(device) -> None:
     """if dialog box is displayed choose for original or cloned app"""
-    app_number = "2" if configs.args.use_cloned_app else "1"
-    obj = device.find(resourceId=f"{ResourceID.MIUI_APP}{app_number}")
+    use_cloned = False
+    if configs and hasattr(configs, "args") and configs.args:
+        use_cloned = getattr(configs.args, "use_cloned_app", False)
+    app_number = "2" if use_cloned else "1"
+    miui_res = getattr(ResourceID, "MIUI_APP", "android:id/text") if ResourceID else "android:id/text"
+    obj = device.find(resourceId=f"{miui_res}{app_number}")
     if obj.exists(3):
         logger.debug(f"Cloned app menu exists. Pressing on app number {app_number}.")
         obj.click()
@@ -553,10 +633,30 @@ def random_sleep(inf=0.5, sup=3.0, modulable=True, log=True):
     delay = max(delay, MIN_INF)
     if log:
         logger.debug(f"{str(delay)[:4]}s sleep")
-    sleep(delay)
+
+    try:
+        from InstaAddict.core.tui import DashboardManager
+
+        if DashboardManager.is_active():
+            dm = DashboardManager.get_instance()
+            if dm.state.is_skip_task_requested():
+                return
+
+            slice_sec = 0.1
+            remaining = delay
+            while remaining > 0:
+                if dm.state.is_skip_task_requested():
+                    break
+                step = min(remaining, slice_sec)
+                sleep(step)
+                remaining -= step
+        else:
+            sleep(delay)
+    except Exception:
+        sleep(delay)
 
 
-def save_crash(device):
+def save_crash(device, error_reason=None, exception=None):
     directory_name = f"{__version__}_" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     crash_path = os.path.join("crashes", directory_name)
@@ -576,6 +676,73 @@ def save_crash(device):
         device.dump_hierarchy(os.path.join(crash_path, "hierarchy" + hierarchy_format))
     except Exception as e:
         logger.error(f"Cannot save 'hierarchy.{hierarchy_format}': {e}")
+
+    # Build machine-readable crash context JSON
+    context_data = {
+        "timestamp": datetime.now().isoformat(),
+        "bot_version": __version__,
+        "error_reason": str(error_reason) if error_reason else None,
+        "exception_type": type(exception).__name__ if exception else None,
+        "exception_message": str(exception) if exception else None,
+    }
+    try:
+        from InstaAddict.core.session_state import SessionState
+
+        active_ss = SessionState.get_active()
+        if active_ss:
+            context_data["session_id"] = getattr(active_ss, "id", None)
+            context_data["username"] = getattr(active_ss, "my_username", None)
+            if getattr(active_ss, "startTime", None):
+                context_data["uptime_seconds"] = round(
+                    (datetime.now() - active_ss.startTime).total_seconds(), 1
+                )
+            context_data["total_crashes"] = getattr(active_ss, "totalCrashes", 0)
+    except Exception:
+        pass
+
+    try:
+        from InstaAddict.core.tui import DashboardManager
+
+        if DashboardManager.is_active():
+            dm_state = DashboardManager.get_instance().state
+            context_data["active_job"] = getattr(dm_state, "current_job", None)
+            context_data["active_target"] = getattr(dm_state, "current_target", None)
+            context_data["current_action"] = getattr(dm_state, "current_action", None)
+    except Exception:
+        pass
+
+    try:
+        if device:
+            if hasattr(device, "get_current_package"):
+                context_data["foreground_package"] = device.get_current_package()
+            elif hasattr(device, "deviceV2") and hasattr(device.deviceV2, "app_current"):
+                app_curr = device.deviceV2.app_current()
+                if isinstance(app_curr, dict):
+                    context_data["foreground_package"] = app_curr.get("package")
+                    context_data["foreground_activity"] = app_curr.get("activity")
+            if hasattr(device, "is_screen_on"):
+                context_data["screen_on"] = device.is_screen_on()
+    except Exception:
+        pass
+
+    try:
+        from InstaAddict.core.watchdog import BotWatchdog
+
+        wd = BotWatchdog.get_instance()
+        if wd:
+            context_data["watchdog_checkpoint"] = getattr(wd, "last_checkpoint", None)
+            context_data["watchdog_status"] = getattr(wd, "last_status", None)
+    except Exception:
+        pass
+
+    try:
+        with open(
+            os.path.join(crash_path, "crash_context.json"), "w", encoding="utf-8"
+        ) as f:
+            json.dump(context_data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Cannot save 'crash_context.json': {e}")
+
     if args is not None and getattr(args, "screen_record", False):
         try:
             device.stop_screenrecord(crash=True)
@@ -611,6 +778,26 @@ def save_crash(device):
         f"Crash saved as {crash_path}.zip",
         extra={"color": Fore.GREEN},
     )
+
+    try:
+        from InstaAddict.core.session_state import SessionState
+
+        active_ss = SessionState.get_active()
+        if active_ss:
+            active_ss.record_crash(
+                {
+                    "timestamp": context_data["timestamp"],
+                    "crash_archive": f"{crash_path}.zip",
+                    "foreground_package": context_data.get("foreground_package"),
+                    "foreground_activity": context_data.get("foreground_activity"),
+                    "active_job": context_data.get("active_job"),
+                    "active_target": context_data.get("active_target"),
+                    "error_reason": error_reason,
+                    "exception": str(exception) if exception else None,
+                }
+            )
+    except Exception:
+        pass
     logger.info(
         "If you want to report this crash, please upload the dump file via a ticket in the #lobby channel on discord ",
         extra={"color": Fore.GREEN},
@@ -667,7 +854,7 @@ def stop_bot(device, sessions, session_state, was_sleeping=False):
         disable_tui_logging()
 
     close_instagram(device)
-    if args.kill_atx_agent:
+    if args is not None and getattr(args, "kill_atx_agent", False):
         kill_atx_agent(device)
     head_up_notifications(enabled=True)
     logger.info(
@@ -675,7 +862,10 @@ def stop_bot(device, sessions, session_state, was_sleeping=False):
         extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
     )
     if session_state is not None:
-        print_full_report(sessions, configs.args.scrape_to_file)
+        if getattr(session_state, "finishTime", None) is None:
+            session_state.finishTime = datetime.now()
+        scrape_to_file = getattr(getattr(configs, "args", None), "scrape_to_file", None)
+        print_full_report(sessions, scrape_to_file)
         if not was_sleeping:
             sessions.persist(directory=session_state.my_username)
     ask_for_a_donation()
@@ -864,6 +1054,25 @@ def wait_for_next_session(time_left, session_state, sessions, device):
         f"Time left: {hours:02d}:{minutes:02d}:{seconds:02d}.",
         extra={"color": f"{Fore.GREEN}"},
     )
+    try:
+        from InstaAddict.core.tui import DashboardManager
+
+        if DashboardManager.is_active():
+            wh_str = (
+                getattr(args, "working_hours", "configured hours")
+                if args
+                else "configured hours"
+            )
+            dm = DashboardManager.get_instance()
+            next_start_time = (datetime.now() + time_left).strftime("%H:%M")
+            dm.state.update_activity(
+                job="Scheduled Sleep",
+                action=f"Sleeping until {next_start_time} (Working hours: {wh_str})",
+                source="working-hours",
+            )
+            dm.update_render()
+    except Exception:
+        pass
     try:
         total_seconds = time_left.total_seconds()
         while total_seconds > 0:

@@ -112,3 +112,61 @@ def test_matplotlib_missing_graceful_handling():
             assert "Matplotlib is required" in mock_err.call_args[0][0]
     finally:
         da_module.MATPLOTLIB_AVAILABLE = orig_available
+
+
+def test_data_analytics_handles_missing_finish_time(tmp_path):
+    """Verify that DataAnalytics tolerates sessions missing finish_time without KeyError."""
+    from InstaAddict.plugins.data_analytics import DataAnalytics
+
+    plugin = DataAnalytics()
+    plugin.username = "test_user"
+
+    mock_storage = MagicMock()
+    mock_storage.report_path = str(tmp_path / "reports")
+
+    mock_device = MagicMock()
+    mock_configs = MagicMock()
+    mock_configs.args = MagicMock()
+
+    # Session 1 has valid times
+    session_valid = {
+        "profile": {"followers": 100},
+        "start_time": "2026-09-18 10:00:00.000000",
+        "finish_time": "2026-09-18 10:10:00.000000",
+        "total_followed": 5,
+        "total_unfollowed": 2,
+        "total_likes": 10,
+        "successful_interactions": 3,
+        "args": {"likes_count": 2, "follow_percentage": 50},
+    }
+    # Session 2 has finish_time = "None"
+    session_none_str = {
+        "profile": {"followers": 102},
+        "start_time": "2026-09-19 10:00:00.000000",
+        "finish_time": "None",
+        "total_followed": 2,
+        "total_unfollowed": 0,
+        "total_likes": 5,
+        "successful_interactions": 2,
+        "args": {"likes_count": 2, "follow_percentage": 50},
+    }
+    # Session 3 has NO finish_time key at all (the exact bug encountered)
+    session_missing_key = {
+        "profile": {"followers": 105},
+        "start_time": "2026-09-20 10:00:00.000000",
+        "total_followed": 1,
+        "total_unfollowed": 0,
+        "total_likes": 2,
+        "successful_interactions": 1,
+        "args": {"likes_count": 1, "follow_percentage": 50},
+    }
+
+    mock_session_state = MagicMock()
+    mock_session_state.my_username = "test_user"
+
+    with patch.object(plugin, "load_sessions", return_value=[session_valid, session_none_str, session_missing_key]):
+        plugin.run(mock_device, mock_configs, mock_storage, [mock_session_state], plugin)
+
+    files = os.listdir(mock_storage.report_path)
+    assert any(f.endswith(".pdf") for f in files)
+    assert any(f.endswith(".md") for f in files)

@@ -1,6 +1,6 @@
-# Project Requirements: InstaAddict
+# Project Requirements: InstaAddict-AI
 
-**Project Name**: InstaAddict  
+**Project Name**: InstaAddict-AI  
 **Version**: 1.4.1  
 **Created**: 2026-09-11  
 **Last Updated**: 2026-09-19  
@@ -10,9 +10,9 @@
 
 ## Overview
 
-InstaAddict is an advanced, production-grade Instagram automation bot written in Python that interacts directly with an Android device or emulator running the official Instagram app (tested up to v446+) via `uiautomator2` and native `adb`. It faithfully simulates human behavior (scroll physics, typing cadences, randomized intervals, like/follow ratios, story watching) to grow organic audience engagement safely without touching private, reverse-engineered APIs that trigger account bans.
+InstaAddict-AI is an advanced, production-grade Instagram automation bot written in Python that interacts directly with an Android device or emulator running the official Instagram app (tested up to v446+) via `uiautomator2` and native `adb`. It faithfully simulates human behavior (scroll physics, typing cadences, randomized intervals, like/follow ratios, story watching) to grow organic audience engagement safely without touching private, reverse-engineered APIs that trigger account bans.
 
-InstaAddict is an active continuation and evolution of the GramAddict project, fundamentally rebuilt with modern Instagram UI compatibility, AI multimodal reasoning, resilient ad/browser escape watchdogs, dynamic hashtag optimization, and persistent caching.
+InstaAddict-AI is an active continuation and evolution of the GramAddict / InstaAddict project, fundamentally rebuilt with modern Instagram UI compatibility, AI multimodal reasoning, resilient ad/browser escape watchdogs, dynamic hashtag optimization, and persistent caching.
 
 ---
 

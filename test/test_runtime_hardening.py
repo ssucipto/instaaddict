@@ -586,20 +586,35 @@ def test_opened_post_view_like_in_peek():
 
 
 def test_opened_post_view_dismiss_peek():
-    """Verify dismiss_peek calls back and checks profile tabs container."""
+    """Verify dismiss_peek calls back and checks if peek closed."""
     from InstaAddict.core.views import OpenedPostView
 
     mock_device = MagicMock()
-    mock_tabs = MagicMock()
-    mock_tabs.exists.return_value = True
-    mock_device.find.return_value = mock_tabs
 
-    with patch("InstaAddict.core.views.random_sleep"):
+    with patch("InstaAddict.core.views.random_sleep"), \
+         patch.object(OpenedPostView, "is_peek_preview_opened", return_value=False):
         post_view = OpenedPostView(mock_device)
         res = post_view.dismiss_peek()
 
     assert res is True
     mock_device.back.assert_called_once()
+
+
+def test_opened_post_view_dismiss_peek_fallback_click():
+    """Verify dismiss_peek falls back to outside click if back fails."""
+    from InstaAddict.core.views import OpenedPostView
+
+    mock_device = MagicMock()
+    mock_device.get_info.return_value = {"displayWidth": 1080, "displayHeight": 2400}
+    # is_peek_preview_opened returns True during back loops, then False after click
+    with patch("InstaAddict.core.views.random_sleep"), \
+         patch.object(OpenedPostView, "is_peek_preview_opened", side_effect=[True, True, False]):
+        post_view = OpenedPostView(mock_device)
+        res = post_view.dismiss_peek()
+
+    assert res is True
+    assert mock_device.back.call_count == 2
+    mock_device.deviceV2.click.assert_called_once_with(540, 120)
 
 
 def test_posts_grid_view_navigate_to_post_peek_detection():
@@ -631,6 +646,55 @@ def test_posts_grid_view_navigate_to_post_peek_detection():
     assert opened_view is not None
     assert getattr(opened_view, "is_peek", False) is True
     mock_device.deviceV2.click.assert_called_once_with(200, 300)
+
+
+def test_posts_grid_view_navigate_to_post_peek_detected_even_when_not_still_on_profile():
+    """Verify navigateToPost prioritizes Peek Preview detection even when profile is dimmed/obscured."""
+    from InstaAddict.core.views import PostsGridView
+
+    mock_device = MagicMock()
+    grid_view = PostsGridView(mock_device)
+
+    mock_post_list = MagicMock()
+    mock_row = MagicMock()
+    mock_post = MagicMock()
+
+    mock_post_list.exists.return_value = True
+    mock_row.exists.return_value = True
+    mock_post.exists.return_value = True
+    mock_post.ui_info.return_value = {"contentDescription": "Photo"}
+    mock_post.get_bounds.return_value = {"left": 100, "top": 200, "right": 300, "bottom": 400}
+
+    mock_post_list.child.return_value = mock_row
+    mock_row.child.return_value = mock_post
+    grid_view._get_post_view = MagicMock(return_value=mock_post_list)
+
+    # In real Instagram, the peek modal dims the profile so _is_still_on_profile() returns False!
+    with patch("InstaAddict.core.views.OpenedPostView.is_post_opened", return_value=False), \
+         patch("InstaAddict.core.views.OpenedPostView.is_peek_preview_opened", return_value=True), \
+         patch.object(grid_view, "_is_still_on_profile", return_value=False):
+        opened_view, media_type, obj_count = grid_view.navigateToPost(0, 0)
+
+    assert opened_view is not None
+    assert getattr(opened_view, "is_peek", False) is True
+
+
+def test_universal_actions_dismiss_peek_if_open():
+    """Verify UniversalActions.dismiss_peek_if_open detects and dismisses peek modal."""
+    from InstaAddict.core.views import UniversalActions, OpenedPostView
+
+    mock_device = MagicMock()
+    with patch.object(OpenedPostView, "is_peek_preview_opened", return_value=True), \
+         patch.object(OpenedPostView, "dismiss_peek", return_value=True) as mock_dismiss:
+        res = UniversalActions.dismiss_peek_if_open(mock_device)
+        assert res is True
+        mock_dismiss.assert_called_once()
+
+    with patch.object(OpenedPostView, "is_peek_preview_opened", return_value=False), \
+         patch.object(OpenedPostView, "dismiss_peek") as mock_dismiss:
+        res = UniversalActions.dismiss_peek_if_open(mock_device)
+        assert res is False
+        mock_dismiss.assert_not_called()
 
 
 def test_profile_view_is_still_on_profile():
@@ -709,6 +773,68 @@ def test_interact_with_user_peek_preview_liking():
 
     assert res[0] is True  # interacted
     assert res[5] == 1     # number_of_liked
+    mock_opened_post.like_in_peek.assert_called_once()
+    mock_opened_post.dismiss_peek.assert_called_once()
+    mock_reg_like.assert_called_once()
+
+
+def test_interact_with_user_peek_dynamic_recovery():
+    """Verify interact_with_user detects Peek Preview dynamically if is_peek was not initially set."""
+    from InstaAddict.core.interaction import interact_with_user
+    from InstaAddict.core.session_state import SessionState
+
+    mock_device = MagicMock()
+    mock_filter = MagicMock()
+    mock_filter.check_profile.return_value = (
+        SimpleNamespace(is_private=False, posts_count=3),
+        False,
+    )
+    mock_filter.can_comment.return_value = (False, False, False, False)
+
+    mock_args = MagicMock()
+    mock_args.likes_count = "1"
+    session_state = SessionState(configs=MagicMock(args=mock_args))
+
+    mock_opened_post = MagicMock()
+    mock_opened_post.is_peek = False
+    mock_opened_post.is_peek_preview_opened.return_value = True
+    mock_opened_post.is_peek_already_liked.return_value = False
+    mock_opened_post.like_in_peek.return_value = True
+
+    with patch("InstaAddict.core.interaction.ProfileView") as MockProfileView, \
+         patch("InstaAddict.core.interaction.PostsGridView") as MockPostsGridView, \
+         patch("InstaAddict.core.interaction._watch_stories", return_value=0), \
+         patch("InstaAddict.core.interaction.can_like", return_value=True), \
+         patch("InstaAddict.core.interaction.register_like") as mock_reg_like, \
+         patch("InstaAddict.core.interaction.random_sleep"):
+        mock_pv = MagicMock()
+        mock_pv.count_photo_in_view.return_value = (1, 0)
+        MockProfileView.return_value = mock_pv
+
+        mock_grid = MagicMock()
+        mock_grid.navigateToPost.return_value = (mock_opened_post, None, None)
+        MockPostsGridView.return_value = mock_grid
+
+        res = interact_with_user(
+            device=mock_device,
+            username="test_target",
+            my_username="my_user",
+            likes_count="1",
+            likes_percentage=100,
+            stories_percentage=0,
+            can_follow=False,
+            follow_percentage=0,
+            comment_percentage=0,
+            pm_percentage=0,
+            profile_filter=mock_filter,
+            args=mock_args,
+            session_state=session_state,
+            scraping_file=None,
+            current_mode="hashtag-posts-recent",
+        )
+
+    assert res[0] is True
+    assert res[5] == 1
     mock_opened_post.like_in_peek.assert_called_once()
     mock_opened_post.dismiss_peek.assert_called_once()
     mock_reg_like.assert_called_once()

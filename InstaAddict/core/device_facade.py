@@ -513,34 +513,56 @@ class DeviceFacade:
         """Swipe finger in the `direction`.
         Scale is the sliding distance. Default to 50% of the screen width
         """
-        logger.debug(f"Swipe {direction.name}, scale={scale}")
+        from InstaAddict.core.session_state import SessionState
+        from InstaAddict.core.telemetry import PerformanceTracker
+
+        tracker = PerformanceTracker.get_instance()
+        session = SessionState.get_active()
+        effective_scale = min(scale * tracker.adaptive_scale_factor, 0.85)
+
+        logger.debug(f"Swipe {direction.name}, scale={scale} (effective={effective_scale:.2f})")
 
         try:
-            info = self.get_info()
-            w, h = info["displayWidth"], info["displayHeight"]
-            cx, cy = w / 2, h / 2
-            
-            sx, sy, ex, ey = cx, cy, cx, cy
-            if direction == Direction.UP:
-                sy = min(h * 0.9, cy + (h * scale / 2))
-                ey = max(h * 0.1, cy - (h * scale / 2))
-            elif direction == Direction.DOWN:
-                sy = max(h * 0.1, cy - (h * scale / 2))
-                ey = min(h * 0.9, cy + (h * scale / 2))
-            elif direction == Direction.LEFT:
-                sx = min(w * 0.9, cx + (w * scale / 2))
-                ex = max(w * 0.1, cx - (w * scale / 2))
-            elif direction == Direction.RIGHT:
-                sx = max(w * 0.1, cx - (w * scale / 2))
-                ex = min(w * 0.9, cx + (w * scale / 2))
+            with tracker.measure("motion", "swipe"):
+                info = self.get_info()
+                w, h = info["displayWidth"], info["displayHeight"]
+                cx, cy = w / 2, h / 2
 
-            logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 200ms.")
-            self.deviceV2.swipe(sx, sy, ex, ey, 0.20)
-            DeviceFacade.sleep_mode(SleepTime.TINY)
+                sx, sy, ex, ey = cx, cy, cx, cy
+                if direction == Direction.UP:
+                    sy = min(h * 0.9, cy + (h * effective_scale / 2))
+                    ey = max(h * 0.1, cy - (h * effective_scale / 2))
+                elif direction == Direction.DOWN:
+                    sy = max(h * 0.1, cy - (h * effective_scale / 2))
+                    ey = min(h * 0.9, cy + (h * effective_scale / 2))
+                elif direction == Direction.LEFT:
+                    sx = min(w * 0.9, cx + (w * effective_scale / 2))
+                    ex = max(w * 0.1, cx - (w * effective_scale / 2))
+                elif direction == Direction.RIGHT:
+                    sx = max(w * 0.1, cx - (w * effective_scale / 2))
+                    ex = min(w * 0.9, cx + (w * effective_scale / 2))
+
+                logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 200ms.")
+                self.deviceV2.swipe(sx, sy, ex, ey, 0.20)
+                DeviceFacade.sleep_mode(SleepTime.TINY)
+
+            tracker.record_swipe_motion(displaced=True)
+            if session:
+                session.increment_swipes()
         except Exception as e:
+            tracker.record_swipe_motion(displaced=False)
+            if session:
+                session.increment_swipes()
+                session.increment_zero_displacement()
             raise DeviceFacade.JsonRpcError(e) from e
 
     def swipe_points(self, sx, sy, ex, ey, random_x=True, random_y=True):
+        from InstaAddict.core.session_state import SessionState
+        from InstaAddict.core.telemetry import PerformanceTracker
+
+        tracker = PerformanceTracker.get_instance()
+        session = SessionState.get_active()
+
         if random_x:
             sx = int(sx * uniform(0.85, 1.15))
             ex = int(ex * uniform(0.85, 1.15))
@@ -548,19 +570,31 @@ class DeviceFacade:
             ey = int(ey * uniform(0.98, 1.02))
         sy = int(sy)
         try:
-            logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 200ms.")
-            self.deviceV2.swipe(sx, sy, ex, ey, 0.20)
-            DeviceFacade.sleep_mode(SleepTime.TINY)
+            with tracker.measure("motion", "swipe"):
+                logger.debug(f"UIA2 Swipe from ({sx},{sy}) to ({ex},{ey}) over 200ms.")
+                self.deviceV2.swipe(sx, sy, ex, ey, 0.20)
+                DeviceFacade.sleep_mode(SleepTime.TINY)
+
+            tracker.record_swipe_motion(displaced=True)
+            if session:
+                session.increment_swipes()
         except Exception as e:
+            tracker.record_swipe_motion(displaced=False)
+            if session:
+                session.increment_swipes()
+                session.increment_zero_displacement()
             raise DeviceFacade.JsonRpcError(e) from e
 
     def get_info(self):
         import time
+        from InstaAddict.core.telemetry import PerformanceTracker
 
+        tracker = PerformanceTracker.get_instance()
         last_exc = None
         for attempt in range(5):
             try:
-                return self.deviceV2.info
+                with tracker.measure("rpc", "get_info"):
+                    return self.deviceV2.info
             except Exception as e:
                 last_exc = e
                 logger.debug(
@@ -820,8 +854,16 @@ class DeviceFacade:
             except Exception as e:
                 raise DeviceFacade.JsonRpcError(e)
 
-        def exists(self, ui_timeout=None, ignore_bug: bool = False) -> bool:
+        def exists(
+            self,
+            ui_timeout=None,
+            ignore_bug: bool = False,
+            timeout=None,
+            **kwargs,
+        ) -> bool:
             try:
+                if ui_timeout is None and timeout is not None:
+                    ui_timeout = timeout
                 # Currently, the methods left, right, up and down from
                 # uiautomator2 return None when a Selector does not exist.
                 # All other selectors return an UiObject with exists() == False.
@@ -979,7 +1021,7 @@ class DeviceFacade:
                             if j < len(sentences):
                                 self.deviceV2.send_keys("\n")
 
-                        typed_text = self.viewV2.get_text(error=False)
+                        typed_text = self.get_text(error=False)
                         # Instagram strips spaces out of hashtag searches, so we don't need to throw an error if the stripped version matches
                         if typed_text.replace(" ", "") != text.replace(" ", ""):
                             logger.warning(

@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug encountered while operating InstaAddict
+about: Report a bug encountered while operating InstaAddict-AI
 labels: kind/bug
 
 ---
@@ -16,7 +16,7 @@ labels: kind/bug
 **Anything else we need to know?**:
 
 **Environment**:
-- InstaAddict version:
+- InstaAddict-AI version:
 - Device Model/Emulator Type:
 - Android Version:
 - Instagram Version:

@@ -1,6 +1,6 @@
 ---
 name: Enhancement Request
-about: Suggest an enhancement to the InstaAddict project
+about: Suggest an enhancement to the InstaAddict-AI project
 labels: kind/feature
 
 ---

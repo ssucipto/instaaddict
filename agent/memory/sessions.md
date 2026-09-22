@@ -2,6 +2,272 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-23
+  executor: Antigravity
+  branch: master
+  tasks_completed: [rebrand-instaaddict-ai, acp-validate-sync-update-commit]
+  done:
+    - rebranded-project-and-distribution-package-to-instaaddict-ai-in-pyproject-toml
+    - preserved-internal-python-module-imports-as-instaaddict-for-valid-identifier-syntax
+    - added-instaaddict-ai-cli-entrypoint-alongside-legacy-instaaddict-command
+    - updated-cli-startup-banners-pip-upgrade-prompts-and-pypi-json-endpoints
+    - updated-tui-dashboard-live-header-rich-summary-banner-and-telegram-bot-headers
+    - updated-readme-contributing-and-github-issue-templates-with-upstream-attribution
+    - updated-acp-identity-progress-yaml-design-requirements-and-test-assertions
+    - validated-full-test-suite-with-374-of-374-tests-passing-100-percent-green
+    - validated-acp-documentation-with-zero-errors-and-zero-warnings
+  deferred: []
+  key_fact: "Distribution packages and CLI commands can use hyphens (InstaAddict-AI, instaaddict-ai), but internal Python import namespaces must remain valid Python identifiers (InstaAddict) to prevent SyntaxError on module imports."
+
+- date: 2026-09-23
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-114-tui-interface-enhancement]
+  done:
+    - audited-both-existing-tui-interfaces-live-dashboard-and-statistics-charts-and-identified-16-findings
+    - added-third-viewmode-filter-intelligence-cycling-live-kpi-charts-filter-intel-via-ctrl-g
+    - upgraded-render-header-from-1-row-flat-text-to-2-row-group-brand-account-row-plus-device-session-working-hours-row
+    - added-render-skip-reasons-panel-showing-skip-reason-distribution-as-horizontal-bar-chart-top-10
+    - added-render-job-metrics-panel-showing-per-job-lifecycle-duration-attempts-successes-yield-percent-status
+    - added-render-crash-timeline-panel-showing-last-5-crashes-with-timestamp-job-reason-foreground-package
+    - added-render-filter-intelligence-view-assembling-skip-reasons-job-metrics-crash-timeline-in-responsive-layout
+    - upgraded-render-footer-from-single-dense-line-to-2-row-mode-indicator-plus-boxed-keyboard-shortcuts
+    - expanded-render-latency-chart-to-include-filter-check-profile-and-dynamic-job-star-operations-plus-error-column
+    - created-new-instaaddict-core-rich-summary-py-module-interface-3-with-hero-banner-health-score-kpi-grid-per-source-skip-reasons-job-yield-upload-activity-dogfood-recommendations-crash-history
+    - wired-print-rich-session-summary-into-report-py-print-full-report-as-a-soft-fallback-with-silent-exception-handling
+    - updated-test-tui-dashboard-py-with-14-new-tests-covering-all-new-panels-and-3rd-view-mode
+    - updated-test-telemetry-and-kpi-charts-py-toggle-test-to-reflect-3-way-cycle
+  deferred: []
+  key_fact: "The 3rd view mode (FILTER_INTELLIGENCE) surfaces skip_reasons and job_metrics data that was instrumented in Audit #113 but was never visible in any TUI. The new rich_summary.py Interface #3 fills the UX dead zone between Live TUI exit and shell return."
+
+- date: 2026-09-22
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-113, data-sufficiency-and-dogfood-hardening]
+
+  done:
+    - audited-log-data-sufficiency-across-logging-session-persistence-crash-dumps-and-dogfood-optimizers
+    - identified-4-critical-telemetry-gaps-filter-reason-blindness-crash-context-deficit-task-standards-gap-uninstrumented-latencies
+    - enriched-session-state-with-skip-reasons-dict-job-metrics-dict-and-crash-history-list
+    - updated-filter-py-to-record-discrete-skipreason-enums-into-active-session-state
+    - enriched-save-crash-with-machine-readable-crash-context-json-capturing-active-job-target-foreground-package-and-watchdog-checkpoints
+    - instrumented-bot-flow-py-with-per-job-start-end-lifecycle-metrics-and-performance-tracker-profiling
+    - enhanced-dogfood-optimizer-with-filter-starvation-diagnostics-task-performance-standards-0-percent-yield-checks-and-crash-forensics
+    - implemented-closed-loop-filters-yml-autotuning-relaxing-min-followers-with-timestamped-bak-backups
+    - added-5-unit-tests-in-test-tuning-and-operational-fixes-py-covering-all-new-telemetry-and-autotune-paths
+    - executed-full-test-suite-achieving-100-percent-pass-rate-360-of-360-tests-passing
+    - authored-structured-audit-report-agent-reports-audit-113-log-data-sufficiency-and-dogfood-system-audit-md
+    - logged-carryover-co-066-in-agent-memory-audit-carryovers-md
+  deferred: []
+  key_fact: "Recording granular SkipReason distributions in SessionState and saving machine-readable crash_context.json eliminates guesswork during dogfooding, enabling DogfoodOptimizer to autonomously diagnose filter starvation and tune filters.yml."
+
+- date: 2026-09-22
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-110, audit-111, audit-112, review-059, review-060, bugfix-startup-anr-and-apphascrashed-resilience]
+  done:
+    - forensically-analyzed-early-session-termination-dropping-to-powershell-prompt-after-2m31s
+    - extracted-and-examined-crash-dump-hierarchy-xml-and-logs-txt-from-crashes-1-4-1-2026-09-22-08-26-48-zip
+    - discovered-botwatchdog-90s-inactivity-timer-expired-during-91s-emulator-cold-start-and-ime-config
+    - identified-watchdog-tier-1-recovery-dispatched-2x-keycode-back-displacing-profile-screen-to-home-feed
+    - identified-profile-view-getprofileinfo-returned-none-on-home-feed-triggering-softban-abort-via-sys-exit-2
+    - instrumented-open-instagram-app-start-and-ui-settle-loops-with-record-heartbeat-checkpoints
+    - instrumented-accountview-refresh-account-and-profileview-getprofileinfo-with-heartbeats
+    - added-self-healing-ui-recovery-in-bot-flow-py-dismissing-dialogs-and-navigating-to-profile-tab-before-aborting
+    - guarded-utils-py-configs-args-and-configs-device-id-accesses-against-none-contexts
+    - re-balanced-lolatheozjack-config-yml-and-filters-yml-parameters-per-dogfood-tuning-recommendations
+    - forensically-investigated-wake-up-crash-after-120-minute-sleep-at-20-51-28
+    - discovered-system-anr-instagram-isnt-responding-causing-foreground-loss-and-watchdog-back-key
+    - identified-actionbarview-init-eagerly-called-device-find-raising-unhandled-apphascrashed-in-profileview
+    - hardened-actionbarview-init-and-getactionbar-to-catch-apphascrashed-safely-setting-action-bar-none
+    - hardened-homeview-and-profileview-to-dynamically-resolve-action-bar-container-on-demand
+    - hardened-getusername-and-getactionbartitlebtn-to-catch-apphascrashed-and-return-none
+    - added-foreground-verification-at-conclusion-of-open-instagram-before-declaring-success
+    - added-watchdog-heartbeat-when-tapping-wait-on-system-anr-dialogs
+    - guarded-choose-cloned-app-against-none-configs-and-resourceid
+    - implemented-3-attempt-self-healing-startup-retry-loop-in-start-bot-catching-apphascrashed-with-open-instagram-relaunch
+    - guarded-profile-view-getusername-at-job-loop-entry
+    - added-4-unit-tests-in-test-tuning-and-operational-fixes-py-covering-actionbarview-getusername-and-open-instagram
+    - verified-100-percent-green-status-across-entire-test-suite-355-of-355-tests-passing
+    - authored-audit-reports-110-111-and-112-documenting-findings-root-causes-and-operational-remedies
+  deferred: []
+  key_fact: "ActionBarView and UserView must never invoke device.find() during __init__ without catching AppHasCrashed, and start_bot() must wrap initial profile discovery in a self-healing retry loop that catches AppHasCrashed and relaunches Instagram; otherwise transient ANRs or background transitions immediately kill the process."
+
+- date: 2026-09-21
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-107, audit-108, audit-109, review-057, review-058, bugfix-apphascrashed-and-peek-specificity]
+  done:
+    - forensically-investigated-lolatheozjack-log-and-error-trace-for-apphascrashed-and-peek-preview-false-positives
+    - identified-false-positive-peek-preview-regex-trap-comment-and-share-matching-standard-reels-and-posts
+    - identified-unhandled-apphascrashed-in-tabbarview-is-tab-bar-visible-during-profile-recovery
+    - identified-lack-of-self-healing-foreground-relaunch-in-bot-flow-recovery-loop-and-subscreen-escape
+    - identified-daily-gemini-vision-quota-exhaustion-causing-3-minute-retry-delays-per-post
+    - removed-comment-and-share-from-is-peek-preview-opened-strictly-requiring-repost-or-report
+    - hardened-is-tab-bar-visible-to-check-ig-is-opened-and-catch-apphascrashed-returning-false
+    - hardened-escape-subscreens-to-relaunch-instagram-if-app-in-background-before-subscreen-escape
+    - guarded-bot-flow-profile-recovery-loop-with-try-except-apphascrashed-and-open-instagram-relaunch
+    - guarded-bot-flow-main-job-dispatch-with-outer-try-except-apphascrashed-invoking-restart
+    - added-daily-quota-exhaustion-circuit-breaker-in-gemini-vision-to-fast-exit-without-delay
+    - added-6-unit-tests-in-test-tuning-and-operational-fixes-py-covering-all-fixes
+    - verified-all-349-of-349-unit-tests-pass-with-100-percent-green-status
+    - verified-all-6-of-6-local-acp-ci-parity-gates-pass-via-acp-ci-fast
+    - authored-audit-reports-107-108-109-and-review-reports-057-058
+  deferred: []
+  key_fact: "Boolean UI queries like is_tab_bar_visible() and is_peek_preview_opened() must never throw AppHasCrashed when the target app is backgrounded or closed — they must return False safely; moreover, context markers for floating cards like Peek Preview must strictly require distinguishing actions (Repost/Report) rather than ubiquitous post actions (Comment/Share)."
+
+- date: 2026-09-21
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-106, review-056, regression-check-and-startup-hardening]
+  done:
+    - investigated-startup-regression-report-bot-unable-to-call-start-instagram
+    - forensically-audited-lolatheozjack-log-confirming-working-hours-06-00-23-59-gating-at-04-00-startup
+    - verified-zero-regression-in-open-instagram-startup-pathway
+    - hardened-open-instagram-target-app-resolution-with-strict-string-validation-and-config-fallbacks
+    - optimized-dismiss-peek-if-open-with-foreground-package-check-and-timeout-zero-latency-elimination
+    - enriched-telegram-start-and-help-with-schedule-aware-status-reporting-on-start-instagram
+    - enriched-telegram-status-with-live-session-state-and-sleep-timer-reporting
+    - updated-bot-flow-and-wait-for-next-session-to-display-sleeping-state-in-tui-activity-panel
+    - fixed-session-state-inside-working-hours-to-gracefully-accept-string-intervals-without-character-iteration
+    - added-2-unit-tests-in-test-telegram-commands-py-covering-start-instagram-and-enriched-status
+    - verified-343-of-343-tests-pass-with-100-percent-green-status
+    - authored-audit-report-audit-106-and-code-quality-review-review-056
+  deferred: []
+  key_fact: "When launching outside configured working-hours, the bot correctly delays Instagram startup until the window opens; diagnostics in Telegram (/start instagram, /status) and TUI activity panels must explicitly display the sleep schedule and wake-up time to eliminate user confusion."
+
+- date: 2026-09-21
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-105, review-055, bugfix-peek-preview-and-profile-stagnation]
+  done:
+    - diagnosed-instagram-peek-preview-3d-touch-long-press-modal-trap-and-profile-stagnation
+    - identified-evaluation-ordering-inversion-in-navigateToPost-bypassing-peek-detection-due-to-dimmed-profile-tabs
+    - hardened-OpenedPostView-is-peek-preview-opened-with-unrestricted-class-locators-for-Repost-and-Report
+    - hardened-OpenedPostView-like-in-peek-to-inspect-both-text-and-contentDescription-for-Like-and-Unlike
+    - hardened-OpenedPostView-dismiss-peek-with-2-pass-back-key-loop-and-outside-tap-fallback
+    - added-UniversalActions-dismiss-peek-if-open-and-integrated-as-step-0-in-dismiss-dialog-sweeps
+    - integrated-peek-preview-clearance-into-UniversalActions-check-micro-stall-recovery
+    - integrated-dynamic-peek-preview-detection-and-recovery-in-interact-with-user-and-profile-exit-loop
+    - protected-handle-posts-with-lingering-peek-dismissal-on-feed-loop-start-and-unidentifiable-post-authors
+    - added-5-comprehensive-unit-tests-covering-fallback-click-dimmed-profile-universal-actions-and-dynamic-recovery
+    - verified-341-of-341-tests-in-full-suite-pass-with-100-percent-green-status
+    - passed-all-6-of-6-local-acp-ci-parity-gates-via-acp-ci-fast
+    - authored-audit-report-audit-105-and-review-report-review-055
+  deferred: []
+  key_fact: "Instagram's 3D Touch / long-press Peek Preview popup dims the underlying profile tabs, causing _is_still_on_profile() to return False. In navigateToPost(), opened_post_view.is_peek_preview_opened() must strictly be evaluated before checking profile presence; otherwise, the modal is misclassified as a normal post opening and bypassed."
+
+- date: 2026-09-20
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-102, audit-103, audit-104, review-054]
+  done:
+    - audited-tuning-suggestions-and-operational-logs-deep-dive-audit-102
+    - identified-empty-list-crashes-in-unfollow-harvest-followers-and-handle-likers
+    - identified-type-error-in-view-exists-with-timeout-parameter
+    - identified-attribute-error-in-view-set-text-typing-simulation
+    - identified-false-positive-401-circuit-breaker-trips-on-floating-point-retry-seconds-in-gemini-vision
+    - identified-profile-filter-business-starvation-in-accounts-lolatheozjack
+    - conducted-pre-implementation-gap-analysis-and-logged-co-063-audit-103
+    - added-defensive-empty-list-handling-across-all-4-inspect-current-view-call-sites
+    - updated-device-facade-view-exists-signature-to-accept-timeout-and-kwargs
+    - fixed-typing-simulation-to-invoke-self-get-text-instead-of-self-viewv2-get-text
+    - prioritized-429-and-quota-checks-and-hardened-401-circuit-breaker-with-word-boundary-regex
+    - tuned-lolatheozjack-filters-and-config-with-business-allowed-20-percent-ai-quota-and-8-sources
+    - created-comments-list-txt-with-70-spintax-persona-fallbacks
+    - created-and-verified-6-case-unit-test-suite-in-test-tuning-and-operational-fixes-py
+    - verified-all-337-tests-in-full-suite-pass-with-zero-regressions
+    - executed-post-implementation-audit-audit-104-and-marked-co-063-fixed
+    - conducted-64-rule-review-review-054-and-coderabbit-diff-review
+    - passed-all-6-of-6-acp-ci-parity-gates-via-acp-ci-fast
+  deferred: []
+  key_fact: "Always use word-boundary regexes like r'\\b401\\b' rather than substring '401' in error string checks, as floating-point timestamps in retry messages (e.g. 'retry in 7.924074016s') will otherwise cause false-positive circuit breaker trips."
+
+- date: 2026-09-20
+  executor: Antigravity
+  branch: master
+  tasks_completed: [bugfix-ctrl-s-skip-task-responsiveness]
+  done:
+    - added-instantaneous-multi-channel-visual-and-audible-feedback-on-ctrl-s-and-s-hotkey
+    - rendered-bright-red-skip-pending-badge-in-tui-header-upon-skip-request
+    - rendered-prominent-alert-banner-in-tui-activity-panel-upon-skip-request
+    - rendered-dynamic-flashing-skipping-task-button-in-tui-footer-with-or-s-fallback-hint
+    - emitted-terminal-bell-sound-via-sys-stdout-write-bell-for-immediate-haptic-audible-acknowledgement
+    - sliced-utils-random-sleep-into-0-1s-interruptible-steps-when-tui-active-for-immediate-abort
+    - added-responsive-skip-checks-inside-inner-loops-of-interact-reels-handle-sources-and-action-unfollow-followers
+    - prevented-accidental-likes-follows-and-comments-on-reels-after-watch-sleep-aborted-by-user
+    - added-automated-unit-tests-in-test-tui-dashboard-py-covering-visual-feedback-and-interruptible-sleep
+    - verified-100-percent-green-full-regression-test-suite-330-of-330-tests-passing-with-0-flake8-lint-errors
+  deferred: []
+  key_fact: "Interactive CLI/TUI shortcut commands (such as CTRL+S to skip tasks) must always provide immediate on-screen and audible acknowledgement (header badges, flashing footers, activity alerts, terminal bell) and slice background sleeps into small ticks (0.1s); otherwise long blocking sleeps make the command appear non-functional to the user."
+
+- date: 2026-09-20
+  executor: Antigravity
+  branch: master
+  tasks_completed: [bugfix-finish-time-keyerror]
+  done:
+    - resolved-keyerror-finish-time-startup-defect-in-data-analytics-py
+    - serialized-finish-time-in-session-state-encoder-default
+    - hardened-data-analytics-get-finish-time-and-get-start-time-with-defensive-get-and-multi-format-parsing
+    - guarded-filter-sessions-plot-followers-growth-and-plot-duration-statistics-against-null-or-corrupted-timestamps
+    - hardened-telegram-duration-calculation-against-type-error-key-error-and-value-error
+    - added-regression-test-in-test-matplotlib-backend-py-verifying-tolerance-of-missing-and-none-finish-times
+    - verified-live-data-analytics-execution-on-actual-lolatheozjack-sessions-json
+    - verified-100-percent-green-full-regression-test-suite-328-of-328-tests-passing
+  deferred: []
+  key_fact: "Never perform raw dictionary indexing session['key'] in reporting plugins like data_analytics.py and telegram.py because historical sessions.json files often contain unfinalized, crashed, or older schema entries; always use defensive .get() with multi-format datetime parsing."
+
+- date: 2026-09-20
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-099, route-062, audit-100, review-053]
+  done:
+    - audited-lolatheozjack-44-minute-premature-session-termination-logs-audit-099
+    - identified-watchdog-inactivity-alarms-firing-during-gemini-vision-60s-backoffs
+    - identified-watchdog-inactivity-during-fast-skipping-cached-non-bot-users
+    - identified-unhandled-emptylist-in-iterate-over-followers-killing-session
+    - identified-obsolete-list-view-scroll-crashing-on-instagram-v447-ui
+    - discovered-stop-bot-omitted-setting-session-state-finish-time-causing-zero-completed-sessions
+    - created-route-062-and-comprehensive-implementation-plan-with-zero-shortcuts
+    - implemented-safe-rate-limit-sleep-in-gemini-vision-with-watchdog-pause-and-5s-heartbeats
+    - added-heartbeat-instrumentation-to-action-unfollow-followers-and-handle-sources
+    - added-gesture-swipe-fallback-with-direction-up-on-list-view-scroll-failure
+    - handled-emptylist-gracefully-in-iterate-over-followers-returning-to-blogger-profile
+    - stamped-finish-time-in-stop-bot-and-hardened-args-and-configs-against-nonetype
+    - bumped-total-crashes-limit-to-15-in-accounts-lolatheozjack-config-yml
+    - built-4-case-unit-test-suite-in-test-multi-session-resilience-py-with-100-percent-pass-rate
+    - executed-post-impl-audit-confirming-full-resolution-and-zero-regressions-audit-100
+    - conducted-64-rule-code-quality-and-coderabbit-diff-review-review-053
+    - verified-all-6-of-6-acp-ci-parity-gates-passing-via-acp-ci-fast
+    - verified-100-percent-green-full-regression-test-suite-327-of-327-tests-passing
+  deferred: []
+  key_fact: "In InstaAddict's device_facade, Direction only has UP, DOWN, LEFT, RIGHT (Direction.BOTTOM does not exist), and swiping UP on screen moves content down to reveal items further down a list; additionally, sleeping during LLM rate-limit backoffs or fast-skipping cached non-bot entries starves the 90s watchdog unless wrapped in pause/resume with 5-second chunked heartbeats."
+
+- date: 2026-09-20
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-096, audit-097, audit-098, review-052, route-061]
+  done:
+    - deep-dive-investigation-and-telemetry-dogfooding-research-audit-096
+    - authored-pre-impl-audit-confirming-zero-open-carryovers-and-remediated-reload-page-sleep-audit-097
+    - built-thread-safe-performance-tracker-singleton-in-instaaddict-core-telemetry-py
+    - implemented-high-resolution-p50-and-p95-latency-percentile-math-with-bounded-sample-eviction
+    - instrumented-profile-load-search-navigation-post-modal-and-gemini-vision-api-calls
+    - built-viewport-motion-sentinel-with-zero-displacement-snapback-and-dynamic-scaling
+    - created-micro-stall-sentinel-in-universal-actions-for-early-15-to-20-second-escape
+    - extended-session-state-with-motion-sentinel-and-p50-p95-telemetry-fields-and-safe-encoder
+    - implemented-autonomous-dogfood-auto-tuning-with-timestamped-backups-and-regex-preservation
+    - registered-auto-tune-cli-argument-across-core-arguments-py-and-report-py
+    - designed-second-terminal-interface-accessible-via-ctrl-g-with-4-rich-kpi-charts
+    - implemented-safe-bar-with-fractional-unicode-sub-blocks-and-ascii-console-fallback
+    - built-15-case-unit-test-suite-in-test-telemetry-and-kpi-charts-py-with-100-percent-pass-rate
+    - executed-post-impl-audit-confirming-complete-implementation-and-zero-shortcuts-audit-098
+    - conducted-64-rule-code-quality-and-coderabbit-diff-review-review-052
+    - verified-all-6-of-6-acp-ci-parity-gates-passing-via-acp-ci-fast
+    - verified-100-percent-green-full-regression-test-suite-323-of-323-tests-passing
+  deferred: []
+  key_fact: "Windows msvcrt.getch() emits ASCII BEL (b'\\x07') for [CTRL+G] keystroke chords, requiring byte and character level decoding; and SessionStateEncoder.default must defensively check hasattr(session.args, '__dict__') before __dict__ extraction to tolerate dictionary args without throwing AttributeError."
+
 - date: 2026-09-19
   executor: Antigravity
   branch: master

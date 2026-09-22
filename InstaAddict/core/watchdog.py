@@ -359,4 +359,3 @@ def record_heartbeat(stage: Optional[str] = None, action: Optional[str] = None) 
             BotWatchdog.get_instance().heartbeat(stage=stage, action=action)
     except Exception:
         pass
-

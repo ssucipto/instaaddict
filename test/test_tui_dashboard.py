@@ -283,6 +283,7 @@ class TestDashboardManager:
 
     def test_layout_generation(self):
         mgr = DashboardManager.get_instance()
+        mgr.state.skip_task_requested = False
         mgr.state.username = "test_user"
         mgr.state.likes_count = 50
         mgr.state.likes_limit = 100
@@ -301,9 +302,14 @@ class TestDashboardManager:
         assert isinstance(logs, Panel)
         footer = mgr._render_footer()
         assert isinstance(footer, Panel)
-        plain_footer = getattr(footer.renderable, "renderable", footer.renderable).plain
+        # Footer is now a Group of 2 rows — serialize via console to extract text
+        from rich.console import Console as _Con
+        from io import StringIO as _SIO
+        buf = _SIO()
+        _Con(file=buf, highlight=False, markup=False, width=200).print(footer)
+        plain_footer = buf.getvalue()
         assert "[Ctrl+U]" in plain_footer
-        assert "Upload Queued Photo" in plain_footer
+        assert "Upload Now" in plain_footer
         assert "[Ctrl+S]" in plain_footer
         assert "Skip Task" in plain_footer
         assert "[Ctrl+D]" in plain_footer
@@ -456,3 +462,246 @@ class TestArgumentParsing:
             elapsed = time.time() - start_time
             assert elapsed < 2.0
             assert mgr.state.skip_task_requested is False
+
+    def test_random_sleep_prearmed_skip(self):
+        from InstaAddict.core.utils import random_sleep
+
+        mgr = DashboardManager.get_instance()
+        with patch.object(DashboardManager, "is_active", return_value=True):
+            mgr.state.skip_task_requested = True
+            try:
+                start_time = time.time()
+                random_sleep(5.0, 10.0)
+                elapsed = time.time() - start_time
+                assert elapsed < 0.5
+            finally:
+                mgr.state.skip_task_requested = False
+
+    def test_skip_task_feedback_and_visual_badge(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        mgr = DashboardManager.get_instance()
+        mgr.state.username = "charlie"
+        account_dir = tmp_path / "accounts" / "charlie"
+        account_dir.mkdir(parents=True)
+
+        with patch("sys.stdout.write") as mock_stdout:
+            mgr.trigger_skip_task()
+            mock_stdout.assert_any_call("\a")
+
+        assert mgr.state.skip_task_requested is True
+        assert (account_dir / ".skip_task").exists()
+
+        header = mgr._render_header()
+        from rich.console import Console as _Con
+        from io import StringIO as _SIO
+        buf_h = _SIO()
+        _Con(file=buf_h, highlight=False, markup=False, width=200).print(header)
+        plain_header = buf_h.getvalue()
+        assert "SKIP PENDING" in plain_header
+
+        activity = mgr._render_activity_panel()
+        plain_activity = getattr(activity.renderable, "plain", str(activity.renderable))
+        assert "CTRL+S RECEIVED" in plain_activity or "Task Skip Pending" in plain_activity
+
+        footer = mgr._render_footer()
+        from rich.console import Console as _Con
+        from io import StringIO as _SIO
+        buf = _SIO()
+        _Con(file=buf, highlight=False, markup=False, width=200).print(footer)
+        plain_footer = buf.getvalue()
+        assert "SKIPPING" in plain_footer
+        assert "[Ctrl+S]" in plain_footer
+
+        assert mgr.state.consume_skip_task_request() is True
+        assert mgr.state.skip_task_requested is False
+        assert not (account_dir / ".skip_task").exists()
+
+    def test_job_pipeline_visualization_and_next_job(self):
+        mgr = DashboardManager.get_instance()
+        pipeline = [
+            "upload-posts",
+            "interact-reels",
+            "interact-blogger-followers",
+            "action-unfollow-followers",
+        ]
+        mgr.state.set_pipeline(pipeline, current_index=1)
+        mgr.state.current_job = "interact-reels"
+
+        assert mgr.state.get_next_job_name() == "interact-blogger-followers"
+
+        activity = mgr._render_activity_panel()
+        renderable = getattr(activity.renderable, "plain", str(activity.renderable))
+        plain_activity = renderable
+        assert "Job Queue:" in plain_activity
+        assert "[interact-reels (ACTIVE)]" in plain_activity
+        assert "[interact-blogger-followers (NEXT)]" in plain_activity
+
+        # When skip is armed, activity panel shows exact next job
+        mgr.state.skip_task_requested = True
+        try:
+            activity_skip = mgr._render_activity_panel()
+            plain_skip = getattr(
+                activity_skip.renderable, "plain", str(activity_skip.renderable)
+            )
+            assert "Advancing to 'interact-blogger-followers'" in plain_skip
+        finally:
+            mgr.state.skip_task_requested = False
+
+
+class TestNewViewModeAndPanels:
+    def test_view_mode_enum_has_filter_intelligence(self):
+        from InstaAddict.core.tui import ViewMode
+        assert hasattr(ViewMode, 'FILTER_INTELLIGENCE')
+        assert ViewMode.FILTER_INTELLIGENCE.value == 'filter_intelligence'
+
+    def test_view_mode_cycle_three_way(self, monkeypatch):
+        from InstaAddict.core.tui import DashboardManager, ViewMode
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        monkeypatch.setattr(mgr, 'update_render', lambda force=False: None)
+        assert mgr.view_mode == ViewMode.LIVE_DASHBOARD
+        mgr.trigger_view_toggle()
+        assert mgr.view_mode == ViewMode.STATISTICS_CHARTS
+        mgr.trigger_view_toggle()
+        assert mgr.view_mode == ViewMode.FILTER_INTELLIGENCE
+        mgr.trigger_view_toggle()
+        assert mgr.view_mode == ViewMode.LIVE_DASHBOARD
+
+    def test_skip_reasons_panel_empty_state(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.bound_session_state = None
+        panel = mgr._render_skip_reasons_panel()
+        assert isinstance(panel, Panel)
+        assert '0 total skips' in str(panel.title)
+
+    def test_skip_reasons_panel_with_data(self):
+        from unittest.mock import MagicMock
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mock_ss = MagicMock()
+        mock_ss.skip_reasons = {'not_follower_of_source': 50, 'private_account': 50}
+        mgr.bound_session_state = mock_ss
+        panel = mgr._render_skip_reasons_panel()
+        assert isinstance(panel, Panel)
+        assert '100 total skips' in str(panel.title)
+
+    def test_job_metrics_panel_empty_state(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.bound_session_state = None
+        panel = mgr._render_job_metrics_panel()
+        assert isinstance(panel, Panel)
+        assert 'Task Yield' in str(panel.title)
+
+    def test_crash_timeline_panel_no_crashes(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.bound_session_state = None
+        mgr.state.crashes_count = 0
+        panel = mgr._render_crash_timeline_panel()
+        assert isinstance(panel, Panel)
+        assert '0 total' in str(panel.title)
+
+    def test_crash_timeline_panel_with_crashes(self):
+        from unittest.mock import MagicMock
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.state.crashes_count = 2
+        mock_ss = MagicMock()
+        mock_ss.crash_history = [
+            {'timestamp': '2026-09-22T12:00:00', 'active_job': 'interact-reels', 'error_reason': 'AppHasCrashed', 'foreground_package': 'com.instagram.android'},
+        ]
+        mgr.bound_session_state = mock_ss
+        panel = mgr._render_crash_timeline_panel()
+        assert isinstance(panel, Panel)
+        assert '2 total' in str(panel.title)
+
+    def test_filter_intelligence_view_returns_layout(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.layout import Layout
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.bound_session_state = None
+        result = mgr._render_filter_intelligence_view()
+        assert isinstance(result, Layout)
+
+    def test_generate_layout_routes_filter_intelligence(self):
+        from InstaAddict.core.tui import DashboardManager, ViewMode
+        from rich.layout import Layout
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        mgr.view_mode = ViewMode.FILTER_INTELLIGENCE
+        mgr.bound_session_state = None
+        result = mgr.generate_layout()
+        assert isinstance(result, Layout)
+
+    def test_header_is_two_row_group(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.console import Group
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        panel = mgr._render_header()
+        assert isinstance(panel.renderable, Group)
+
+    def test_footer_is_two_row_group(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.console import Group
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        panel = mgr._render_footer()
+        assert isinstance(panel.renderable, Group)
+
+    def test_rich_summary_noop_on_empty_sessions(self):
+        from InstaAddict.core.rich_summary import print_rich_session_summary
+        print_rich_session_summary([], None)
+
+    def test_rich_summary_renders_with_session(self):
+        from unittest.mock import MagicMock
+        from datetime import datetime, timedelta
+        from InstaAddict.core.rich_summary import print_rich_session_summary
+        mock_session = MagicMock()
+        mock_session.my_username = 'testuser'
+        mock_session.startTime = datetime.now() - timedelta(hours=2)
+        mock_session.finishTime = datetime.now()
+        mock_session.totalLikes = 100
+        mock_session.totalFollowed = {'hashtag_followers': 30}
+        mock_session.totalUnfollowed = 10
+        mock_session.totalComments = 5
+        mock_session.totalPm = 0
+        mock_session.totalWatched = 50
+        mock_session.totalCrashes = 0
+        mock_session.totalWatchdogRecoveries = 0
+        mock_session.totalPostsChecked = 300
+        mock_session.totalProfilesChecked = 150
+        mock_session.totalProfilesSkipped = 80
+        mock_session.totalAdsBypassed = 12
+        mock_session.totalUploadsSuccess = 2
+        mock_session.totalUploadsFailed = 0
+        mock_session.totalInteractions = {'hashtag_followers': 145}
+        mock_session.successfulInteractions = {'hashtag_followers': 90}
+        mock_session.skip_reasons = {'not_follower_of_source': 40, 'private_account': 15}
+        mock_session.job_metrics = {'interact-reels': {'interactions_attempted': 145, 'interactions_successful': 90, 'duration_seconds': 7200.0, 'status': 'completed'}}
+        mock_session.uploadHistory = [{'timestamp': '2026-09-22 12:00:00', 'file': 'photo.jpg', 'status': 'ok', 'caption': 'Test caption'}]
+        mock_session.crash_history = []
+        print_rich_session_summary([mock_session], None)
+
+    def test_latency_chart_title_includes_job_filter_note(self):
+        from InstaAddict.core.tui import DashboardManager
+        from rich.panel import Panel
+        DashboardManager._reset_instance()
+        mgr = DashboardManager.get_instance()
+        panel = mgr._render_latency_chart()
+        assert isinstance(panel, Panel)
+        title_str = str(panel.title)
+        assert 'Filter Ops' in title_str or 'Job' in title_str

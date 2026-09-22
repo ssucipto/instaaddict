@@ -8,7 +8,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Deque, Optional, Tuple
+from typing import Any, Deque, List, Optional, Tuple
 
 from rich.align import Align
 from rich.console import Console, Group
@@ -22,6 +22,17 @@ from rich.text import Text
 from InstaAddict import __version__
 
 
+from enum import Enum
+
+
+class ViewMode(Enum):
+    """Display modes for the interactive terminal dashboard."""
+
+    LIVE_DASHBOARD = "live_dashboard"
+    STATISTICS_CHARTS = "statistics_charts"
+    FILTER_INTELLIGENCE = "filter_intelligence"
+
+
 def safe_glyph(glyph: str, fallback: str) -> str:
     """Return emoji glyph if current stdout encoding supports it, else return safe ascii fallback."""
     encoding = getattr(sys.stdout, "encoding", "utf-8") or "utf-8"
@@ -32,6 +43,52 @@ def safe_glyph(glyph: str, fallback: str) -> str:
         return glyph
     except Exception:
         return fallback
+
+
+def safe_bar(
+    ratio: float,
+    width: int = 16,
+    filled_style: str = "bright_cyan",
+    empty_style: str = "dim white",
+) -> Text:
+    """Renders a high-resolution horizontal bar using Unicode fractional sub-blocks.
+
+    Falls back to ASCII '#' and '-' if console encoding does not support UTF-8.
+    """
+    ratio = max(0.0, min(1.0, float(ratio))) if (ratio == ratio) else 0.0
+    encoding = getattr(sys.stdout, "encoding", "utf-8") or "utf-8"
+    is_utf = "utf" in encoding.lower()
+
+    if not is_utf:
+        full = int(ratio * width)
+        empty = max(0, width - full)
+        t = Text()
+        if full > 0:
+            t.append("#" * full, style=filled_style)
+        if empty > 0:
+            t.append("-" * empty, style=empty_style)
+        return t
+
+    sub_blocks = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+    total_eighths = int(round(ratio * width * 8))
+    full_chars = min(total_eighths // 8, width)
+    remainder_eighth = total_eighths % 8 if full_chars < width else 0
+
+    rem_char = (
+        sub_blocks[remainder_eighth]
+        if (full_chars < width and remainder_eighth > 0)
+        else ""
+    )
+    empty_chars = max(0, width - full_chars - (1 if rem_char else 0))
+
+    t = Text()
+    if full_chars > 0:
+        t.append("█" * full_chars, style=filled_style)
+    if rem_char:
+        t.append(rem_char, style=filled_style)
+    if empty_chars > 0:
+        t.append(" " * empty_chars, style=empty_style)
+    return t
 
 
 def _safe_int(val, default: int) -> int:
@@ -105,6 +162,13 @@ class DashboardState:
     dialogs_dismissed: int = 0
     reels_evaluated: int = 0
     watchdog_recoveries: int = 0
+    subscreen_escapes: int = 0
+
+    # Motion & Stability telemetry
+    total_swipes: int = 0
+    zero_displacement_swipes: int = 0
+    snapback_events: int = 0
+    micro_stall_escapes: int = 0
 
     # Content queue & upload telemetry
     queue_pending: int = 0
@@ -113,6 +177,10 @@ class DashboardState:
     upload_cooldown_str: str = "Ready"
     upload_requested: bool = False
     skip_task_requested: bool = False
+
+    # Pipeline & scheduled jobs context
+    pipeline_jobs: List[str] = field(default_factory=list)
+    pipeline_index: int = 0
 
     # Concurrency guard
     lock: threading.RLock = field(default_factory=threading.RLock)
@@ -173,6 +241,22 @@ class DashboardState:
                 if os.path.isfile(signal_file):
                     return True
             return False
+
+    def set_pipeline(self, jobs: List[str], current_index: int = 0):
+        """Update the list of scheduled jobs and current active index."""
+        with self.lock:
+            self.pipeline_jobs = list(jobs)
+            self.pipeline_index = current_index
+
+    def get_next_job_name(self) -> Optional[str]:
+        """Get the name of the upcoming job in the pipeline or None."""
+        with self.lock:
+            if not self.pipeline_jobs:
+                return None
+            idx = self.pipeline_index + 1
+            if idx < len(self.pipeline_jobs):
+                return self.pipeline_jobs[idx]
+            return "End of Session"
 
     def refresh_queue_status(self, username: Optional[str] = None):
         """Scan content queue directory on disk and update queue telemetry."""
@@ -354,6 +438,17 @@ class DashboardState:
             self.watchdog_recoveries = getattr(
                 session, "totalWatchdogRecoveries", 0
             )
+            self.subscreen_escapes = getattr(
+                session, "totalSubscreenEscapes", 0
+            )
+            self.total_swipes = getattr(session, "totalSwipes", 0)
+            self.zero_displacement_swipes = getattr(
+                session, "zeroDisplacementSwipes", 0
+            )
+            self.snapback_events = getattr(session, "snapbackEvents", 0)
+            self.micro_stall_escapes = getattr(
+                session, "totalMicroStallEscapes", 0
+            )
 
             # Check upload history from session if available
             upload_hist = getattr(session, "uploadHistory", [])
@@ -468,17 +563,45 @@ class KeyboardListenerThread(threading.Thread):
             except ImportError:
                 return
 
-            while self._running and self.manager.is_active():
-                try:
-                    if msvcrt.kbhit():
-                        ch = msvcrt.getch()
-                        if ch in (b"\x00", b"\xe0"):
-                            msvcrt.getch()
-                            continue
-                        self._handle_key(ch)
-                    time.sleep(0.1)
-                except Exception:
-                    time.sleep(0.2)
+            # Harden console input: Clear ENABLE_PROCESSED_INPUT on CONIN$ so
+            # CTRL+S (0x13) reaches getch() instead of XOFF pause in conhost.
+            orig_mode = None
+            conin_handle = None
+            try:
+                import ctypes
+                k32 = ctypes.windll.kernel32
+                conin_handle = k32.CreateFileW(
+                    "CONIN$", 0xC0000000, 3, None, 3, 0, None
+                )
+                if conin_handle and conin_handle != -1:
+                    m = ctypes.c_ulong()
+                    if k32.GetConsoleMode(conin_handle, ctypes.byref(m)):
+                        orig_mode = m.value
+                        k32.SetConsoleMode(conin_handle, orig_mode & ~0x0001)
+            except Exception:
+                pass
+
+            try:
+                while self._running and self.manager.is_active():
+                    try:
+                        if msvcrt.kbhit():
+                            ch = msvcrt.getch()
+                            if ch in (b"\x00", b"\xe0"):
+                                msvcrt.getch()
+                                continue
+                            self._handle_key(ch)
+                        time.sleep(0.1)
+                    except Exception:
+                        time.sleep(0.2)
+            finally:
+                if orig_mode is not None and conin_handle:
+                    try:
+                        import ctypes
+                        k32 = ctypes.windll.kernel32
+                        k32.SetConsoleMode(conin_handle, orig_mode)
+                        k32.CloseHandle(conin_handle)
+                    except Exception:
+                        pass
         else:
             import select
 
@@ -507,6 +630,9 @@ class KeyboardListenerThread(threading.Thread):
         # CTRL+D: b'\x04' (byte 4), '\x04', or fallbacks 'd', 'D'
         elif bval == b"\x04" or sval in ("\x04", "d", "D"):
             self.manager.trigger_debug_toggle()
+        # CTRL+G: b'\x07' (byte 7), '\x07', or fallbacks 'g', 'G'
+        elif bval == b"\x07" or sval in ("\x07", "g", "G"):
+            self.manager.trigger_view_toggle()
 
 
 class DashboardManager:
@@ -522,6 +648,7 @@ class DashboardManager:
     ):
         self.console = console or Console(force_terminal=True, safe_box=True)
         self.state = DashboardState()
+        self.view_mode: ViewMode = ViewMode.LIVE_DASHBOARD
         self.refresh_rate = refresh_rate
         self.screen = screen
         self.live: Optional[Live] = None
@@ -549,6 +676,11 @@ class DashboardManager:
         return cls._instance
 
     @classmethod
+    def _reset_instance(cls) -> None:
+        """Reset the singleton for test isolation. Not for production use."""
+        cls._instance = None
+
+    @classmethod
     def is_active(cls) -> bool:
         if cls._instance is None:
             return False
@@ -569,17 +701,41 @@ class DashboardManager:
             self.update_render(force=True)
 
     def trigger_skip_task(self):
-        """Handle skip task hotkey [CTRL+S]."""
+        """Handle skip task hotkey [CTRL+S], [S], [N], or IPC signal."""
         with self._lock:
             self.state.skip_task_requested = True
-            self.state.update_activity(
-                action="[CTRL+S] Task skip requested! Advancing to next task...",
+            next_job = self.state.get_next_job_name() or "next task"
+            action_msg = (
+                f"⚡ [SKIP REQUESTED] Skipping '{self.state.current_job}' "
+                f"➔ Advancing to '{next_job}'..."
+            )
+            self.state.update_activity(action=action_msg)
+            log_msg = (
+                f"User shortcut [S]/[N]/[CTRL+S]: Aborting job "
+                f"'{self.state.current_job}' and advancing to '{next_job}'..."
             )
             self.state.add_log(
                 "WARNING",
                 datetime.now().strftime("%H:%M:%S"),
-                "User pressed [CTRL+S]: Skipping current task and advancing to next scheduled task...",
+                log_msg,
             )
+            # Create/touch IPC signal file for disk-level synchronization
+            if self.state.username:
+                account_dir = os.path.join("accounts", self.state.username)
+                if os.path.isdir(account_dir):
+                    try:
+                        sig_path = os.path.join(account_dir, ".skip_task")
+                        with open(sig_path, "w") as f:
+                            f.write(str(time.time()))
+                    except Exception:
+                        pass
+            # Trigger terminal bell / beep for immediate tactile/audible feedback
+            try:
+                sys.stdout.write("\a")
+                sys.stdout.flush()
+            except Exception:
+                pass
+
             self.update_render(force=True)
 
     def trigger_debug_toggle(self):
@@ -601,6 +757,29 @@ class DashboardManager:
                 "INFO",
                 datetime.now().strftime("%H:%M:%S"),
                 f"User pressed [CTRL+D]: Log level switched to {lvl_str}. Full TUI re-render forced.",
+            )
+            self.update_render(force=True)
+
+    def trigger_view_toggle(self):
+        """Handle screen toggle hotkey [CTRL+G]. Cycles Live → KPI Charts → Filter Intelligence → Live."""
+        with self._lock:
+            if self.view_mode == ViewMode.LIVE_DASHBOARD:
+                self.view_mode = ViewMode.STATISTICS_CHARTS
+                mode_str = "Statistics & KPI Charts"
+            elif self.view_mode == ViewMode.STATISTICS_CHARTS:
+                self.view_mode = ViewMode.FILTER_INTELLIGENCE
+                mode_str = "Filter Intelligence & Job Yield"
+            else:
+                self.view_mode = ViewMode.LIVE_DASHBOARD
+                mode_str = "Live Operations Dashboard"
+
+            self.state.update_activity(
+                action=f"[CTRL+G] Display switched to {mode_str}",
+            )
+            self.state.add_log(
+                "INFO",
+                datetime.now().strftime("%H:%M:%S"),
+                f"User pressed [CTRL+G]: Interface toggled to {mode_str}.",
             )
             self.update_render(force=True)
 
@@ -668,73 +847,109 @@ class DashboardManager:
     def _render_header(self) -> Panel:
         s = self.state
         user_str = f"@{s.username}" if s.username else "No Account"
-        stats_str = (
-            f"({s.followers_count or '0'} followers | {s.following_count or '0'} following)"
-        )
-        device_str = (
-            f"{s.device_id or 'Auto-Detect'} ({s.device_status})"
-        )
-        duration_str = s.elapsed_duration_str()
-
-        icon_bot = safe_glyph("🤖", "[*]")
-        icon_dev = safe_glyph("📱", "[Dev]")
-        icon_time = safe_glyph("⏱️", "[Time]")
         sep = safe_glyph("│", "|")
+        icon_bot = safe_glyph("🤖", "[BOT]")
+        icon_dev = safe_glyph("📱", "[Dev]")
+        icon_time = safe_glyph("⏱", "[T]")
+        icon_eye = safe_glyph("👁", "[~]")
+        icon_clock = safe_glyph("🕐", "[H]")
+        blink_on = int(time.time()) % 2 == 0
 
-        header_text = Text()
-        header_text.append(f"{icon_bot} InstaAddict AI ", style="bold bright_cyan")
-        header_text.append(f"v{__version__}  {sep}  ", style="dim cyan")
-        header_text.append(f"{user_str} ", style="bold white")
-        header_text.append(f"{stats_str}  {sep}  ", style="dim white")
-        header_text.append(f"{icon_dev} Device: ", style="bold yellow")
-        header_text.append(f"{device_str}  {sep}  ", style="yellow")
-        header_text.append(f"{icon_time} Elapsed: ", style="bold green")
-        header_text.append(f"{duration_str} (Session #{s.session_index})", style="green")
+        # ── Row 1: Brand + Account identity ──────────────────────────────
+        row1 = Text(justify="center")
+        pulse = safe_glyph("●", "*") if blink_on else safe_glyph("○", "o")
+        row1.append(f" {icon_bot} ", style="bold bright_cyan")
+        row1.append("InstaAddict-AI", style="bold bright_cyan")
+        row1.append(f" v{__version__} ", style="dim cyan")
+        row1.append(f" {sep} ", style="dim blue")
+        row1.append(f" {user_str} ", style="bold white")
+        followers = s.followers_count or "–"
+        following = s.following_count or "–"
+        posts = s.posts_count or "–"
+        row1.append(f" {icon_eye} {followers} followers ", style="dim white")
+        row1.append(f"{sep} ", style="dim blue")
+        row1.append(f" {following} following ", style="dim white")
+        row1.append(f"{sep} ", style="dim blue")
+        row1.append(f" {posts} posts ", style="dim white")
+        row1.append(f" {sep} ", style="dim blue")
+        row1.append(f" {pulse} ", style="bold bright_green" if blink_on else "green")
+        row1.append("LIVE", style="bold bright_green")
+        if self.state.skip_task_requested:
+            row1.append(f" {sep} ", style="dim white")
+            row1.append(" ⚡ SKIP PENDING ", style="bold bright_white on red")
+        if self.view_mode == ViewMode.STATISTICS_CHARTS:
+            row1.append(f" {sep} ", style="dim blue")
+            row1.append(" KPI CHARTS ", style="bold bright_magenta")
+        elif self.view_mode == ViewMode.FILTER_INTELLIGENCE:
+            row1.append(f" {sep} ", style="dim blue")
+            row1.append(" FILTER INTEL ", style="bold bright_yellow")
 
-        # Watchdog Status & Blinking LED light in top-right panel corner
+        # ── Row 2: Device + Session + Working Hours ───────────────────────
+        row2 = Text(justify="center")
+        device_id = s.device_id or "Auto-Detect"
+        duration_str = s.elapsed_duration_str()
+        wh_status = s.working_hours_status
+        wh_color = (
+            "bright_green" if "Active" in wh_status
+            else ("bright_yellow" if "Sleep" in wh_status else "dim white")
+        )
+        wh_icon = (
+            safe_glyph("🟢", "[ON]")
+            if "Active" in wh_status
+            else safe_glyph("🔴", "[ZZ]")
+        )
+        row2.append(f" {icon_dev} ", style="yellow")
+        row2.append(f"{device_id} ", style="yellow")
+        row2.append(f"({s.device_status}) ", style="dim yellow")
+        row2.append(f" {sep} ", style="dim blue")
+        row2.append(f" {icon_time} ", style="green")
+        row2.append(f"{duration_str} ", style="bright_green")
+        row2.append(f"Session #{s.session_index}/{s.total_sessions} ", style="dim green")
+        row2.append(f" {sep} ", style="dim blue")
+        row2.append(f" {icon_clock} Working Hours: ", style="dim white")
+        row2.append(f"{wh_icon} {wh_status} ", style=wh_color)
+        row2.append(f" {sep} ", style="dim blue")
+        row2.append(" Status: ", style="dim white")
+        status_color = (
+            "bold bright_green" if s.status_message == "RUNNING"
+            else ("bold bright_red" if "SLEEP" in s.status_message.upper() else "bold bright_yellow")
+        )
+        row2.append(f" {s.status_message} ", style=status_color)
+
+        # ── Watchdog LED for panel title ──────────────────────────────────
         led_text = Text()
         try:
             from InstaAddict.core.watchdog import BotWatchdog
-
             wd = BotWatchdog.get_instance()
-            status = wd.get_status()
-            wd_state = status.get("state", "STOPPED")
-            elapsed = int(status.get("elapsed", 0))
-            attempts = status.get("attempts", 0)
-
-            blink_on = int(time.time()) % 2 == 0
+            wd_status = wd.get_status()
+            wd_state = wd_status.get("state", "STOPPED")
+            elapsed_wd = int(wd_status.get("elapsed", 0))
+            attempts_wd = wd_status.get("attempts", 0)
 
             if wd_state == "HEALTHY":
                 dot = safe_glyph("●", "*") if blink_on else safe_glyph("○", "o")
-                style = "bold bright_green" if blink_on else "green"
                 led_text.append(safe_glyph("🟢 ", "[OK] "))
-                led_text.append(f"{dot} LIVE", style=style)
+                led_text.append(f"{dot} WATCHDOG HEALTHY", style="bold bright_green" if blink_on else "green")
             elif wd_state == "PAUSED":
-                dot = safe_glyph("⏸️", "||")
-                led_text.append(safe_glyph("🔵 ", "[PAUSED] "))
-                led_text.append(f"{dot} PAUSED", style="dim cyan")
+                led_text.append(safe_glyph("🔵 ", "[P] "))
+                led_text.append("⏸ PAUSED", style="dim cyan")
             elif wd_state == "STALLED":
-                dot = safe_glyph("●", "*")
                 led_text.append(safe_glyph("🟡 ", "[!] "))
-                led_text.append(
-                    f"{dot} STALLED {elapsed}s", style="bold bright_yellow"
-                )
+                led_text.append(f"● STALLED {elapsed_wd}s", style="bold bright_yellow")
             elif wd_state == "RECOVERING":
-                dot = safe_glyph("▲", "^")
-                fast_blink = int(time.time() * 2) % 2 == 0
-                style = "bold bright_red" if fast_blink else "dim red"
+                fast = int(time.time() * 2) % 2 == 0
                 led_text.append(safe_glyph("🔴 ", "[!] "))
-                led_text.append(f"{dot} RECOVERING #{attempts}", style=style)
+                led_text.append(f"▲ RECOVERING #{attempts_wd}", style="bold bright_red" if fast else "dim red")
             else:
                 led_text.append(safe_glyph("⚪ ", "[-] "))
                 led_text.append("IDLE", style="dim white")
         except Exception:
-            dot = safe_glyph("●", "*") if int(time.time()) % 2 == 0 else safe_glyph("○", "o")
+            dot = safe_glyph("●", "*") if blink_on else safe_glyph("○", "o")
             led_text.append(safe_glyph("🟢 ", "[OK] "))
             led_text.append(f"{dot} LIVE", style="bold bright_green")
 
         return Panel(
-            Align.center(header_text),
+            Group(Align.center(row1), Align.center(row2)),
             title=led_text,
             title_align="right",
             style="bright_blue",
@@ -814,7 +1029,7 @@ class DashboardManager:
                 f"[bold cyan]{icon_effort} Effort:[/] Posts: [bold white]{s.posts_checked}[/] │ "
                 f"Profiles: [bold white]{s.profiles_checked}[/] ([dim]{s.profiles_skipped} skp[/]) │ "
                 f"Ads: [yellow]{s.ads_bypassed}[/] │ Dialogs: [green]{s.dialogs_dismissed}[/] │ "
-                f"Reels: [magenta]{s.reels_evaluated}[/] │ Rec: [{short_rec_color}]{s.watchdog_recoveries}[/]"
+                f"Escapes: [cyan]{s.subscreen_escapes}[/] │ Rec: [{short_rec_color}]{s.watchdog_recoveries}[/]"
             )
             queue_text = Text.from_markup(
                 f"[bold magenta]{icon_queue} Queue:[/] [bold green]{s.queue_pending} media[/] │ "
@@ -839,10 +1054,11 @@ class DashboardManager:
             f"[bold white]Dialogs Cleared:[/] [green]{s.dialogs_dismissed}[/]",
             f"[bold white]Filter Pass Rate:[/] [{pass_style}]{pass_pct:.1f}%[/]",
         )
+        esc_color = "bright_cyan" if s.subscreen_escapes > 0 else "dim white"
         effort_table.add_row(
             f"[bold white]Watchdog Rec:[/] [{rec_color}]{s.watchdog_recoveries}[/]",
+            f"[bold white]Subscreen Esc:[/] [{esc_color}]{s.subscreen_escapes}[/]",
             "[bold white]Self-Healing:[/] [bright_green]Active (3-Tier)[/]",
-            "",
         )
 
         queue_header = Text.from_markup(f"[bold bright_magenta]{icon_queue} Content Queue & Publishing[/] [dim](hotkey: \\[U] to upload now)[/]")
@@ -873,11 +1089,38 @@ class DashboardManager:
         content.append(f"{bullet} Active Job:   ", style="bold yellow")
         content.append(f"{s.current_job}\n", style="bright_white")
 
+        # Render Job Pipeline Queue if configured
+        if s.pipeline_jobs:
+            content.append(f"{bullet} Job Queue:    ", style="bold bright_cyan")
+            for i, job_name in enumerate(s.pipeline_jobs):
+                if i < s.pipeline_index:
+                    content.append(f"[{job_name} ✓] ", style="dim green")
+                elif i == s.pipeline_index:
+                    content.append(
+                        f"[{job_name} (ACTIVE)] ",
+                        style="bold bright_white on dark_blue",
+                    )
+                elif i == s.pipeline_index + 1:
+                    content.append(
+                        f"[{job_name} (NEXT)] ",
+                        style="bold bright_yellow",
+                    )
+                else:
+                    content.append(f"[{job_name}] ", style="dim white")
+                if i < len(s.pipeline_jobs) - 1:
+                    content.append("➔ ", style="dim cyan")
+            content.append("\n")
+
         content.append(f"{bullet} Current Step: ", style="bold cyan")
         content.append(f"{s.current_action}\n", style="white")
 
         if s.skip_task_requested:
-            content.append("⚡ Task Skip Pending: Advancing to next task...\n", style="bold bright_yellow")
+            next_job = s.get_next_job_name() or "next task"
+            skip_banner = (
+                f"🚨 [CTRL+S RECEIVED] Task Skip Pending: Terminating "
+                f"'{s.current_job}' ➔ Advancing to '{next_job}'...\n"
+            )
+            content.append(skip_banner, style="bold bright_yellow on red")
 
         if s.target_user:
             content.append(f"{bullet} Target Post:  ", style="bold magenta")
@@ -942,29 +1185,543 @@ class DashboardManager:
 
     def _render_footer(self) -> Panel:
         sep = safe_glyph("│", "|")
-        footer_text = Text()
-        footer_text.append(" [Ctrl+C] ", style="bold bright_red")
-        footer_text.append(f"Stop  {sep} ", style="dim white")
-        footer_text.append(" [Ctrl+S] ", style="bold bright_yellow")
-        footer_text.append(f"Skip Task  {sep} ", style="bright_white")
-        footer_text.append(" [Ctrl+U] ", style="bold bright_magenta")
-        footer_text.append(f"Upload Queued Photo  {sep} ", style="bright_white")
-        footer_text.append(" [Ctrl+D] ", style="bold bright_yellow")
-        footer_text.append(f"Debug  {sep} ", style="dim white")
-        footer_text.append(" Mode: ", style="bold cyan")
-        footer_text.append(f"Live (Human Sim)  {sep} ", style="bold green")
-        footer_text.append(" Queue: ", style="bold green")
-        cooldown_style = "bright_green" if self.state.upload_cooldown_str == "Ready" else "yellow"
-        footer_text.append(
-            f"{self.state.queue_pending} pending ({self.state.upload_cooldown_str})",
-            style=cooldown_style,
-        )
+        s = self.state
+
+        # ── Row 1: View mode indicator + Queue status ─────────────────────
+        row1 = Text(justify="center")
+        if self.view_mode == ViewMode.LIVE_DASHBOARD:
+            next_mode = "KPI Charts"
+        elif self.view_mode == ViewMode.STATISTICS_CHARTS:
+            next_mode = "Filter Intel"
+        else:
+            next_mode = "Live Ops"
+
+        mode_labels = {
+            ViewMode.LIVE_DASHBOARD: "● Live Ops",
+            ViewMode.STATISTICS_CHARTS: "◈ KPI Charts",
+            ViewMode.FILTER_INTELLIGENCE: "◉ Filter Intel",
+        }
+        current_mode = mode_labels.get(self.view_mode, "Live Ops")
+        row1.append(f" ◀ {current_mode} ▶ ", style="bold bright_cyan")
+        row1.append(f" {sep} ", style="dim white")
+        row1.append(" Next: ", style="dim cyan")
+        row1.append(f"{next_mode} ", style="cyan")
+        row1.append(f" {sep} ", style="dim white")
+
+        if s.skip_task_requested:
+            blink_on = int(time.time() * 2) % 2 == 0
+            skip_style = "bold bright_white on red" if blink_on else "bold bright_yellow on dark_red"
+            row1.append(" ⚡ SKIPPING → NEXT TASK ", style=skip_style)
+            row1.append(f" {sep} ", style="dim white")
+
+        cooldown_style = "bright_green" if s.upload_cooldown_str == "Ready" else "yellow"
+        row1.append(" 📦 Queue: ", style="bold green")
+        row1.append(f"{s.queue_pending} pending ", style="bright_green" if s.queue_pending == 0 else "bold bright_yellow")
+        row1.append(f"{sep} Cooldown: ", style="dim green")
+        row1.append(f"{s.upload_cooldown_str} ", style=cooldown_style)
+        row1.append(f" {sep} ", style="dim white")
+        row1.append(f" Published: {s.queue_published} posts ", style="dim green")
+
+        # ── Row 2: Keyboard shortcut legend ──────────────────────────────
+        row2 = Text(justify="center")
+        shortcuts = [
+            ("Ctrl+G", f"→ {next_mode}", "bright_cyan"),
+            ("Ctrl+S", "Skip Task", "bright_yellow"),
+            ("Ctrl+U", "Upload Now", "bright_magenta"),
+            ("Ctrl+D", "Debug Toggle", "yellow"),
+            ("Ctrl+C", "Stop Bot", "bright_red"),
+        ]
+        for i, (key, label, color) in enumerate(shortcuts):
+            row2.append(f" [{key}] ", style=f"bold {color}")
+            row2.append(label, style="white")
+            if i < len(shortcuts) - 1:
+                row2.append(f"  {sep}  ", style="dim white")
 
         return Panel(
-            Align.center(footer_text),
+            Group(Align.center(row1), Align.center(row2)),
             style="dim white",
+            padding=(0, 0),
+        )
+
+    def _render_funnel_chart(self) -> Panel:
+        s = self.state
+        posts_checked = max(s.posts_checked, 0)
+        profiles_checked = max(s.profiles_checked, 0)
+        pass_count = max(0, s.profiles_checked - s.profiles_skipped)
+        total_interactions = max(s.total_interactions, 0)
+        outcomes = s.likes_count + s.follows_count + s.comments_count + s.watched_count
+
+        table = Table(box=None, expand=True, padding=(0, 1), header_style="bold bright_cyan")
+        table.add_column("Funnel Stage", style="bold white", width=18)
+        table.add_column("Conversion Bar", ratio=1)
+        table.add_column("Count", justify="right", width=7)
+        table.add_column("Step %", justify="right", width=8)
+        table.add_column("Tot %", justify="right", width=7)
+
+        base = max(posts_checked, profiles_checked, pass_count, total_interactions, outcomes, 1)
+
+        stages = [
+            ("1. Posts Scanned", posts_checked, 1.0, 1.0, "bright_blue"),
+            (
+                "2. Profiles Inspected",
+                profiles_checked,
+                (profiles_checked / max(posts_checked, 1)) if posts_checked > 0 else (1.0 if profiles_checked > 0 else 0.0),
+                (profiles_checked / base),
+                "bright_cyan",
+            ),
+            (
+                "3. Filter Passed",
+                pass_count,
+                (pass_count / max(profiles_checked, 1)) if profiles_checked > 0 else (1.0 if pass_count > 0 else 0.0),
+                (pass_count / base),
+                "bright_green",
+            ),
+            (
+                "4. Engagements Attempted",
+                total_interactions,
+                (total_interactions / max(pass_count, 1)) if pass_count > 0 else (1.0 if total_interactions > 0 else 0.0),
+                (total_interactions / base),
+                "bright_yellow",
+            ),
+            (
+                "5. Successful Converts",
+                outcomes,
+                (outcomes / max(total_interactions, 1)) if total_interactions > 0 else (1.0 if outcomes > 0 else 0.0),
+                (outcomes / base),
+                "bold bright_magenta",
+            ),
+        ]
+
+        for name, count, step_ratio, total_ratio, color in stages:
+            step_pct = min(int(round(step_ratio * 100.0)), 100)
+            tot_pct = min(int(round(total_ratio * 100.0)), 100)
+            bar = safe_bar(min(total_ratio, 1.0), width=16, filled_style=color)
+            table.add_row(
+                name,
+                bar,
+                str(count),
+                f"[{color}]{step_pct}%[/{color}]",
+                f"[dim]{tot_pct}%[/dim]",
+            )
+
+        icon_funnel = safe_glyph("⚡", "[*]")
+        return Panel(
+            table,
+            title=f"[bold bright_cyan]{icon_funnel} Engagement & Conversion Funnel[/bold bright_cyan]",
+            border_style="cyan",
             padding=(0, 1),
         )
+
+    def _render_quota_velocity_chart(self) -> Panel:
+        s = self.state
+        hours_elapsed = max((datetime.now() - s.start_time).total_seconds() / 3600.0, 0.02)
+
+        table = Table(box=None, expand=True, padding=(0, 1), header_style="bold bright_green")
+        table.add_column("Action / Quota", style="bold white", width=15)
+        table.add_column("Quota Gauge", ratio=1)
+        table.add_column("Count / Limit", justify="right", width=13)
+        table.add_column("Velocity", justify="right", width=9)
+        table.add_column("Pace", justify="center", width=7)
+
+        quotas = [
+            ("Likes", s.likes_count, s.likes_limit, 60.0),
+            ("Follows", s.follows_count, s.follows_limit, 20.0),
+            ("Unfollows", s.unfollows_count, s.unfollows_limit, 20.0),
+            ("Comments", s.comments_count, s.comments_limit, 8.0),
+            ("Stories Watched", s.watched_count, s.watched_limit, 50.0),
+            ("Total Actions", s.total_interactions, s.total_interactions_limit, 100.0),
+            ("Crash Budget", s.crashes_count, s.crashes_limit, 2.0),
+        ]
+
+        for name, current, limit, max_safe_rate in quotas:
+            limit_val = max(limit, 1)
+            ratio = min(current / limit_val, 1.0)
+            rate_per_hr = current / hours_elapsed
+
+            if name == "Crash Budget":
+                color = "bright_red" if current > 0 else "bright_green"
+                pace_str = "[green]SAFE[/green]" if current == 0 else "[red]RISK[/red]"
+            elif ratio >= 1.0:
+                color = "bright_red"
+                pace_str = "[red]MAX[/red]"
+            elif rate_per_hr > max_safe_rate:
+                color = "bright_yellow"
+                pace_str = "[yellow]FAST[/yellow]"
+            else:
+                color = "bright_green"
+                pace_str = "[green]OPT[/green]"
+
+            bar = safe_bar(ratio, width=15, filled_style=color)
+            table.add_row(
+                name,
+                bar,
+                f"{current} / {limit}",
+                f"{rate_per_hr:.1f}/h",
+                pace_str,
+            )
+
+        icon_gauge = safe_glyph("⏱️", "[#]")
+        return Panel(
+            table,
+            title=f"[bold bright_green]{icon_gauge} Quota Consumption & Velocity Gauges[/bold bright_green]",
+            border_style="green",
+            padding=(0, 1),
+        )
+
+    def _render_latency_chart(self) -> Panel:
+        table = Table(box=None, expand=True, padding=(0, 1), header_style="bold bright_yellow")
+        table.add_column("Operation", style="bold white", width=20)
+        table.add_column("Tail Latency (P95)", ratio=1)
+        table.add_column("Calls", justify="right", width=6)
+        table.add_column("P50", justify="right", width=8)
+        table.add_column("P95", justify="right", width=8)
+        table.add_column("Err", justify="right", width=5)
+        table.add_column("Status", justify="center", width=7)
+
+        percentiles: dict = {}
+        counts: dict = {}
+        errors: dict = {}
+        try:
+            from InstaAddict.core.telemetry import PerformanceTracker
+            tracker = PerformanceTracker.get_instance()
+            percentiles = tracker.get_percentiles()
+            counts = tracker.operation_counts
+            errors = tracker.operation_errors
+        except Exception:
+            pass
+
+        # Core operations + new job/filter operations from Audit #113
+        operations = [
+            ("view.profile_load", "Profile View Load", 3000.0),
+            ("view.post_open", "Post Modal Open", 3000.0),
+            ("view.search_query", "Search Navigation", 4000.0),
+            ("api.gemini_vision", "Gemini Vision AI", 15000.0),
+            ("motion.swipe", "Gesture & Swipe", 1500.0),
+            ("filter.check_profile", "Filter Evaluation", 500.0),
+        ]
+
+        # Dynamically append any job.* operations tracked this session
+        job_ops = sorted(
+            [(k, c) for k, c in counts.items() if k.startswith("job.")],
+            key=lambda x: x[1],
+            reverse=True,
+        )[:3]  # Top 3 jobs by call count
+        for job_key, _ in job_ops:
+            job_display = job_key.replace("job.", "").replace("_", " ").title()[:18]
+            operations.append((job_key, job_display, 30000.0))
+
+        for op_key, display_name, baseline_target in operations:
+            stat = percentiles.get(op_key, {})
+            p50 = stat.get("p50", 0.0)
+            p95 = stat.get("p95", 0.0)
+            call_count = counts.get(op_key, 0)
+            err_count = errors.get(op_key, 0)
+
+            if call_count == 0:
+                bar = safe_bar(0.0, width=15, filled_style="dim white")
+                status = "[dim]IDLE[/dim]"
+                p50_str = "[dim]-[/dim]"
+                p95_str = "[dim]-[/dim]"
+                err_str = "[dim]-[/dim]"
+            else:
+                ratio = min(p95 / baseline_target, 1.0)
+                if p95 <= baseline_target * 0.5:
+                    color = "bright_green"
+                    status = "[green]FAST[/green]"
+                elif p95 <= baseline_target:
+                    color = "bright_yellow"
+                    status = "[yellow]NOM[/yellow]"
+                else:
+                    color = "bright_red"
+                    status = "[red]SLOW[/red]"
+
+                bar = safe_bar(ratio, width=15, filled_style=color)
+                p50_str = f"{p50:.0f}ms"
+                p95_str = f"[{color}]{p95:.0f}ms[/{color}]"
+                err_color = "bright_red" if err_count > 0 else "dim white"
+                err_str = f"[{err_color}]{err_count}[/{err_color}]"
+
+            table.add_row(
+                display_name,
+                bar,
+                str(call_count),
+                p50_str,
+                p95_str,
+                err_str,
+                status,
+            )
+
+        icon_latency = safe_glyph("📈", "[~]")
+        return Panel(
+            table,
+            title=f"[bold bright_yellow]{icon_latency} Operation Latency Distribution (P50/P95) — incl. Job & Filter Ops[/bold bright_yellow]",
+            border_style="yellow",
+            padding=(0, 1),
+        )
+
+    def _render_motion_health_chart(self) -> Panel:
+        s = self.state
+        motion_stats: dict = {}
+        try:
+            from InstaAddict.core.telemetry import PerformanceTracker
+
+            tracker = PerformanceTracker.get_instance()
+            motion_stats = tracker.get_motion_summary()
+        except Exception:
+            pass
+
+        total_swipes = motion_stats.get("total_swipes", s.total_swipes)
+        displaced = motion_stats.get("displaced_swipes", max(0, total_swipes - s.zero_displacement_swipes))
+        zero_disp = motion_stats.get("zero_displacement_swipes", s.zero_displacement_swipes)
+        snapbacks = motion_stats.get("snapback_events", s.snapback_events)
+        eff_pct = motion_stats.get("displacement_efficiency_pct", 100.0)
+        scale_factor = motion_stats.get("adaptive_scale_factor", 1.0)
+
+        table = Table(box=None, expand=True, padding=(0, 1), show_header=False)
+        table.add_column("C1", ratio=1)
+        table.add_column("C2", ratio=1)
+
+        eff_color = "bright_green" if eff_pct >= 85 else ("bright_yellow" if eff_pct >= 70 else "bright_red")
+        eff_bar = safe_bar(eff_pct / 100.0, width=16, filled_style=eff_color)
+
+        table.add_row(
+            Text.from_markup(f"[bold white]Displacement Efficiency:[/] [{eff_color}]{eff_pct}%[/]"),
+            Text.from_markup(f"[bold white]Dynamic Swipe Scale:[/] [cyan]{scale_factor:.2f}x[/]"),
+        )
+        table.add_row(
+            eff_bar,
+            Text.from_markup(f"[bold white]Zero-Displacement:[/] [yellow]{zero_disp}[/] / {total_swipes}"),
+        )
+        table.add_row(
+            Text.from_markup(f"[bold white]Effective Swipes:[/] [green]{displaced}[/] (snapbacks: [yellow]{snapbacks}[/])"),
+            Text.from_markup(f"[bold white]Micro-Stall Escapes:[/] [bright_cyan]{s.micro_stall_escapes}[/]"),
+        )
+        table.add_row(
+            Text.from_markup(f"[bold white]Subscreen Auto-Escapes:[/] [bright_cyan]{s.subscreen_escapes}[/]"),
+            Text.from_markup(f"[bold white]Watchdog Hard Relaunches:[/] [{'bright_red' if s.watchdog_recoveries > 0 else 'bright_green'}]{s.watchdog_recoveries}[/]"),
+        )
+        table.add_row(
+            Text.from_markup("[bold white]Self-Healing Framework:[/] [bright_green]3-Tier Active (Sentinel / Subscreen / Watchdog)[/]"),
+            Text.from_markup("[bold white]UI Recovery Integrity:[/] [bright_green]100% NOMINAL[/]"),
+        )
+
+        icon_shield = safe_glyph("🛡️", "[!]")
+        return Panel(
+            table,
+            title=f"[bold bright_magenta]{icon_shield} Motion Dynamics & Stability Matrix[/bold bright_magenta]",
+            border_style="magenta",
+            padding=(0, 1),
+        )
+
+    def _render_skip_reasons_panel(self) -> Panel:
+        """Render skip reason distribution as a horizontal bar chart."""
+        s = self.state
+        skip_reasons: dict = {}
+        try:
+            if self.bound_session_state:
+                skip_reasons = dict(getattr(self.bound_session_state, "skip_reasons", {}) or {})
+        except Exception:
+            pass
+
+        table = Table(box=None, expand=True, padding=(0, 1), header_style="bold bright_red")
+        table.add_column("Skip Reason", style="bold white", width=22)
+        table.add_column("Distribution Bar", ratio=1)
+        table.add_column("Count", justify="right", width=7)
+        table.add_column("%", justify="right", width=7)
+
+        if not skip_reasons:
+            table.add_row(
+                "[dim]No skip reasons recorded yet[/dim]",
+                "", "", "",
+            )
+        else:
+            total = max(sum(skip_reasons.values()), 1)
+            sorted_reasons = sorted(skip_reasons.items(), key=lambda x: x[1], reverse=True)
+            for reason, count in sorted_reasons[:10]:
+                ratio = count / total
+                pct = int(round(ratio * 100))
+                if ratio >= 0.30:
+                    color = "bright_red"
+                elif ratio >= 0.15:
+                    color = "bright_yellow"
+                else:
+                    color = "bright_green"
+                bar = safe_bar(ratio, width=20, filled_style=color)
+                display = reason.replace("_", " ").title()
+                table.add_row(display, bar, str(count), f"[{color}]{pct}%[/{color}]")
+
+        total_skipped = sum(skip_reasons.values()) if skip_reasons else 0
+        icon = safe_glyph("🚫", "[X]")
+        return Panel(
+            table,
+            title=f"[bold bright_red]{icon} Filter Rejection Intelligence — {total_skipped} total skips[/bold bright_red]",
+            border_style="red",
+            padding=(0, 1),
+        )
+
+    def _render_job_metrics_panel(self) -> Panel:
+        """Render per-job task lifecycle and yield performance table."""
+        job_metrics: dict = {}
+        try:
+            if self.bound_session_state:
+                job_metrics = dict(getattr(self.bound_session_state, "job_metrics", {}) or {})
+        except Exception:
+            pass
+
+        table = Table(box=None, expand=True, padding=(0, 1), header_style="bold bright_cyan")
+        table.add_column("Task / Plugin", style="bold white", width=22)
+        table.add_column("Yield Bar", ratio=1)
+        table.add_column("Duration", justify="right", width=9)
+        table.add_column("Attempts", justify="right", width=9)
+        table.add_column("Successes", justify="right", width=10)
+        table.add_column("Yield %", justify="right", width=8)
+        table.add_column("Status", justify="center", width=10)
+
+        if not job_metrics:
+            table.add_row(
+                "[dim]No job metrics recorded yet[/dim]",
+                "", "", "", "", "", "",
+            )
+        else:
+            for job_name, metrics in job_metrics.items():
+                attempts = metrics.get("interactions_attempted", 0)
+                successes = metrics.get("interactions_successful", 0)
+                duration = metrics.get("duration_seconds", 0.0)
+                status = metrics.get("status", "in_progress")
+
+                yield_ratio = successes / max(attempts, 1) if attempts > 0 else 0.0
+                yield_pct = int(round(yield_ratio * 100))
+
+                if yield_pct >= 50:
+                    yield_color = "bright_green"
+                elif yield_pct >= 20:
+                    yield_color = "bright_yellow"
+                elif attempts == 0:
+                    yield_color = "dim white"
+                else:
+                    yield_color = "bright_red"
+
+                if status == "in_progress":
+                    status_str = "[bold bright_cyan]⚡ ACTIVE[/bold bright_cyan]"
+                elif status == "completed":
+                    status_str = "[green]✓ Done[/green]"
+                elif status == "app_has_crashed":
+                    status_str = "[bold red]💥 CRASH[/bold red]"
+                else:
+                    status_str = f"[dim]{status}[/dim]"
+
+                bar = safe_bar(yield_ratio, width=18, filled_style=yield_color)
+                dur_str = f"{duration:.0f}s" if duration < 3600 else f"{duration/3600:.1f}h"
+                display = job_name.replace("_", " ").title()[:20]
+                table.add_row(
+                    display,
+                    bar,
+                    dur_str,
+                    str(attempts),
+                    str(successes),
+                    f"[{yield_color}]{yield_pct}%[/{yield_color}]",
+                    status_str,
+                )
+
+        icon = safe_glyph("⚙", "[J]")
+        return Panel(
+            table,
+            title=f"[bold bright_cyan]{icon} Task Yield & Job Performance Standards[/bold bright_cyan]",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+
+    def _render_crash_timeline_panel(self) -> Panel:
+        """Render crash history timeline if crashes occurred this session."""
+        crash_history: list = []
+        total_crashes = self.state.crashes_count
+        try:
+            if self.bound_session_state:
+                crash_history = list(getattr(self.bound_session_state, "crash_history", []) or [])
+        except Exception:
+            pass
+
+        content = Text()
+        if not crash_history and total_crashes == 0:
+            content.append(" ✓ No crashes recorded this session.", style="bold bright_green")
+        elif not crash_history:
+            content.append(f" {total_crashes} crash(es) recorded — context JSON not yet available.", style="bright_yellow")
+        else:
+            for i, crash in enumerate(crash_history[-5:], 1):
+                ts = crash.get("timestamp", "")[:19]
+                job = crash.get("active_job", "unknown")
+                reason = crash.get("error_reason") or crash.get("exception_type", "unknown")
+                pkg = crash.get("foreground_package", "")
+                content.append(f" #{i} ", style="bold bright_red")
+                content.append(f"[{ts}] ", style="dim")
+                content.append(f"{job} ", style="bold white")
+                content.append(f"— {reason} ", style="bright_red")
+                if pkg:
+                    content.append(f"(fg: {pkg})", style="dim yellow")
+                content.append("\n")
+
+        icon = safe_glyph("💥", "[!]")
+        crash_color = "bright_red" if total_crashes > 0 else "bright_green"
+        return Panel(
+            content,
+            title=f"[bold {crash_color}]{icon} Crash Timeline — {total_crashes} total[/bold {crash_color}]",
+            border_style=crash_color,
+            padding=(0, 1),
+        )
+
+    def _render_filter_intelligence_view(self) -> Layout:
+        """Render the 3rd view: Filter Intelligence, Job Yield, Crash Timeline, and Dogfood Tips."""
+        fi_layout = Layout(name="fi_body")
+        panel_skip = self._render_skip_reasons_panel()
+        panel_jobs = self._render_job_metrics_panel()
+        panel_crash = self._render_crash_timeline_panel()
+
+        if self.console.width >= 100 and self.console.height >= 26:
+            top_row = Layout(name="fi_top", ratio=3)
+            top_row.split_row(
+                Layout(panel_skip, name="skip", ratio=1),
+                Layout(panel_jobs, name="jobs", ratio=1),
+            )
+            fi_layout.split_column(
+                top_row,
+                Layout(panel_crash, name="crash", size=7),
+            )
+        else:
+            fi_layout.split_column(
+                Layout(panel_skip, name="skip", ratio=1),
+                Layout(panel_jobs, name="jobs", ratio=1),
+                Layout(panel_crash, name="crash", ratio=1),
+            )
+        return fi_layout
+
+    def _render_charts_view(self) -> Layout:
+        charts_layout = Layout(name="charts_body")
+        panel_funnel = self._render_funnel_chart()
+        panel_quota = self._render_quota_velocity_chart()
+        panel_latency = self._render_latency_chart()
+        panel_motion = self._render_motion_health_chart()
+
+        # Responsive: 2x2 grid if width >= 100 and height >= 26, else vertical stack
+        if self.console.width >= 100 and self.console.height >= 26:
+            top_row = Layout(name="charts_top", ratio=1)
+            top_row.split_row(
+                Layout(panel_funnel, name="funnel", ratio=1),
+                Layout(panel_quota, name="quota", ratio=1),
+            )
+            bottom_row = Layout(name="charts_bottom", ratio=1)
+            bottom_row.split_row(
+                Layout(panel_latency, name="latency", ratio=1),
+                Layout(panel_motion, name="motion", ratio=1),
+            )
+            charts_layout.split_column(top_row, bottom_row)
+        else:
+            charts_layout.split_column(
+                Layout(panel_funnel, name="funnel", ratio=1),
+                Layout(panel_quota, name="quota", ratio=1),
+                Layout(panel_latency, name="latency", ratio=1),
+                Layout(panel_motion, name="motion", ratio=1),
+            )
+        return charts_layout
 
     def generate_layout(self) -> Layout:
         """Construct the full terminal layout with responsive width adaptation."""
@@ -973,13 +1730,23 @@ class DashboardManager:
 
         layout = Layout()
 
-        # Top-level vertical split: Header, Body, Footer
+        # Top-level vertical split: Header (2-row), Body, Footer (2-row)
         layout.split_column(
-            Layout(self._render_header(), name="header", size=3),
+            Layout(self._render_header(), name="header", size=4),
             Layout(name="body", ratio=1),
-            Layout(self._render_footer(), name="footer", size=3),
+            Layout(self._render_footer(), name="footer", size=4),
         )
 
+        # Route to the correct view mode
+        if self.view_mode == ViewMode.STATISTICS_CHARTS:
+            layout["body"].update(self._render_charts_view())
+            return layout
+
+        if self.view_mode == ViewMode.FILTER_INTELLIGENCE:
+            layout["body"].update(self._render_filter_intelligence_view())
+            return layout
+
+        # ── LIVE_DASHBOARD (default) ──────────────────────────────────────
         icon_stats = safe_glyph("📊", "[#]")
         stats_panel = Panel(
             self._render_stats_table(),

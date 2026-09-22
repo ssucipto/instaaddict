@@ -1,5 +1,5 @@
 project:
-  name: InstaAddict
+  name: InstaAddict-AI
   version: 1.4.1
   started: 2026-09-11
   status: completed
@@ -344,6 +344,58 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-09-22'
+  description: 'Rebranded Project to InstaAddict-AI, Updated CLI Entrypoints, TUI Branding, Issue Templates, and Documentation.'
+  items:
+  - "✓ Renamed distribution package to InstaAddict-AI and added instaaddict-ai CLI script entrypoint in pyproject.toml"
+  - "✓ Updated TUI Dashboard Live Header, Post-Session Rich Summary Banner, and Telegram Assistant/Status messages to InstaAddict-AI"
+  - "✓ Updated CLI startup banners, pip upgrade notifications, PyPI JSON URLs, and account configuration headers"
+  - "✓ Updated README.md and CONTRIBUTING.md with distinct InstaAddict-AI branding while attributing upstream lineage"
+  - "✓ Updated agent identity.yml, progress.yaml, design requirements, and issue templates to InstaAddict-AI"
+  - "✓ Validated full regression test suite (374/374 unit and integration tests passing, 100% green)"
+- date: '2026-09-22'
+  description: 'Audit #114 TUI Interface Enhancement & Post-Session Rich Terminal Summary Renderer (Audit-114).'
+  items:
+  - "✓ Audited Live TUI and statistics charts and added 3rd ViewMode (Filter Intelligence) accessible via Ctrl+G"
+  - "✓ Upgraded header to 2-row layout with device, working hours, and watchdog health status"
+  - "✓ Created InstaAddict/core/rich_summary.py with post-session KPI grid, yield metrics, and session health scores"
+  - "✓ Added classmethod DashboardManager._reset_instance() for test isolation"
+  - "✓ Added 14 new test cases in test/test_tui_dashboard.py and verified all 374 tests passing"
+- date: '2026-09-20'
+  description: 'Hardened DataAnalytics and SessionState JSON Serialization Against KeyError finish_time Startup Defect.'
+  items:
+  - "✓ Resolved KeyError: finish_time startup crash in DataAnalytics.plot_duration_statistics on accounts/lolatheozjack"
+  - "✓ Serialized finish_time in SessionStateEncoder.default() to guarantee persistent timestamp tracking across sessions.json"
+  - "✓ Hardened DataAnalytics.get_finish_time and get_start_time with defensive session.get() and dual datetime format parsing (%Y-%m-%d %H:%M:%S.%f and %Y-%m-%d %H:%M:%S)"
+  - "✓ Added null and type guards across filter_sessions, plot_followers_growth, and plot_duration_statistics in data_analytics.py"
+  - "✓ Hardened telegram.py _calculate_session_duration and daily_summary against missing or invalid start/finish timestamps"
+  - "✓ Added regression unit test in test/test_matplotlib_backend.py verifying graceful tolerance of missing and null timestamps"
+  - "✓ Verified all 328 unit tests passing (100% green) across entire repository suite"
+- date: '2026-09-20'
+  description: 'Multi-Session 24/7 Autonomous Looping, Watchdog Heartbeat Instrumentation, Blogger Follower Hardening, and Clean Completion Stamping (Audit-099/100, Route-062, Review-053).'
+  items:
+  - "✓ Resolved 44-minute premature termination on lolatheozjack by eliminating watchdog false-positive KEYCODE_BACK alarms during 60s Gemini Vision rate-limit backoffs"
+  - "✓ Implemented _safe_rate_limit_sleep() in gemini_vision.py pausing watchdog and emitting 5-second chunked heartbeats"
+  - "✓ Added record_heartbeat instrumentation to action_unfollow_followers.py during visible row iterations and list scrolling"
+  - "✓ Handled EmptyList gracefully in handle_sources.py iterate_over_followers, returning to blogger profile without raising fatal crashes"
+  - "✓ Added resilient gesture swipe fallback with Direction.UP when list_view.scroll fails on Instagram v447 UI"
+  - "✓ Stamped session_state.finishTime on bot exit in stop_bot(), resolving Completed sessions: 0 reporting defect"
+  - "✓ Defensively guarded args and configs against NoneType in utils.py"
+  - "✓ Bumped total-crashes-limit to 15 in accounts/lolatheozjack/config.yml for reliable 24/7 multi-session looping"
+  - "✓ Created 4-case unit test suite in test/test_multi_session_resilience.py with 100% pass rate"
+  - "✓ Verified all 327 regression test suite tests passing (100% green) and all 6/6 ACP CI fast gates passing"
+- date: '2026-09-20'
+  description: 'Implemented High-Resolution Performance Profiling, Motion Sentinel, Micro-Stall Detection, Dogfood Auto-Tune, and [CTRL+G] Terminal KPI Charts Interface (Audit-096/097/098, Route-061).'
+  items:
+  - "✓ Built thread-safe PerformanceTracker singleton in InstaAddict/core/telemetry.py tracking UI transition latencies, Gemini API calls, and gestures with P50/P95 math and bounded sample eviction"
+  - "✓ Implemented Viewport Motion Sentinel with zero-displacement and snapback tracking, adaptive dynamic scale factor [1.0, 1.5] for boundary escape"
+  - "✓ Created MicroStallSentinel detecting early UI stalls within 15-20s (3 consecutive timeouts) to execute proactive soft back/dialog recovery"
+  - "✓ Built autonomous closed-loop dogfood tuning in DogfoodOptimizer.apply_tuning() with timestamped backups and regex YAML parameter preservation"
+  - "✓ Registered --auto-tune CLI argument across core_arguments.py and report.py"
+  - "✓ Designed Second Terminal Interface accessible via [CTRL+G] in DashboardManager with 4 state-of-the-art KPI charts: Conversion Funnel, Quota Velocity, P50/P95 Tail Latency Distribution, and Motion Health Matrix"
+  - "✓ Implemented safe_bar() with fractional Unicode sub-blocks (█, ▉, ▊, ▋, ▌, ▍, ▎, ▏) and ASCII fallbacks"
+  - "✓ Created 15-case test suite in test/test_telemetry_and_kpi_charts.py (323/323 total repo tests passing, 100% green, 0 failures)"
+  - "✓ Verified all 6/6 ACP CI fast gates passing and zero findings from review-scan"
 - date: 2026-09-19
   description: 'Remediated 0-Follows and 0-Comments Production Defect from Audit-088 (Route-058).'
   items:

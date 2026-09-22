@@ -171,7 +171,18 @@ class InteractReelsPlugin(Plugin):
                     continue
 
                 # Brief pause to let video render for classification
-                sleep(2)
+                random_sleep(1.5, 2.0, modulable=False)
+                try:
+                    from InstaAddict.core.tui import DashboardManager
+
+                    if DashboardManager.is_active() and DashboardManager.get_instance().state.is_skip_task_requested():
+                        logger.warning(
+                            "[TUI] Task skip requested by user ([CTRL+S]). Exiting interact-reels early...",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        break
+                except Exception:
+                    pass
 
                 # 1. THROTTLE & FILTER
                 raw_interact = getattr(configs.args, "interact_percentage", None)
@@ -221,6 +232,17 @@ class InteractReelsPlugin(Plugin):
                         "🐾 Engaging with target Reel..."
                     )
                     random_sleep(5, 15)
+                    try:
+                        from InstaAddict.core.tui import DashboardManager
+
+                        if DashboardManager.is_active() and DashboardManager.get_instance().state.is_skip_task_requested():
+                            logger.warning(
+                                "[TUI] Task skip requested by user ([CTRL+S]). Aborting engagement and exiting interact-reels early...",
+                                extra={"color": f"{Fore.YELLOW}"},
+                            )
+                            break
+                    except Exception:
+                        pass
 
                     # Double Tap to Like
                     raw_like = getattr(configs.args, "likes_percentage", None)

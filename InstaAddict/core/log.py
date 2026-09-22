@@ -280,7 +280,7 @@ def update_log_file_name(username: str):
 
 def enable_tui_logging(dashboard_manager=None):
     """Route logs through TuiLogHandler and detach raw console StreamHandler."""
-    global g_console_handler, g_tui_handler
+    global g_tui_handler
     root_logger = logging.getLogger()
 
     if g_console_handler and g_console_handler in root_logger.handlers:
@@ -302,7 +302,6 @@ def enable_tui_logging(dashboard_manager=None):
 
 def disable_tui_logging():
     """Detach TuiLogHandler and reattach standard console StreamHandler."""
-    global g_console_handler, g_tui_handler
     root_logger = logging.getLogger()
 
     if g_tui_handler and g_tui_handler in root_logger.handlers:
@@ -310,4 +309,3 @@ def disable_tui_logging():
 
     if g_console_handler and g_console_handler not in root_logger.handlers:
         root_logger.addHandler(g_console_handler)
-

@@ -115,15 +115,20 @@ class DataAnalytics(Plugin):
             return None
 
     def plot_followers_growth(self, sessions, pdf, username, period):
+        valid_sessions = [s for s in sessions if self.get_start_time(s) is not None]
+        if not valid_sessions:
+            logger.warning("No valid sessions with start_time to plot followers growth.")
+            return
+
         followers_count = [
-            int(session.get("profile", {}).get("followers", 0)) for session in sessions
+            int(session.get("profile", {}).get("followers", 0)) for session in valid_sessions
         ]
-        dates = [self.get_start_time(session) for session in sessions]
-        total_followed = [int(session.get("total_followed", 0)) for session in sessions]
+        dates = [self.get_start_time(session) for session in valid_sessions]
+        total_followed = [int(session.get("total_followed", 0)) for session in valid_sessions]
         total_unfollowed = [
-            -int(session.get("total_unfollowed", 0)) for session in sessions
+            -int(session.get("total_unfollowed", 0)) for session in valid_sessions
         ]
-        total_likes = [int(session.get("total_likes", 0)) for session in sessions]
+        total_likes = [int(session.get("total_likes", 0)) for session in valid_sessions]
 
         fig, (axes1, axes2, axes3) = plt.subplots(
             ncols=1,
@@ -165,29 +170,40 @@ class DataAnalytics(Plugin):
     def filter_sessions(self, sessions, period):
         if period == Period.LAST_WEEK:
             week_ago = datetime.now() - timedelta(weeks=1)
-            return list(
-                filter(
-                    lambda session: self.get_start_time(session) > week_ago, sessions
-                )
-            )
+            return [
+                s for s in sessions
+                if self.get_start_time(s) is not None and self.get_start_time(s) > week_ago
+            ]
         if period == Period.LAST_MONTH:
             month_ago = datetime.now() - timedelta(days=30)
-            return list(
-                filter(
-                    lambda session: self.get_start_time(session) > month_ago, sessions
-                )
-            )
+            return [
+                s for s in sessions
+                if self.get_start_time(s) is not None and self.get_start_time(s) > month_ago
+            ]
         if period == Period.ALL_TIME:
             return sessions
 
     def get_start_time(self, session):
-        return datetime.strptime(session["start_time"], "%Y-%m-%d %H:%M:%S.%f")
+        start_time = session.get("start_time")
+        if not start_time or start_time == "None" or start_time is None:
+            return None
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(str(start_time), fmt)
+            except ValueError:
+                pass
+        return None
 
     def get_finish_time(self, session):
-        finish_time = session["finish_time"]
-        if finish_time == "None":
+        finish_time = session.get("finish_time")
+        if not finish_time or finish_time == "None" or finish_time is None:
             return None
-        return datetime.strptime(finish_time, "%Y-%m-%d %H:%M:%S.%f")
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(str(finish_time), fmt)
+            except ValueError:
+                pass
+        return None
 
     def plot_duration_statistics(self, sessions, pdf, username, period):
         setups_map = {}
@@ -197,7 +213,9 @@ class DataAnalytics(Plugin):
             if successful_interactions is None or successful_interactions == 0:
                 continue
 
-            args = session["args"]
+            args = session.get("args")
+            if not isinstance(args, dict):
+                continue
 
             likes_count = args.get("likes_count")
             if likes_count is None:
@@ -208,11 +226,11 @@ class DataAnalytics(Plugin):
                 continue
 
             finish_time = self.get_finish_time(session)
-            if finish_time is None:
+            start_time = self.get_start_time(session)
+            if finish_time is None or start_time is None:
                 continue
 
             setup = f"--likes-count {str(likes_count)}\n--follow-percentage {str(follow_percentage)}"
-            start_time = self.get_start_time(session)
             time_per_interaction = (finish_time - start_time) / successful_interactions
             setups_map[setup] = time_per_interaction.total_seconds()
 
@@ -249,7 +267,7 @@ class DataAnalytics(Plugin):
 
     def generate_markdown_report(self, sessions, filename):
         with open(filename, "w", encoding="utf-8") as f:
-            f.write(f"# InstaAddict Comprehensive Report for @{self.username}\n\n")
+            f.write(f"# InstaAddict-AI Comprehensive Report for @{self.username}\n\n")
             f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
             f.write("## Aggregate Statistics\n")

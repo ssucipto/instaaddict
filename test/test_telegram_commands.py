@@ -207,6 +207,56 @@ class TestTelegramCommands(unittest.TestCase):
             call_caption = mock_send_photo.call_args[1].get("caption", "")
             self.assertIn("Beautiful sunny day", call_caption)
 
+    @patch("InstaAddict.plugins.telegram.telegram_bot_send_text")
+    @patch("InstaAddict.plugins.telegram.telegram_bot_get_updates")
+    def test_check_telegram_inbox_start_instagram(self, mock_updates, mock_send_text):
+        mock_updates.return_value = [
+            {
+                "update_id": 104,
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/start instagram",
+                },
+            }
+        ]
+        config = {
+            "telegram-api-token": "dummy_token",
+            "telegram-chat-id": "12345",
+        }
+        with patch("InstaAddict.plugins.telegram._load_telegram_state", return_value={}), \
+             patch("InstaAddict.plugins.telegram._save_telegram_state"):
+            check_telegram_inbox(self.username, telegram_config=config, queue_dir=os.path.join(self.user_dir, "content_queue"))
+            mock_send_text.assert_called()
+            call_text = mock_send_text.call_args[0][2]
+            self.assertIn("Instagram Bot Status", call_text)
+            self.assertIn("Working Hours", call_text)
+            self.assertIn("com.instagram.android", call_text)
+
+    @patch("InstaAddict.plugins.telegram.telegram_bot_send_text")
+    @patch("InstaAddict.plugins.telegram.telegram_bot_get_updates")
+    def test_check_telegram_inbox_status_enriched(self, mock_updates, mock_send_text):
+        mock_updates.return_value = [
+            {
+                "update_id": 105,
+                "message": {
+                    "chat": {"id": "12345"},
+                    "text": "/status",
+                },
+            }
+        ]
+        config = {
+            "telegram-api-token": "dummy_token",
+            "telegram-chat-id": "12345",
+        }
+        with patch("InstaAddict.plugins.telegram._load_telegram_state", return_value={}), \
+             patch("InstaAddict.plugins.telegram._save_telegram_state"):
+            check_telegram_inbox(self.username, telegram_config=config, queue_dir=os.path.join(self.user_dir, "content_queue"))
+            mock_send_text.assert_called()
+            call_text = mock_send_text.call_args[0][2]
+            self.assertIn("InstaAddict-AI Bot Status", call_text)
+            self.assertIn("Working Hours", call_text)
+            self.assertIn("Session State", call_text)
+
 
 if __name__ == "__main__":
     unittest.main()

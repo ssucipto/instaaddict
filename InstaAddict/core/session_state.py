@@ -36,6 +36,17 @@ class SessionState:
     totalAdsBypassed = 0
     totalDialogsDismissed = 0
     totalReelsEvaluated = 0
+    totalSubscreenEscapes = 0
+    totalSwipes = 0
+    zeroDisplacementSwipes = 0
+    snapbackEvents = 0
+    totalMicroStallEscapes = 0
+    durationsP50 = {}
+    durationsP95 = {}
+    skip_reasons = {}
+    job_metrics = {}
+    crash_history = []
+    current_job = None
     startTime = None
     finishTime = None
 
@@ -47,9 +58,9 @@ class SessionState:
     def set_active(cls, session: Optional["SessionState"]):
         cls._active_session = session
 
-    def __init__(self, configs):
+    def __init__(self, configs=None):
         self.id = str(uuid.uuid4())
-        self.args = configs.args
+        self.args = configs.args if configs and hasattr(configs, "args") else {}
         self.my_username = None
         self.my_posts_count = None
         self.my_followers_count = None
@@ -72,6 +83,17 @@ class SessionState:
         self.totalAdsBypassed = 0
         self.totalDialogsDismissed = 0
         self.totalReelsEvaluated = 0
+        self.totalSubscreenEscapes = 0
+        self.totalSwipes = 0
+        self.zeroDisplacementSwipes = 0
+        self.snapbackEvents = 0
+        self.totalMicroStallEscapes = 0
+        self.durationsP50 = {}
+        self.durationsP95 = {}
+        self.skip_reasons = {}
+        self.job_metrics = {}
+        self.crash_history = []
+        self.current_job = None
         self.totalUploadsSuccess = 0
         self.totalUploadsFailed = 0
         self.uploadHistory = []
@@ -117,6 +139,103 @@ class SessionState:
         self.totalReelsEvaluated = getattr(self, "totalReelsEvaluated", 0) + count
         self._sync_tui()
 
+    def increment_subscreen_escapes(self, count: int = 1):
+        self.totalSubscreenEscapes = (
+            getattr(self, "totalSubscreenEscapes", 0) + count
+        )
+        self._sync_tui()
+
+    def increment_swipes(self, count: int = 1):
+        self.totalSwipes = getattr(self, "totalSwipes", 0) + count
+        self._sync_tui()
+
+    def increment_zero_displacement(self, count: int = 1):
+        self.zeroDisplacementSwipes = (
+            getattr(self, "zeroDisplacementSwipes", 0) + count
+        )
+        self._sync_tui()
+
+    def increment_snapback_events(self, count: int = 1):
+        self.snapbackEvents = getattr(self, "snapbackEvents", 0) + count
+        self._sync_tui()
+
+    def increment_micro_stall_escapes(self, count: int = 1):
+        self.totalMicroStallEscapes = (
+            getattr(self, "totalMicroStallEscapes", 0) + count
+        )
+        self._sync_tui()
+
+    def update_durations(self, p50_dict: dict, p95_dict: dict):
+        self.durationsP50 = dict(p50_dict)
+        self.durationsP95 = dict(p95_dict)
+        self._sync_tui()
+
+    def record_skip_reason(self, reason: str, count: int = 1):
+        if not hasattr(self, "skip_reasons") or self.skip_reasons is None:
+            self.skip_reasons = {}
+        self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + count
+        self._sync_tui()
+
+    def record_crash(self, crash_info: dict):
+        if not hasattr(self, "crash_history") or self.crash_history is None:
+            self.crash_history = []
+        self.crash_history.append(crash_info)
+        self.totalCrashes = getattr(self, "totalCrashes", 0) + 1
+        self._sync_tui()
+
+    def start_job(self, job_name: str):
+        self.current_job = job_name
+        if not hasattr(self, "job_metrics") or self.job_metrics is None:
+            self.job_metrics = {}
+        if job_name not in self.job_metrics:
+            self.job_metrics[job_name] = {
+                "started_at": datetime.now().isoformat(),
+                "finished_at": None,
+                "duration_seconds": 0.0,
+                "status": "in_progress",
+                "interactions_attempted": 0,
+                "interactions_successful": 0,
+                "followed": 0,
+                "scraped": 0,
+            }
+        else:
+            self.job_metrics[job_name]["status"] = "in_progress"
+
+    def end_job(self, job_name: str, status: str = "completed"):
+        if getattr(self, "current_job", None) == job_name:
+            self.current_job = None
+        if not hasattr(self, "job_metrics") or self.job_metrics is None:
+            self.job_metrics = {}
+        if job_name in self.job_metrics:
+            metrics = self.job_metrics[job_name]
+            metrics["finished_at"] = datetime.now().isoformat()
+            metrics["status"] = status
+            try:
+                start_dt = datetime.fromisoformat(metrics["started_at"])
+                metrics["duration_seconds"] = round(
+                    (datetime.now() - start_dt).total_seconds(), 1
+                )
+            except Exception:
+                pass
+
+    def record_job_interaction(
+        self,
+        job_name: str,
+        success: bool = True,
+        followed: bool = False,
+        scraped: bool = False,
+    ):
+        if not hasattr(self, "job_metrics") or self.job_metrics is None:
+            self.job_metrics = {}
+        if job_name in self.job_metrics:
+            self.job_metrics[job_name]["interactions_attempted"] += 1
+            if success or scraped:
+                self.job_metrics[job_name]["interactions_successful"] += 1
+            if followed:
+                self.job_metrics[job_name]["followed"] += 1
+            if scraped:
+                self.job_metrics[job_name]["scraped"] += 1
+
     def add_interaction(self, source, succeed, followed, scraped):
         if self.totalInteractions.get(source) is None:
             self.totalInteractions[source] = 1
@@ -141,6 +260,9 @@ class SessionState:
         else:
             if scraped:
                 self.totalScraped[source] += 1
+
+        if getattr(self, "current_job", None):
+            self.record_job_interaction(self.current_job, is_success, followed, scraped)
 
         self._sync_tui()
 
@@ -322,6 +444,8 @@ class SessionState:
         time_left_list = []
         current_time = datetime.now()
         delta = timedelta(seconds=delta_sec)
+        if isinstance(working_hours, str):
+            working_hours = [working_hours]
         for n in working_hours:
             today = current_time.strftime("%Y-%m-%d")
             inf_value = f"{n.split('-')[0]} {today}"
@@ -390,12 +514,36 @@ class SessionStateEncoder(JSONEncoder):
             "total_ads_bypassed": getattr(session_state, "totalAdsBypassed", 0),
             "total_dialogs_dismissed": getattr(session_state, "totalDialogsDismissed", 0),
             "total_reels_evaluated": getattr(session_state, "totalReelsEvaluated", 0),
+            "total_subscreen_escapes": getattr(
+                session_state, "totalSubscreenEscapes", 0
+            ),
+            "total_swipes": getattr(session_state, "totalSwipes", 0),
+            "zero_displacement_swipes": getattr(
+                session_state, "zeroDisplacementSwipes", 0
+            ),
+            "snapback_events": getattr(session_state, "snapbackEvents", 0),
+            "total_micro_stall_escapes": getattr(
+                session_state, "totalMicroStallEscapes", 0
+            ),
+            "durations_p50": getattr(session_state, "durationsP50", {}),
+            "durations_p95": getattr(session_state, "durationsP95", {}),
+            "skip_reasons": getattr(session_state, "skip_reasons", {}),
+            "job_metrics": getattr(session_state, "job_metrics", {}),
+            "crash_history": getattr(session_state, "crash_history", []),
             "total_uploads_success": getattr(session_state, "totalUploadsSuccess", 0),
             "total_uploads_failed": getattr(session_state, "totalUploadsFailed", 0),
             "upload_history": getattr(session_state, "uploadHistory", []),
             "start_time": str(session_state.startTime),
-            "finish_time": str(session_state.finishTime),
-            "args": session_state.args.__dict__,
+            "finish_time": (
+                str(session_state.finishTime)
+                if getattr(session_state, "finishTime", None) is not None
+                else "None"
+            ),
+            "args": (
+                session_state.args.__dict__
+                if hasattr(session_state.args, "__dict__")
+                else (session_state.args or {})
+            ),
             "profile": {
                 "posts": session_state.my_posts_count,
                 "followers": session_state.my_followers_count,

@@ -24,6 +24,7 @@ from InstaAddict.core.resources import ResourceID as resources
 from InstaAddict.core.resources import TabBarText
 from InstaAddict.core.utils import (
     ActionBlockedError,
+    EmptyList,
     get_value,
     inspect_current_view,
     random_sleep,
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Module-level globals initialized to prevent NameError prior to load_config
 args = None
 configs = None
-ResourceID = None
+ResourceID = resources("com.instagram.android")
 
 
 def load_config(config):
@@ -113,7 +114,97 @@ class TabBarView:
 
     def is_tab_bar_visible(self) -> bool:
         """The tab bar is only present on the main screens (home, search, profile, ...)."""
-        return self._getTabBar().exists(Timeout.SHORT)
+        try:
+            if hasattr(self.device, "_ig_is_opened") and not self.device._ig_is_opened():
+                return False
+            return self._getTabBar().exists(Timeout.SHORT)
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception as e:
+            logger.debug(f"is_tab_bar_visible error: {e}")
+            return False
+
+    def _escape_subscreens(self, max_attempts: int = 3) -> bool:
+        """If the tab bar is not visible because we are stuck in a subscreen,
+        attempt to back out to the main screen using back button or device back.
+        """
+        if self.is_tab_bar_visible():
+            return True
+
+        if hasattr(self.device, "_ig_is_opened") and not self.device._ig_is_opened():
+            logger.warning(
+                "Instagram is not in the foreground during subscreen escape. Restoring via open_instagram()..."
+            )
+            try:
+                from InstaAddict.core.utils import open_instagram
+
+                if open_instagram(self.device):
+                    random_sleep(1.0, 2.0, modulable=False)
+                    if self.is_tab_bar_visible():
+                        logger.info("Tab bar restored after relaunching Instagram.")
+                        return True
+            except Exception as e:
+                logger.debug(f"open_instagram error in _escape_subscreens: {e}")
+
+        logger.info("Tab bar not visible (screen in subscreen). Attempting auto-escape...")
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # Dismiss any blocking modal dialog first
+                if UniversalActions.dismiss_dialog(self.device):
+                    logger.info(
+                        f"Dismissed dialog during subscreen escape (attempt {attempt}/{max_attempts})."
+                    )
+                    if self.is_tab_bar_visible():
+                        logger.info("Tab bar restored after dialog dismissal.")
+                        return True
+
+                # Try action bar back button first (least disruptive)
+                back_btn = self.device.find(
+                    resourceIdMatches=case_insensitive_re(ResourceID.ACTION_BAR_BUTTON_BACK)
+                )
+                if back_btn.exists(Timeout.SHORT):
+                    logger.debug(
+                        f"Clicking action bar back button (attempt {attempt}/{max_attempts})..."
+                    )
+                    back_btn.click()
+                else:
+                    logger.debug(
+                        f"Pressing device back key (attempt {attempt}/{max_attempts})..."
+                    )
+                    self.device.back()
+
+                random_sleep(0.8, 1.4, modulable=False)
+                if self.is_tab_bar_visible():
+                    logger.info(
+                        f"Tab bar successfully restored after {attempt} back step(s)."
+                    )
+                    try:
+                        from InstaAddict.core.session_state import SessionState
+
+                        active_session = SessionState.get_active()
+                        if active_session:
+                            active_session.increment_subscreen_escapes()
+                    except Exception:
+                        pass
+                    return True
+            except DeviceFacade.AppHasCrashed:
+                logger.warning(
+                    f"AppHasCrashed encountered during subscreen escape attempt {attempt}/{max_attempts}. Restoring Instagram..."
+                )
+                try:
+                    from InstaAddict.core.utils import open_instagram
+
+                    open_instagram(self.device)
+                    random_sleep(1.5, 2.5, modulable=False)
+                    if self.is_tab_bar_visible():
+                        return True
+                except Exception as e:
+                    logger.debug(f"AppHasCrashed relaunch error in _escape_subscreens: {e}")
+
+        logger.warning(
+            f"Could not restore tab bar after {max_attempts} escape attempt(s)."
+        )
+        return False
 
     def navigateToHome(self):
         self._navigateTo(TabBarTabs.HOME)
@@ -133,8 +224,11 @@ class TabBarView:
         self._navigateTo(TabBarTabs.ACTIVITY)
 
     def navigateToProfile(self):
-        self._navigateTo(TabBarTabs.PROFILE)
-        return ProfileView(self.device, is_own_profile=True)
+        from InstaAddict.core.telemetry import PerformanceTracker
+
+        with PerformanceTracker.get_instance().measure("view", "profile_load"):
+            self._navigateTo(TabBarTabs.PROFILE)
+            return ProfileView(self.device, is_own_profile=True)
 
     def _get_new_profile_position(self) -> Optional[DeviceFacade.View]:
         obj = self.device.find(
@@ -155,6 +249,21 @@ class TabBarView:
         logger.debug(f"Navigate to {tab_name}")
         button = None
         UniversalActions.close_keyboard(self.device)
+
+        # Ensure tab bar is visible before attempting tab lookup
+        try:
+            if not self.is_tab_bar_visible():
+                self._escape_subscreens()
+        except DeviceFacade.AppHasCrashed:
+            from InstaAddict.core.utils import open_instagram
+
+            logger.warning(
+                f"AppHasCrashed during navigateTo({tab_name}). Relaunching Instagram..."
+            )
+            open_instagram(self.device)
+            random_sleep(1.5, 2.5, modulable=False)
+            self._escape_subscreens()
+
         if tab == TabBarTabs.HOME:
             button = self.device.find(resourceIdMatches=ResourceID.FEED_TAB)
             if not button.exists():
@@ -172,11 +281,24 @@ class TabBarView:
                 )
 
             if not button.exists():
+                # If still not found, check if we are stuck on a subscreen and attempt escape
+                if not self.is_tab_bar_visible():
+                    self._escape_subscreens()
+                    button = self.device.find(resourceIdMatches=ResourceID.SEARCH_TAB)
+                    if not button.exists():
+                        button = self.device.find(
+                            classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                            descriptionMatches=case_insensitive_re(TabBarText.SEARCH_CONTENT_DESC),
+                        )
+
+            if not button.exists():
                 # Some accounts display the search btn only in Home -> action bar
                 logger.debug("Didn't find search in the tab bar...")
                 home_view = self.navigateToHome()
-                home_view.navigateToSearch()
-                return
+                search_view = home_view.navigateToSearch()
+                if search_view is not None:
+                    return
+
         elif tab == TabBarTabs.REELS:
             button = self.device.find(resourceIdMatches=ResourceID.CLIPS_TAB)
             if not button.exists():
@@ -213,6 +335,8 @@ class TabBarView:
             # Attempt popup dismissal and retry before failing (CO-032 / F-05)
             if UniversalActions.dismiss_dialog(self.device):
                 logger.info(f"Dismissed popup during navigation to {tab_name}. Retrying tab lookup...")
+            if not self.is_tab_bar_visible():
+                self._escape_subscreens()
             if tab == TabBarTabs.PROFILE:
                 button = self.device.find(resourceIdMatches=ResourceID.PROFILE_TAB)
                 if not button.exists():
@@ -243,6 +367,18 @@ class TabBarView:
                         classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
                         descriptionMatches=case_insensitive_re(TabBarText.REELS_CONTENT_DESC),
                     )
+            elif tab == TabBarTabs.ORDERS:
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(TabBarText.ORDERS_CONTENT_DESC),
+                )
+            elif tab == TabBarTabs.ACTIVITY:
+                button = self.device.find(
+                    classNameMatches=ClassName.BUTTON_OR_FRAME_LAYOUT_REGEX,
+                    descriptionMatches=case_insensitive_re(
+                        TabBarText.ACTIVITY_CONTENT_DESC
+                    ),
+                )
 
         if button is not None and button.exists(Timeout.MEDIUM):
             # Two clicks to reset tab content
@@ -257,13 +393,19 @@ class TabBarView:
 class ActionBarView:
     def __init__(self, device: DeviceFacade):
         self.device = device
-        self.action_bar = self._getActionBar()
+        try:
+            self.action_bar = self._getActionBar()
+        except DeviceFacade.AppHasCrashed:
+            self.action_bar = None
 
     def _getActionBar(self):
-        return self.device.find(
-            resourceIdMatches=case_insensitive_re(ResourceID.ACTION_BAR_CONTAINER),
-            className=ClassName.FRAME_LAYOUT,
-        )
+        try:
+            return self.device.find(
+                resourceIdMatches=case_insensitive_re(ResourceID.ACTION_BAR_CONTAINER),
+                className=ClassName.FRAME_LAYOUT,
+            )
+        except DeviceFacade.AppHasCrashed:
+            return None
 
 
 class HomeView(ActionBarView):
@@ -273,9 +415,17 @@ class HomeView(ActionBarView):
 
     def navigateToSearch(self):
         logger.debug("Navigate to Search")
+        if self.action_bar is None:
+            self.action_bar = self._getActionBar()
+        if self.action_bar is None:
+            logger.warning("Search icon not found in Home action bar.")
+            return None
         search_btn = self.action_bar.child(
             descriptionMatches=case_insensitive_re(TabBarText.SEARCH_CONTENT_DESC)
         )
+        if not search_btn.exists(Timeout.SHORT):
+            logger.warning("Search icon not found in Home action bar.")
+            return None
         search_btn.click()
 
         return SearchView(self.device)
@@ -461,34 +611,37 @@ class SearchView:
         return None
 
     def navigate_to_target(self, target: str, job: str) -> bool:
-        target = emoji.emojize(target, use_aliases=True)
-        logger.info(f"Navigate to {target}")
-        search_edit_text = self._getSearchEditText()
-        if search_edit_text is not None:
-            logger.debug("Pressing on searchbar.")
-            search_edit_text.click(sleep=SleepTime.SHORT)
-        else:
-            logger.debug("There is no searchbar!")
+        from InstaAddict.core.telemetry import PerformanceTracker
+
+        with PerformanceTracker.get_instance().measure("view", "search_query"):
+            target = emoji.emojize(target, use_aliases=True)
+            logger.info(f"Navigate to {target}")
+            search_edit_text = self._getSearchEditText()
+            if search_edit_text is not None:
+                logger.debug("Pressing on searchbar.")
+                search_edit_text.click(sleep=SleepTime.SHORT)
+            else:
+                logger.debug("There is no searchbar!")
+                return False
+            if self._check_current_view(target, job):
+                logger.info(f"{target} is in recent history.")
+                return True
+            search_edit_text.set_text(
+                target,
+                Mode.PASTE,
+            )
+            if self._check_current_view(target, job):
+                logger.info(f"{target} is in top view.")
+                return True
+            echo_text = self.device.find(resourceId=ResourceID.ECHO_TEXT)
+            if echo_text.exists(Timeout.SHORT):
+                logger.debug("Pressing on see all results.")
+                echo_text.click()
+            # at this point we have the tabs available
+            self._switch_to_target_tag(job)
+            if self._check_current_view(target, job, in_place_tab=True):
+                return True
             return False
-        if self._check_current_view(target, job):
-            logger.info(f"{target} is in recent history.")
-            return True
-        search_edit_text.set_text(
-            target,
-            Mode.PASTE,
-        )
-        if self._check_current_view(target, job):
-            logger.info(f"{target} is in top view.")
-            return True
-        echo_text = self.device.find(resourceId=ResourceID.ECHO_TEXT)
-        if echo_text.exists(Timeout.SHORT):
-            logger.debug("Pressing on see all results.")
-            echo_text.click()
-        # at this point we have the tabs available
-        self._switch_to_target_tag(job)
-        if self._check_current_view(target, job, in_place_tab=True):
-            return True
-        return False
 
     def _switch_to_target_tag(self, job: str):
         if "place" in job:
@@ -2045,6 +2198,11 @@ class AccountView:
         return False
 
     def refresh_account(self):
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+            record_heartbeat("profile", "Refreshing account profile")
+        except Exception:
+            pass
         textview = self.device.find(
             resourceIdMatches=ResourceID.ROW_PROFILE_HEADER_TEXTVIEW_POST_CONTAINER
         )
@@ -2128,54 +2286,117 @@ class OpenedPostView:
     def is_peek_preview_opened(self) -> bool:
         """Confirm if Instagram's 3D Touch / long-press Peek Preview popup is open.
         This popup displays a floating preview card with a context menu containing
-        options like Like, Comment, Repost, Share, Report."""
-        like_btn = self.device.find(
-            classNameMatches="(?i)TextView|Button",
-            textMatches=case_insensitive_re("^(Like|Unlike)$"),
-        )
-        context_opt = self.device.find(
-            classNameMatches="(?i)TextView|Button",
-            textMatches=case_insensitive_re("^(Comment|Repost|Share|Report)$"),
-        )
-        if like_btn.exists(Timeout.TINY) and context_opt.exists(Timeout.TINY):
-            return True
-        return False
+        options like Repost, Report, Like/Unlike.
+        Note: Standard Reels and Feed posts also contain Like, Comment, and Share.
+        To completely prevent false-positive detection on normal content, (Repost|Report)
+        is strictly required as the identifying context marker."""
+        try:
+            if hasattr(self.device, "_ig_is_opened") and not self.device._ig_is_opened():
+                return False
+
+            # 1. Distinctive Peek Preview options (Repost and Report in popup context menus)
+            distinct_opt = self.device.find(
+                textMatches=case_insensitive_re(r"^\s*(Repost|Report)\s*$"),
+            )
+            if not distinct_opt.exists(Timeout.ZERO):
+                distinct_opt = self.device.find(
+                    descriptionMatches=case_insensitive_re(r"^\s*(Repost|Report)\s*$"),
+                )
+            if distinct_opt.exists(Timeout.ZERO):
+                return True
+
+            # 2. Context options: Like/Unlike alongside Repost/Report
+            like_btn = self.device.find(
+                textMatches=case_insensitive_re(r"^\s*(Like|Unlike)\s*$"),
+            )
+            if not like_btn.exists(Timeout.ZERO):
+                like_btn = self.device.find(
+                    descriptionMatches=case_insensitive_re(r"^\s*(Like|Unlike)\s*$"),
+                )
+
+            context_opt = self.device.find(
+                textMatches=case_insensitive_re(r"^\s*(Repost|Report)\s*$"),
+            )
+            if not context_opt.exists(Timeout.ZERO):
+                context_opt = self.device.find(
+                    descriptionMatches=case_insensitive_re(r"^\s*(Repost|Report)\s*$"),
+                )
+
+            if like_btn.exists(Timeout.ZERO) and context_opt.exists(Timeout.ZERO):
+                return True
+            return False
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception as e:
+            logger.debug(f"is_peek_preview_opened error: {e}")
+            return False
 
     def is_peek_already_liked(self) -> bool:
         """Check if the post in the Peek Preview is already liked (shows 'Unlike')."""
-        unlike_btn = self.device.find(
-            classNameMatches="(?i)TextView|Button",
-            textMatches=case_insensitive_re("^Unlike$"),
-        )
-        return unlike_btn.exists(Timeout.TINY)
+        try:
+            unlike_btn = self.device.find(
+                textMatches=case_insensitive_re(r"^\s*Unlike\s*$"),
+            )
+            if not unlike_btn.exists(Timeout.ZERO):
+                unlike_btn = self.device.find(
+                    descriptionMatches=case_insensitive_re(r"^\s*Unlike\s*$"),
+                )
+            return unlike_btn.exists(Timeout.TINY)
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception:
+            return False
 
     def like_in_peek(self) -> bool:
         """Perform a like directly from the Peek Preview context menu."""
-        if self.is_peek_already_liked():
-            logger.info("Post already liked (detected via Peek Preview menu)!")
-            return True
-        like_btn = self.device.find(
-            classNameMatches="(?i)TextView|Button",
-            textMatches=case_insensitive_re("^Like$"),
-        )
-        if like_btn.exists(Timeout.TINY):
-            logger.info("Liking post directly from Peek Preview menu ❤️.")
-            like_btn.click()
-            UniversalActions.detect_block(self.device)
-            random_sleep(0.5, 1.0, modulable=False)
-            return True
-        logger.warning("Like button not found in Peek Preview menu!")
-        return False
+        try:
+            if self.is_peek_already_liked():
+                logger.info("Post already liked (detected via Peek Preview menu)!")
+                return True
+            like_btn = self.device.find(
+                textMatches=case_insensitive_re(r"^\s*Like\s*$"),
+            )
+            if not like_btn.exists(Timeout.ZERO):
+                like_btn = self.device.find(
+                    descriptionMatches=case_insensitive_re(r"^\s*Like\s*$"),
+                )
+            if like_btn.exists(Timeout.TINY):
+                logger.info("Liking post directly from Peek Preview menu ❤️.")
+                like_btn.click()
+                UniversalActions.detect_block(self.device)
+                random_sleep(0.5, 1.0, modulable=False)
+                return True
+            logger.warning("Like button not found in Peek Preview menu!")
+            return False
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception as e:
+            logger.debug(f"like_in_peek error: {e}")
+            return False
 
     def dismiss_peek(self) -> bool:
         """Cleanly and immediately dismiss the Peek Preview and return to profile grid."""
-        logger.debug("Dismissing Peek Preview...")
-        self.device.back()
-        random_sleep(0.5, 1.0, modulable=False)
-        profile_tabs = self.device.find(
-            resourceIdMatches=case_insensitive_re(ResourceID.PROFILE_TABS_CONTAINER)
-        )
-        return profile_tabs.exists(Timeout.SHORT)
+        try:
+            logger.debug("Dismissing Peek Preview...")
+            for _ in range(2):
+                self.device.back()
+                random_sleep(0.5, 1.0, modulable=False)
+                if not self.is_peek_preview_opened():
+                    return True
+            # If back key did not clear the overlay, tap outside the modal card (top margin)
+            try:
+                info = self.device.get_info()
+                w, h = info["displayWidth"], info["displayHeight"]
+                self.device.deviceV2.click(w // 2, int(h * 0.05))
+                random_sleep(0.5, 1.0, modulable=False)
+            except Exception:
+                pass
+            return not self.is_peek_preview_opened()
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception as e:
+            logger.debug(f"dismiss_peek error: {e}")
+            return False
 
     def detect_opened_media_type(self) -> MediaType:
         """Detect the media type from the opened post itself.
@@ -2493,48 +2714,51 @@ class PostsGridView:
         return profile_tabs.exists(Timeout.SHORT)
 
     def navigateToPost(self, row, col):
-        post_list_view = self._get_post_view()
-        post_list_view.wait(Timeout.MEDIUM)
-        OFFSET = 1  # row with post starts from index 1
-        row_view = post_list_view.child(index=row + OFFSET)
-        if not row_view.exists():
-            return None, None, None
-        post_view = row_view.child(index=col)
-        if not post_view.exists():
-            return None, None, None
-        content_desc = post_view.ui_info()["contentDescription"]
-        media_type, obj_count = PostsViewList.detect_media_type(content_desc)
-        opened_post_view = OpenedPostView(self.device)
-        for attempt in range(2):
-            # Fast, crisp tap: calculate center coordinates to avoid lingering touches triggering Peek Preview
-            try:
-                bounds = post_view.get_bounds()
-                x_center = (bounds["left"] + bounds["right"]) // 2
-                y_center = (bounds["top"] + bounds["bottom"]) // 2
-                self.device.deviceV2.click(x_center, y_center)
-            except Exception:
-                post_view.click()
+        from InstaAddict.core.telemetry import PerformanceTracker
 
-            if opened_post_view.is_post_opened() or not self._is_still_on_profile():
-                return opened_post_view, media_type, obj_count
-            if opened_post_view.is_peek_preview_opened():
-                logger.info("Peek Preview detected on post thumbnail.")
-                opened_post_view.is_peek = True
-                return opened_post_view, media_type, obj_count
-            if attempt == 0:
-                logger.debug("Post didn't open, trying one more click...")
-                # Re-resolve both row_view and post_view — the recycler may have
-                # re-bound the previous child reference after a layout pass.
-                row_view = post_list_view.child(index=row + OFFSET)
-                if not row_view.exists():
-                    break
-                post_view = row_view.child(index=col)
-                if not post_view.exists():
-                    break
-        logger.debug(
-            f"Click on row {row}, column {col} didn't open any post (empty grid slot?)."
-        )
-        return None, None, None
+        with PerformanceTracker.get_instance().measure("view", "post_open"):
+            post_list_view = self._get_post_view()
+            post_list_view.wait(Timeout.MEDIUM)
+            OFFSET = 1  # row with post starts from index 1
+            row_view = post_list_view.child(index=row + OFFSET)
+            if not row_view.exists():
+                return None, None, None
+            post_view = row_view.child(index=col)
+            if not post_view.exists():
+                return None, None, None
+            content_desc = post_view.ui_info()["contentDescription"]
+            media_type, obj_count = PostsViewList.detect_media_type(content_desc)
+            opened_post_view = OpenedPostView(self.device)
+            for attempt in range(2):
+                # Fast, crisp tap: calculate center coordinates to avoid lingering touches triggering Peek Preview
+                try:
+                    bounds = post_view.get_bounds()
+                    x_center = (bounds["left"] + bounds["right"]) // 2
+                    y_center = (bounds["top"] + bounds["bottom"]) // 2
+                    self.device.deviceV2.click(x_center, y_center)
+                except Exception:
+                    post_view.click()
+
+                if opened_post_view.is_peek_preview_opened():
+                    logger.info("Peek Preview detected on post thumbnail.")
+                    opened_post_view.is_peek = True
+                    return opened_post_view, media_type, obj_count
+                if opened_post_view.is_post_opened() or not self._is_still_on_profile():
+                    return opened_post_view, media_type, obj_count
+                if attempt == 0:
+                    logger.debug("Post didn't open, trying one more click...")
+                    # Re-resolve both row_view and post_view — the recycler may have
+                    # re-bound the previous child reference after a layout pass.
+                    row_view = post_list_view.child(index=row + OFFSET)
+                    if not row_view.exists():
+                        break
+                    post_view = row_view.child(index=col)
+                    if not post_view.exists():
+                        break
+            logger.debug(
+                f"Click on row {row}, column {col} didn't open any post (empty grid slot?)."
+            )
+            return None, None, None
 
 
 
@@ -2553,43 +2777,51 @@ class ProfileView(ActionBarView):
 
     def navigateToOptions(self):
         logger.debug("Navigate to Options")
+        if self.action_bar is None:
+            self.action_bar = self._getActionBar()
+        if self.action_bar is None:
+            logger.warning("Action bar not found in ProfileView.")
+            return None
         button = self.action_bar.child(index=2)
         button.click()
 
         return OptionsView(self.device)
 
     def _getActionBarTitleBtn(self, watching_stories=False, error=True):
-        bar = case_insensitive_re(
-            [
-                ResourceID.TITLE_VIEW,
-                ResourceID.ACTION_BAR_TITLE,
-                ResourceID.ACTION_BAR_LARGE_TITLE,
-                ResourceID.ACTION_BAR_TEXTVIEW_TITLE,
-                ResourceID.ACTION_BAR_TITLE_AUTO_SIZE,
-                ResourceID.ACTION_BAR_LARGE_TITLE_AUTO_SIZE,
-            ]
-        )
-        action_bar = self.device.find(
-            resourceIdMatches=bar,
-        )
-        timeout = Timeout.LONG if error else Timeout.SHORT
-        if not watching_stories and action_bar.exists(timeout) or watching_stories:
-            return action_bar
-
-        # IG v446 fallback: The dedicated action bar resource IDs were removed.
-        # The title is now simply a TextView at the top of the screen containing the username.
-        logger.debug("Action bar IDs not found. Falling back to layout inspection.")
-        top_text = self.device.find(
-            classNameMatches="(?i)TextView|Button", textMatches="(?i)^[-a-z0-9_.]+$"
-        )
-        if top_text.exists(Timeout.SHORT):
-            return top_text
-
-        if error:
-            logger.error(
-                "Unable to find action bar! (The element with the username at top)"
+        try:
+            bar = case_insensitive_re(
+                [
+                    ResourceID.TITLE_VIEW,
+                    ResourceID.ACTION_BAR_TITLE,
+                    ResourceID.ACTION_BAR_LARGE_TITLE,
+                    ResourceID.ACTION_BAR_TEXTVIEW_TITLE,
+                    ResourceID.ACTION_BAR_TITLE_AUTO_SIZE,
+                    ResourceID.ACTION_BAR_LARGE_TITLE_AUTO_SIZE,
+                ]
             )
-        return None
+            action_bar = self.device.find(
+                resourceIdMatches=bar,
+            )
+            timeout = Timeout.LONG if error else Timeout.SHORT
+            if not watching_stories and action_bar.exists(timeout) or watching_stories:
+                return action_bar
+
+            # IG v446 fallback: The dedicated action bar resource IDs were removed.
+            # The title is now simply a TextView at the top of the screen containing the username.
+            logger.debug("Action bar IDs not found. Falling back to layout inspection.")
+            top_text = self.device.find(
+                classNameMatches="(?i)TextView|Button", textMatches="(?i)^[-a-z0-9_.]+$"
+            )
+            if top_text.exists(Timeout.SHORT):
+                return top_text
+
+            if error:
+                logger.error(
+                    "Unable to find action bar! (The element with the username at top)"
+                )
+            return None
+        except DeviceFacade.AppHasCrashed:
+            return None
 
     def _getSomeText(self) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Get some text from the profile to check the language"""
@@ -2774,9 +3006,15 @@ class ProfileView(ActionBarView):
         return False
 
     def getUsername(self, watching_stories=False, error=True):
-        action_bar = self._getActionBarTitleBtn(watching_stories, error=error)
-        if action_bar is not None:
-            return action_bar.get_text(error=not watching_stories and error).strip()
+        try:
+            action_bar = self._getActionBarTitleBtn(watching_stories, error=error)
+            if action_bar is not None:
+                return action_bar.get_text(error=not watching_stories and error).strip()
+        except DeviceFacade.AppHasCrashed:
+            return None
+        except Exception as e:
+            logger.debug(f"getUsername exception: {e}")
+            return None
         if not watching_stories and error:
             logger.error("Cannot get username.")
         return None
@@ -2916,6 +3154,11 @@ class ProfileView(ActionBarView):
                             return last_index - 1, n
 
     def getProfileInfo(self):
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+            record_heartbeat("profile", "Reading profile counters")
+        except Exception:
+            pass
         username = self.getUsername()
         posts = self.getPostsCount()
         followers = self.getFollowersCount()
@@ -3029,7 +3272,11 @@ class ProfileView(ActionBarView):
             user_list = self.device.find(
                 resourceIdMatches=user_list_id,
             )
-            row_height, n_users = inspect_current_view(user_list)
+            try:
+                row_height, n_users = inspect_current_view(user_list)
+            except EmptyList:
+                logger.info("Followers list is empty or reached end of list.")
+                break
             for item in user_list:
                 cur_row_height = item.get_height()
                 if cur_row_height < row_height:
@@ -3427,6 +3674,38 @@ class UniversalActions:
         self._swipe_points(direction=Direction.UP)
         random_sleep(inf=5, sup=8, modulable=False)
 
+    _micro_stall_sentinel = None
+
+    @classmethod
+    def get_micro_stall_sentinel(cls):
+        if cls._micro_stall_sentinel is None:
+            from InstaAddict.core.telemetry import MicroStallSentinel
+
+            cls._micro_stall_sentinel = MicroStallSentinel(
+                timeout_threshold=3, stagnation_seconds=20.0
+            )
+        return cls._micro_stall_sentinel
+
+    @classmethod
+    def check_micro_stall(cls, device, context: str = "") -> bool:
+        """Check if micro-stall has occurred. If so, execute proactive soft recovery and increment telemetry."""
+        sentinel = cls.get_micro_stall_sentinel()
+        if sentinel.record_timeout(context):
+            cls.dismiss_peek_if_open(device)
+            cls.dismiss_dialog(device)
+            device.back()
+            random_sleep(1.0, 2.0, modulable=False)
+            try:
+                from InstaAddict.core.session_state import SessionState
+
+                session = SessionState.get_active()
+                if session:
+                    session.increment_micro_stall_escapes()
+            except Exception:
+                pass
+            return True
+        return False
+
     @staticmethod
     def escape_in_app_browser(device) -> bool:
         """
@@ -3559,8 +3838,37 @@ class UniversalActions:
 
         return escaped
 
-    @staticmethod
-    def dismiss_dialog(device, max_sweeps: int = 3) -> bool:
+    @classmethod
+    def dismiss_peek_if_open(cls, device) -> bool:
+        """
+        Detects if a lingering Peek Preview / long-press modal is obscuring the screen
+        and dismisses it immediately.
+        """
+        try:
+            d = getattr(device, "deviceV2", None)
+            target_app = "com.instagram.android"
+            if isinstance(getattr(device, "app_id", None), str):
+                target_app = getattr(device, "app_id")
+            if d is not None and hasattr(d, "app_current"):
+                curr = d.app_current()
+                if isinstance(curr, dict) and curr.get("package") != target_app:
+                    return False
+
+            if hasattr(device, "_ig_is_opened") and not device._ig_is_opened():
+                return False
+
+            opened_view = OpenedPostView(device)
+            if opened_view.is_peek_preview_opened():
+                logger.warning("Lingering Peek Preview detected on screen! Dismissing...")
+                return opened_view.dismiss_peek()
+        except DeviceFacade.AppHasCrashed:
+            return False
+        except Exception as e:
+            logger.debug(f"dismiss_peek_if_open error: {e}")
+        return False
+
+    @classmethod
+    def dismiss_dialog(cls, device, max_sweeps: int = 3) -> bool:
         """
         Detects and dismisses modal dialogs, popups, and intrusive system/app overlays
         such as 'Rate Instagram', notification requests, Google autofill, sync prompts, etc.
@@ -3592,6 +3900,13 @@ class UniversalActions:
         for sweep in range(max_sweeps):
             dismissed_this_pass = False
             try:
+                # 0. Check and dismiss lingering Peek Preview popup
+                if cls.dismiss_peek_if_open(device):
+                    dismissed_this_pass = True
+                    dismissed_any = True
+                    random_sleep(0.5, 1.0, modulable=False)
+                    continue
+
                 # 1. High-Priority Special Case: "Rate Instagram" / "Enjoying Instagram?"
                 # Specifically click "No, thanks" or "Remind me later". STRICTLY avoid "Rate Instagram".
                 rate_no_thanks = _find_elem(r"(?i)^(No,\s*thanks|No\s+thanks)$", ["No, thanks", "No thanks"])
@@ -3687,6 +4002,12 @@ class UniversalActions:
                 anr_btn = _find_elem(r"(?i)^Wait$", "Wait")
                 if anr_btn is not None:
                     logger.warning("System ANR detected ('Wait'). Tapping Wait...")
+                    try:
+                        from InstaAddict.core.watchdog import record_heartbeat
+
+                        record_heartbeat("anr_recovery", "Tapping Wait on system ANR dialog")
+                    except Exception:
+                        pass
                     anr_btn.click()
                     dismissed_this_pass = True
                     dismissed_any = True
