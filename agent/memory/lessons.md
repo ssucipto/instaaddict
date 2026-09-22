@@ -2,6 +2,16 @@
 # Populated automatically when developer says "log it" or "wrong, log this"
 # Max 5 entries loaded per session, filtered to current task_type + priority:high
 
+- date: 2026-09-23
+  task_type: feature
+  mistake: _describes_a_post initially returned inner.get_desc() directly, which could
+    be an empty string "". Callers (including _get_media_container's sliver-skip loop)
+    use truthiness checks like `if content_desc:`, so "" silently passed the guard
+    and was treated as a valid description, breaking sliver detection.
+  correction: Always normalize falsy returns to None — `return inner_desc if inner_desc else None`.
+    Write explicit tests for the empty-inner-desc case.
+  priority: high
+
 - date: 2026-09-22
   task_type: audit
   mistake: Discarding granular SkipReason enums into a scalar counter blinded closed-loop autotuning engines from diagnosing parameter starvation (e.g. min_followers, potency_ratio, business accounts). Furthermore, saving crash dumps without machine-readable JSON context (active job, current target, foreground package, uptime) slowed post-mortem diagnosis.

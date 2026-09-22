@@ -5,6 +5,23 @@
 - date: 2026-09-23
   executor: Antigravity
   branch: master
+  tasks_completed: [route-063-upstream-pr28-cherrypick-e1-e2-e3]
+  done:
+    - e1-carousel-detection-walrus-check-before-photo-video-branches-in-detect-media-type
+    - e2-adds-describes-a-post-helper-for-inner-desc-fallback-ig447-plus
+    - e2-sliver-skip-loop-in-get-media-container-skips-54px-remnants
+    - e3-adds-get-like-button-of-geometric-heart-pairing-using-bounds
+    - e3-rewrites-like-in-post-view-fixes-unbound-media-type-and-dead-recursive-call
+    - reels-viewer-path-preserved-verbatim-upstream-removed-it-we-keep-it
+    - 3-new-test-files-24-new-cases-404-404-full-suite-passing
+    - phase0-crash-remediation-committed-co-067-068-069-verified-fixed
+  key_fact: _describes_a_post must normalize empty string from inner.get_desc() to None;
+    callers use truthiness checks so returning "" breaks the sliver-skip loop silently.
+    Test caught this — fix is `return inner_desc if inner_desc else None`.
+
+- date: 2026-09-23
+  executor: Antigravity
+  branch: master
   tasks_completed: [rebrand-instaaddict-ai, acp-validate-sync-update-commit]
   done:
     - rebranded-project-and-distribution-package-to-instaaddict-ai-in-pyproject-toml
