@@ -40,6 +40,16 @@ Patch release resolving false-positive Reels ad classification, inline follow bu
   - Enforced single source of truth for `session_state.totalComments` inside `_comment()`, eliminating duplicate metric increments.
   - Persisted feed interactions via `storage.add_interacted_user()` to record liked and commented states in SQLite.
   - Enforced comment limit termination guard in feed interaction loop.
+- **Upstream PR #28 Port: Carousel Detection, Sliver Skip & Geometric Like Pairing (`InstaAddict/core/views.py`, `test/test_upstream_pr28_e1_e2_e3.py`)**:
+  - Ported E1: Multi-slide carousel indicator walrus detection before photo/video branches in `detect_media_type()`.
+  - Ported E2: Added `_describes_a_post()` helper with empty-string normalization and sliver-skip loop in `_get_media_container()` skipping remnant headers under 54px.
+  - Ported E3: Implemented `_get_like_button_of()` geometric heart pairing with bounding coordinate matching and modernized `_like_in_post_view()`.
+  - Preserved Reels viewer code path and backwards compatibility with Instagram v447+.
+- **Crash Remediation, EmptyList Decoupling & Dogfood Optimizer Modernization (`InstaAddict/core/decorators.py`, `InstaAddict/core/dogfood.py`, `InstaAddict/core/views.py`)**:
+  - Hardened `HomeView.navigateToSearch()` and `SearchView.navigate_to_target()` against transient `JsonRpcError` and `UiObjectNotFoundError`.
+  - Decoupled `EmptyList` from `restart()` in `@run_safely`, advancing task flow gracefully without killing Instagram or incrementing crash counters.
+  - Modernized `DogfoodOptimizer` with sliding session window (`window_sessions=5`) and accurate uncaught error parsing.
+
 
 
 ## v1.4.0 — Engagement Pipeline Restoration, Follower Cache, and Aussie Vision Voice

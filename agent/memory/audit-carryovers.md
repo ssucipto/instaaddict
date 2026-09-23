@@ -15,8 +15,6 @@ carryovers:
     summary: Fix media container contentDescription resolution and remove silent abort in _like_in_post_view()
     affected_files:
       - InstaAddict/core/views.py
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-002
     audit_report: agent/reports/audit-002-action-bar-failure.md
@@ -28,8 +26,6 @@ carryovers:
     summary: Fix action bar title lookup failure in views.py _getActionBarTitleBtn for IG v446
     affected_files:
       - InstaAddict/core/views.py
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-003
     audit_report: agent/reports/audit-004-implementation-review.md
@@ -42,8 +38,6 @@ carryovers:
     affected_files:
       - agent/progress.yaml
       - agent/tasks/milestone-2-compatibility/task-8-establish-post-pipeline.md
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-004
     audit_report: agent/reports/audit-004-implementation-review.md
@@ -55,8 +49,6 @@ carryovers:
     summary: Bare exception handling shortcut in views.py _get_media_container
     affected_files:
       - InstaAddict/core/views.py
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-005
     audit_report: agent/reports/audit-004-implementation-review.md
@@ -68,8 +60,6 @@ carryovers:
     summary: Hardcoded time.sleep(2) shortcut in views.py changeToUsername
     affected_files:
       - InstaAddict/core/views.py
-    fix_applied_date: null
-    verified_in_audit: null
 
   - id: CO-006
     audit_report: agent/reports/audit-015-swipe-distance-snapback.md

@@ -345,6 +345,16 @@ progress:
   overall: 100
 recent_work:
 - date: '2026-09-23'
+  description: 'Ported Upstream PR #28 (E1/E2/E3 Feed Improvements), Fixed Audit-116/117 Findings, and Cleaned ACP Memory Integrity.'
+  items:
+  - "✓ Ported E1: Multi-slide carousel indicator walrus detection before photo/video branches in detect_media_type"
+  - "✓ Ported E2: _describes_a_post helper with empty-string normalization and sliver-skip loop skipping remnant headers"
+  - "✓ Ported E3: _get_like_button_of geometric heart pairing with bounding coordinate matching and modernized _like_in_post_view"
+  - "✓ Preserved Reels viewer code path and backwards compatibility with Instagram v447+"
+  - "✓ Added 24 new unit tests across 3 test modules (404/404 test suite passing, 100% green)"
+  - "✓ Resolved duplicate null key findings in agent/memory/audit-carryovers.md (CO-001 through CO-005)"
+  - "✓ Passed 100% ACP documentation validation and CI fast gates"
+- date: '2026-09-23'
   description: 'Crash Remediation, Non-Fatal EmptyList Decoupling, and Dogfood Optimizer Modernization (Audit-115/116/117, Route-063, Review-059/060).'
   items:
   - "✓ Uncovered forensic root causes of 36 lifetime crashes and 17 genuine fatal exceptions in Audit-115"
