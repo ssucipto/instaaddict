@@ -143,18 +143,37 @@ def create_device(device_id, app_id):
 
 
 def get_device_info(device):
-    logger.debug(
-        f"Phone Name: {device.get_info()['productName']}, SDK Version: {device.get_info()['sdkInt']}"
-    )
-    if int(device.get_info()["sdkInt"]) < 19:
-        logger.warning("Only Android 4.4+ (SDK 19+) devices are supported!")
-    logger.debug(
-        f"Screen dimension: {device.get_info()['displayWidth']}x{device.get_info()['displayHeight']}"
-    )
-    logger.debug(
-        f"Screen resolution: {device.get_info()['displaySizeDpX']}x{device.get_info()['displaySizeDpY']}"
-    )
-    logger.debug(f"Device ID: {device.deviceV2.serial}")
+    try:
+        info = device.get_info() if hasattr(device, "get_info") else {}
+    except Exception as e:
+        logger.warning(f"Could not retrieve device info via RPC ({e}), using fallback defaults.")
+        info = getattr(device, "_get_info_via_adb", lambda: {})()
+
+    product_name = info.get("productName", "Android Device")
+    sdk_int = info.get("sdkInt", 0)
+    display_w = info.get("displayWidth", 0)
+    display_h = info.get("displayHeight", 0)
+    dp_x = info.get("displaySizeDpX", 0)
+    dp_y = info.get("displaySizeDpY", 0)
+
+    logger.debug(f"Phone Name: {product_name}, SDK Version: {sdk_int}")
+    try:
+        if int(sdk_int) < 19:
+            logger.warning("Only Android 4.4+ (SDK 19+) devices are supported!")
+    except (ValueError, TypeError):
+        pass
+
+    logger.debug(f"Screen dimension: {display_w}x{display_h}")
+    logger.debug(f"Screen resolution: {dp_x}x{dp_y}")
+    try:
+        serial = (
+            device.deviceV2.serial
+            if hasattr(device, "deviceV2") and device.deviceV2
+            else getattr(device, "device_id", "unknown")
+        )
+        logger.debug(f"Device ID: {serial}")
+    except Exception:
+        logger.debug(f"Device ID: {getattr(device, 'device_id', 'unknown')}")
 
 
 class Timeout(Enum):
@@ -585,7 +604,109 @@ class DeviceFacade:
                 session.increment_zero_displacement()
             raise DeviceFacade.JsonRpcError(e) from e
 
-    def get_info(self):
+    def _get_info_via_adb(self) -> dict:
+        """Fast direct ADB fallback to query device metrics when UiAutomator RPC service is disconnected or slow."""
+        import subprocess
+
+        info = {
+            "currentPackageName": "com.instagram.android",
+            "displayHeight": 1920,
+            "displayRotation": 0,
+            "displaySizeDpX": 411,
+            "displaySizeDpY": 731,
+            "displayWidth": 1080,
+            "productName": "Android Device",
+            "screenOn": True,
+            "sdkInt": 28,
+            "naturalOrientation": True,
+        }
+        cmd_prefix = ["adb"]
+        device_id = getattr(self, "device_id", None)
+        if device_id:
+            cmd_prefix.extend(["-s", str(device_id)])
+
+        try:
+            # 1. Product Name & SDK
+            res_prod = subprocess.run(
+                cmd_prefix + ["shell", "getprop", "ro.product.model"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res_prod.returncode == 0 and res_prod.stdout.strip():
+                info["productName"] = res_prod.stdout.strip()
+            else:
+                res_name = subprocess.run(
+                    cmd_prefix + ["shell", "getprop", "ro.product.name"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                )
+                if res_name.returncode == 0 and res_name.stdout.strip():
+                    info["productName"] = res_name.stdout.strip()
+
+            res_sdk = subprocess.run(
+                cmd_prefix + ["shell", "getprop", "ro.build.version.sdk"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res_sdk.returncode == 0 and res_sdk.stdout.strip().isdigit():
+                info["sdkInt"] = int(res_sdk.stdout.strip())
+
+            # 2. Display Width & Height via wm size
+            res_wm = subprocess.run(
+                cmd_prefix + ["shell", "wm", "size"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res_wm.returncode == 0 and res_wm.stdout:
+                m_size = re.findall(r"(\d+)x(\d+)", res_wm.stdout)
+                if m_size:
+                    info["displayWidth"] = int(m_size[-1][0])
+                    info["displayHeight"] = int(m_size[-1][1])
+
+            # 3. Density for DP calculation
+            res_density = subprocess.run(
+                cmd_prefix + ["shell", "wm", "density"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            density = 420
+            if res_density.returncode == 0 and res_density.stdout:
+                m_den = re.findall(r"\d+", res_density.stdout)
+                if m_den:
+                    density = int(m_den[-1])
+            info["displaySizeDpX"] = int(info["displayWidth"] * 160 / max(density, 1))
+            info["displaySizeDpY"] = int(info["displayHeight"] * 160 / max(density, 1))
+
+            # 4. Screen On via dumpsys power
+            res_power = subprocess.run(
+                cmd_prefix + ["shell", "dumpsys", "power"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res_power.returncode == 0 and res_power.stdout:
+                p_out = res_power.stdout
+                info["screenOn"] = (
+                    "mWakefulness=Awake" in p_out or "Display Power: state=ON" in p_out
+                )
+        except Exception as e:
+            logger.debug(f"_get_info_via_adb fallback error: {e}")
+
+        return info
+
+    def is_screen_on(self) -> bool:
+        """Check if device screen is on with fast ADB fallback."""
+        try:
+            return bool(self.deviceV2.info.get("screenOn", True))
+        except Exception:
+            return bool(self._get_info_via_adb().get("screenOn", True))
+
+    def get_info(self, fallback_to_adb: bool = False):
         import time
         from InstaAddict.core.telemetry import PerformanceTracker
 
@@ -607,7 +728,16 @@ class DeviceFacade:
                         f"reset_uiautomator attempt {attempt + 1} raised: {r_err}"
                     )
                 time.sleep(1)
+
+        if fallback_to_adb:
+            logger.warning(
+                f"RPC get_info failed ({last_exc}). Falling back to fast direct ADB device inspection..."
+            )
+            tracker.record_metric("rpc", "get_info_fallback", 1.0, error=True)
+            return self._get_info_via_adb()
+
         raise DeviceFacade.JsonRpcError(last_exc) from last_exc
+
     @staticmethod
     def sleep_mode(mode):
         mode = SleepTime.DEFAULT if mode is None else mode

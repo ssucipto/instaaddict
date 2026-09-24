@@ -341,13 +341,23 @@ tasks:
     actual_hours: 2
     route_file: agent/routing/tasks/route-064-hashtag-stuck-and-escape-hardening.md
     notes: Implemented center-point tap retry and OpenedPostView.is_post_opened() verification in navigation.py, 5-consecutive unidentifiable breaker in handle_sources.py, conditional watchdog heartbeats, and wired micro-stall sentinel. 413/413 tests green.
+  - id: task-41
+    name: Startup Resilience, Fast ADB Metadata Fallback, PyPI 404 Toleration & Self-Learning Telemetry Expansion
+    status: completed
+    priority: 1
+    started: 2026-09-25
+    completed_date: '2026-09-25'
+    estimated_hours: 2
+    actual_hours: 2
+    route_file: agent/routing/tasks/route-065-startup-resilience-and-telemetry-optimization.md
+    notes: Fast ADB metadata fallback in DeviceFacade.get_info() and get_device_info(), PyPI 404 update check graceful handling, and DogfoodOptimizer/PerformanceTracker expanded telemetry for RPC/ADB/Watchdog metrics. 420/420 tests passing.
 
 documentation:
   design_documents: 2
   milestone_documents: 8
   pattern_documents: 2
   task_documents: 0
-  last_updated: '2026-09-24'
+  last_updated: '2026-09-25'
 progress:
   planning: 100
   implementation: 100
@@ -355,6 +365,17 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-09-25'
+  description: 'Forensic Remediation of Startup Crash, UiAutomator Disconnects, Fast ADB Metadata Fallback, PyPI 404 Toleration & Self-Learning Telemetry Expansion (Audit-126, Route-065, CO-076/077/078/079).'
+  items:
+  - "✓ Diagnosed and resolved Android 17 emulator Skia rendering loop and UiAutomator2 RPC gateway timeouts (CO-076)"
+  - "✓ Implemented _get_info_via_adb() direct ADB fallback (<50ms) for product name, SDK int, display metrics, and screen state (CO-076)"
+  - "✓ Hardened get_info() with fallback_to_adb option, eliminating 45-minute fatal hang when UiAutomator RPC service is disconnected (CO-076)"
+  - "✓ Hardened get_device_info() with single-call query caching and safe dictionary extraction defaults (CO-076, CO-079)"
+  - "✓ Added DeviceFacade.is_screen_on() with ADB dumpsys power fallback (CO-079)"
+  - "✓ Gracefully handled PyPI 404 responses for source/git installations in utils.update_available() without emitting false-alarm ERROR logs (CO-077)"
+  - "✓ Expanded DogfoodOptimizer and PerformanceTracker telemetry to track and analyze RPC disconnects, ADB timeouts, Watchdog triggers, and device health (CO-078)"
+  - "✓ Added 7 comprehensive unit tests in test_tuning_and_operational_fixes.py (420/420 test suite passing, 100% green)"
 - date: '2026-09-24'
   description: 'Forensic Remediation of Zero-Net Displacement Hashtag Grid Trap, Stuck Detection & Watchdog Escape Hardening (Audit-123/124/125, Route-064, Review-061/062).'
   items:

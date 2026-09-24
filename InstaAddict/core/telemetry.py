@@ -27,6 +27,7 @@ class PerformanceTracker:
         self.zero_displacement_swipes: int = 0
         self.snapback_events: int = 0
         self.adaptive_scale_factor: float = 1.0
+        self.device_health_samples: deque = deque(maxlen=100)
 
     @classmethod
     def get_instance(cls) -> "PerformanceTracker":
@@ -83,6 +84,38 @@ class PerformanceTracker:
 
             if snapback:
                 self.snapback_events += 1
+
+    def record_device_health(self, connected: bool, latency_ms: float = 0.0):
+        """Record device RPC connectivity sample and latency."""
+        with self._lock:
+            self.device_health_samples.append((time.time(), connected, float(latency_ms)))
+            self.record_metric("device", "rpc_ping", latency_ms, error=not connected)
+
+    def get_device_health(self) -> Dict[str, Any]:
+        """Return device connectivity and transport latency summary."""
+        with self._lock:
+            samples = list(self.device_health_samples)
+            if not samples:
+                return {
+                    "total_samples": 0,
+                    "connected_pct": 100.0,
+                    "avg_latency_ms": 0.0,
+                    "latest_latency_ms": 0.0,
+                    "is_healthy": True,
+                }
+            total = len(samples)
+            connected_count = sum(1 for _, conn, _ in samples if conn)
+            latencies = [lat for _, conn, lat in samples if conn and lat > 0.0]
+            avg_lat = sum(latencies) / len(latencies) if latencies else 0.0
+            latest = samples[-1]
+            conn_pct = (connected_count / total) * 100.0
+            return {
+                "total_samples": total,
+                "connected_pct": round(conn_pct, 1),
+                "avg_latency_ms": round(avg_lat, 1),
+                "latest_latency_ms": round(latest[2], 1),
+                "is_healthy": conn_pct >= 90.0,
+            }
 
     def get_motion_summary(self) -> Dict[str, Any]:
         """Return motion displacement efficiency summary."""

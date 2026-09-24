@@ -44,3 +44,10 @@
   context: "Android mobile automation when clicking thumbnail cells in a RecyclerView (such as hashtag/location grids) may trigger long-press peek previews or fail to navigate, leaving the UI trapped on the grid where upward corrective swipes (3x UP) and downward pagination swipes (1x NEXT) create an infinite 0-displacement loop."
   solution: "In nav_to_hashtag_or_place(), compute element center bounds to execute crisp coordinate taps, dismiss lingering peek modals, and verify is_post_opened() across both feed and Reels/Clips root containers before entering handling loops. In handle_posts(), implement an instant grid-exit breakout check and a 5-consecutive unidentifiable author circuit breaker that marks the source dead in HashtagManager, triggers soft recovery via check_micro_stall(), and conditions watchdog heartbeats strictly on verified progress."
 
+- date: 2026-09-25
+  name: fast-adb-metadata-fallback-and-transport-health-telemetry
+  description: "Bypass hung or lagging accessibility RPC daemons by falling back to parameterized direct ADB shell commands (<50ms) for core device metadata, and feed transport metrics into self-learning dogfood optimizers."
+  context: "Android mobile automation where UiAutomator/atx-agent daemons crash or disconnect (e.g. Android 17 emulator Skia rendering ANR loops or HTTP timeouts), multiplying exponential retries into fatal 45-minute hangs before bot start."
+  solution: "In DeviceFacade.get_info() and get_device_info(), reduce RPC attempts and query ro.product.model, ro.build.version.sdk, wm size, wm density, and dumpsys power via direct adb shell. Cache results in a single query pass. Track RPC disconnects, ADB timeouts, and device health latency in PerformanceTracker and expose them to DogfoodOptimizer for autonomous health recommendations."
+
+

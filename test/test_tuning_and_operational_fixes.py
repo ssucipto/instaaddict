@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 from InstaAddict.core.device_facade import DeviceFacade, Mode
 from InstaAddict.core.utils import EmptyList
@@ -1128,4 +1128,175 @@ def test_handle_posts_grid_exit_detection_breaks_out(monkeypatch):
         assert "grid_trap_exit" in micro_stall_calls[0]
     finally:
         SessionState.set_active(None)
+
+
+def test_device_facade_get_info_adb_fallback(monkeypatch):
+    """Verify that DeviceFacade.get_info() recovers via fast ADB inspection on RPC failure."""
+    from InstaAddict.core.device_facade import DeviceFacade
+
+    # Create dummy DeviceFacade instance bypassing __init__
+    dev = DeviceFacade.__new__(DeviceFacade)
+    dev.device_id = "emulator-5554"
+    dev.deviceV2 = MagicMock()
+    # Simulate RPC failure on deviceV2.info
+    type(dev.deviceV2).info = PropertyMock(side_effect=Exception("GatewayError: gateway error"))
+    dev.deviceV2.reset_uiautomator = MagicMock()
+
+    fallback_info = {
+        "productName": "Pixel_10_Pro",
+        "sdkInt": 37,
+        "displayWidth": 1080,
+        "displayHeight": 2424,
+        "displaySizeDpX": 411,
+        "displaySizeDpY": 923,
+        "screenOn": True,
+    }
+    monkeypatch.setattr(dev, "_get_info_via_adb", lambda: fallback_info)
+
+    res = dev.get_info(fallback_to_adb=True)
+    assert res["productName"] == "Pixel_10_Pro"
+    assert res["sdkInt"] == 37
+    assert res["displayWidth"] == 1080
+    assert res["screenOn"] is True
+
+
+def test_get_device_info_single_call_and_safe_defaults():
+    """Verify get_device_info queries get_info() exactly once and tolerates partial/null fields."""
+    from InstaAddict.core.device_facade import get_device_info
+
+    mock_dev = MagicMock()
+    mock_dev.get_info.return_value = {
+        "productName": "sdk_gphone",
+        "sdkInt": 37,
+        "displayWidth": 1080,
+        "displayHeight": 1920,
+        "displaySizeDpX": 411,
+        "displaySizeDpY": 731,
+    }
+    mock_dev.deviceV2.serial = "emulator-5554"
+
+    get_device_info(mock_dev)
+    assert mock_dev.get_info.call_count == 1
+
+
+def test_device_facade_is_screen_on_fallback(monkeypatch):
+    """Verify is_screen_on checks RPC first, falling back to ADB power check."""
+    from InstaAddict.core.device_facade import DeviceFacade
+
+    dev = DeviceFacade.__new__(DeviceFacade)
+    dev.device_id = "emulator-5554"
+    dev.deviceV2 = MagicMock()
+
+    # RPC succeeds
+    type(dev.deviceV2).info = PropertyMock(return_value={"screenOn": True})
+    assert dev.is_screen_on() is True
+
+    # RPC raises exception, falls back to _get_info_via_adb
+    type(dev.deviceV2).info = PropertyMock(side_effect=Exception("RPC timeout"))
+    monkeypatch.setattr(dev, "_get_info_via_adb", lambda: {"screenOn": False})
+    assert dev.is_screen_on() is False
+
+
+def test_update_available_tolerates_404_and_offline(monkeypatch):
+    """Verify update_available gracefully returns (False, 'source') on 404 without error logging."""
+    from InstaAddict.core.utils import update_available, check_if_updated
+
+    # 1. Test 404 response
+    mock_resp_404 = MagicMock()
+    mock_resp_404.status_code = 404
+    mock_resp_404.ok = False
+    monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp_404)
+
+    is_update, ver = update_available()
+    assert is_update is False
+    assert ver == "source"
+
+    # 2. Test check_if_updated with logger spy
+    with patch("InstaAddict.core.utils.logger.error") as mock_err:
+        check_if_updated(crash=False)
+        # Must NOT log ERROR for 404/source installation
+        assert mock_err.called is False
+
+
+def test_dogfood_optimizer_analyzes_rpc_adb_and_watchdog_errors(tmp_path):
+    """Verify DogfoodOptimizer._analyze_error_log parses RPC disconnects, ADB timeouts, and Watchdog tiers."""
+    from InstaAddict.core.dogfood import DogfoodOptimizer
+
+    log_file = tmp_path / "test_user_error_trace.log"
+    log_content = """
+[09/25 00:00:01]  WARNING | Detected disconnected/crashed UiAutomation service (Read timed out.)
+[09/25 00:00:02]    DEBUG | [WATCHDOG] ADB command ['adb', 'shell', 'input', 'keyevent', '4'] error: Command timed out after 5.0 seconds
+[09/25 00:00:03]  WARNING | [WATCHDOG] Tier 1 Triggered: Inactivity (90.2s >= 90.0s). Dispatching WAKEUP
+[09/25 00:00:04]  WARNING | [WATCHDOG] Tier 2 Triggered: Bot frozen (105.5s >= 105.0s). Flagging task skip
+[09/25 00:00:05]    ERROR | [WATCHDOG] Tier 3 Triggered: Hang (150.0s >= 150.0s). Force-stopping
+[09/25 00:00:06]  WARNING | Zero-displacement hashtag grid trap detected on target #dogs
+"""
+    log_file.write_text(log_content.strip(), encoding="utf-8")
+
+    opt = DogfoodOptimizer("test_user")
+    opt.error_log_path = str(log_file)
+
+    diag = opt._analyze_error_log()
+    assert diag["rpc_disconnects"] == 1
+    assert diag["adb_timeouts"] == 1
+    assert diag["watchdog_tier1_triggers"] == 1
+    assert diag["watchdog_tier2_triggers"] == 1
+    assert diag["watchdog_tier3_triggers"] == 1
+    assert diag["grid_traps"] == 1
+
+
+def test_dogfood_optimizer_recommendations_for_transport_and_watchdog(tmp_path):
+    """Verify DogfoodOptimizer.analyze() synthesizes Device Transport and Watchdog Stability recommendations."""
+    from InstaAddict.core.dogfood import DogfoodOptimizer
+
+    opt = DogfoodOptimizer("test_user")
+    opt.sessions_path = str(tmp_path / "sessions.json")
+    opt.error_log_path = str(tmp_path / "error.log")
+    opt.suggestions_json_path = str(tmp_path / "sugg.json")
+    opt.suggestions_md_path = str(tmp_path / "sugg.md")
+
+    # Inject error diagnostics directly
+    mock_diag = {
+        "total_warnings": 5,
+        "total_errors": 1,
+        "total_criticals": 0,
+        "quota_429_errors": 0,
+        "ui_not_found_errors": 0,
+        "fatal_crashes": 0,
+        "subscreen_escapes": 0,
+        "subscreen_escape_failures": 0,
+        "restart_profile_failures": 0,
+        "rpc_disconnects": 2,
+        "adb_timeouts": 1,
+        "watchdog_tier1_triggers": 3,
+        "watchdog_tier2_triggers": 1,
+        "watchdog_tier3_triggers": 0,
+        "grid_traps": 1,
+    }
+    opt._analyze_error_log = lambda: mock_diag
+    opt._load_sessions = lambda: [{"total_interactions": 20, "successful_interactions": 15, "total_likes": 10, "total_followed": 5}]
+
+    report = opt.analyze()
+    categories = [r["category"] for r in report["recommendations"]]
+    assert "Device & Transport Health" in categories
+    assert "Bot Watchdog Stability" in categories
+    assert "Source & Grid Traps" in categories
+
+
+def test_performance_tracker_device_health():
+    """Verify PerformanceTracker records and computes device RPC health metrics."""
+    from InstaAddict.core.telemetry import PerformanceTracker
+
+    PerformanceTracker.reset_instance()
+    tracker = PerformanceTracker.get_instance()
+
+    tracker.record_device_health(connected=True, latency_ms=12.5)
+    tracker.record_device_health(connected=True, latency_ms=17.5)
+    tracker.record_device_health(connected=False, latency_ms=0.0)
+
+    health = tracker.get_device_health()
+    assert health["total_samples"] == 3
+    assert health["connected_pct"] == 66.7
+    assert health["avg_latency_ms"] == 15.0
+    assert health["is_healthy"] is False  # < 90%
 

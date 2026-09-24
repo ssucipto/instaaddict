@@ -962,3 +962,52 @@ carryovers:
       - InstaAddict/core/views.py
       - test/test_tuning_and_operational_fixes.py
 
+  - id: CO-076
+    audit_report: agent/reports/audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    date_raised: 2026-09-25
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-25'
+    verified_in_audit: audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    summary: "Implement fast ADB metadata fallback in DeviceFacade.get_info() and get_device_info(), reduce RPC retries, and eliminate 45-minute fatal hang when UiAutomator RPC service is disconnected or slow."
+    affected_files:
+      - InstaAddict/core/device_facade.py
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-077
+    audit_report: agent/reports/audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    date_raised: 2026-09-25
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-25'
+    verified_in_audit: audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    summary: "Gracefully handle PyPI 404 responses for unindexed package versions and recognize git/source development installations without emitting false-alarm ERROR logs at startup."
+    affected_files:
+      - InstaAddict/core/utils.py
+
+  - id: CO-078
+    audit_report: agent/reports/audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    date_raised: 2026-09-25
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-25'
+    verified_in_audit: audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    summary: "Expand DogfoodOptimizer and PerformanceTracker self-learning telemetry to track, parse, and formulate recommendations for RPC disconnects, ADB command timeouts, Watchdog recovery triggers, and device health."
+    affected_files:
+      - InstaAddict/core/dogfood.py
+      - InstaAddict/core/telemetry.py
+
+  - id: CO-079
+    audit_report: agent/reports/audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    date_raised: 2026-09-25
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-25'
+    verified_in_audit: audit-126-startup-crash-uiautomator-and-telemetry-optimization.md
+    summary: "Add DeviceFacade.is_screen_on() helper with ADB fallback, single-call dictionary caching in get_device_info(), and direct ADB uiautomator daemon restart when atx-agent HTTP daemon is hung."
+    affected_files:
+      - InstaAddict/core/device_facade.py
+      - InstaAddict/core/bot_flow.py
+
+
+

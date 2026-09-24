@@ -54,8 +54,11 @@ def load_config(config: Config):
 def update_available():
     try:
         response = requests.get(
-            "https://pypi.python.org/pypi/InstaAddict-AI/json", timeout=10
+            "https://pypi.python.org/pypi/InstaAddict-AI/json", timeout=5
         )
+        if response.status_code == 404:
+            logger.debug("Package 'InstaAddict-AI' not yet indexed on PyPI (running from source).")
+            return False, "source"
         if response.ok:
             data = response.json()
             latest_version = data.get("info", {}).get("version")
@@ -81,8 +84,12 @@ def check_if_updated(crash=False):
         logger.warning("If you installed with pip: pip3 install InstaAddict-AI -U")
         logger.warning("If you installed with git: git pull")
         sleep(5)
+    elif latest_version == "source":
+        if not crash:
+            logger.debug("Running development build from source repository.")
     elif latest_version is None:
-        logger.error("Unable to get latest version from pypi!")
+        if not crash:
+            logger.debug("Update check skipped (unable to reach PyPI).")
     elif not crash:
         logger.info("Bot is updated.", extra={"color": f"{Style.BRIGHT}"})
 

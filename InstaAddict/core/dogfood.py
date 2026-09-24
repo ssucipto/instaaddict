@@ -336,6 +336,61 @@ class DogfoodOptimizer:
                 }
             )
 
+        # 6b. Evaluate UiAutomator RPC & ADB Transport Health
+        rpc_errs = error_diagnostics.get("rpc_disconnects", 0)
+        adb_timeouts = error_diagnostics.get("adb_timeouts", 0)
+        if rpc_errs > 0 or adb_timeouts > 0:
+            recommendations.append(
+                {
+                    "category": "Device & Transport Health",
+                    "severity": "HIGH",
+                    "issue": (
+                        f"Detected {rpc_errs} UiAutomator RPC disconnection(s) and {adb_timeouts} ADB command timeout(s)."
+                    ),
+                    "action": (
+                        "Android emulator or device transport experienced latency spikes or service crashes. "
+                        "Allocate >= 3GB RAM to emulator, ensure hardware acceleration is active, and verify ADB port forwards."
+                    ),
+                    "parameter": "device_transport",
+                    "suggested_value": "allocate >= 3GB RAM and verify adb connection",
+                }
+            )
+
+        # 6c. Evaluate Watchdog Trigger Health
+        w_t1 = error_diagnostics.get("watchdog_tier1_triggers", 0)
+        w_t2 = error_diagnostics.get("watchdog_tier2_triggers", 0)
+        w_t3 = error_diagnostics.get("watchdog_tier3_triggers", 0)
+        if w_t2 > 0 or w_t3 > 0 or w_t1 >= 3:
+            recommendations.append(
+                {
+                    "category": "Bot Watchdog Stability",
+                    "severity": "HIGH" if (w_t2 > 0 or w_t3 > 0) else "MEDIUM",
+                    "issue": (
+                        f"BotWatchdog triggered {w_t1} soft recoveries (Tier 1), {w_t2} task skips (Tier 2), and {w_t3} hard restarts (Tier 3)."
+                    ),
+                    "action": (
+                        "Bot encountered repeated UI stalls or blocked main-thread loops. "
+                        "Check device CPU/RAM load, review target feeds for infinite scrolling traps, and inspect delay-mean parameters."
+                    ),
+                    "parameter": "watchdog_stability",
+                    "suggested_value": "review feed responsiveness and delay parameters",
+                }
+            )
+
+        # 6d. Evaluate Grid Traps
+        grid_traps = error_diagnostics.get("grid_traps", 0)
+        if grid_traps > 0:
+            recommendations.append(
+                {
+                    "category": "Source & Grid Traps",
+                    "severity": "MEDIUM",
+                    "issue": f"Encountered {grid_traps} zero-displacement grid trap or consecutive unidentifiable post sequence(s).",
+                    "action": "Hashtag or place feeds have depleted or contain repeated non-interactive posts. Rotate source tags in hashtags.yml.",
+                    "parameter": "hashtags.yml",
+                    "suggested_value": "rotate hashtag sources",
+                }
+            )
+
         # 7. Evaluate Performance Telemetry & Motion Dynamics
         telemetry_metrics: Dict[str, Any] = {}
         try:
@@ -344,9 +399,11 @@ class DogfoodOptimizer:
             tracker = PerformanceTracker.get_instance()
             motion_summary = tracker.get_motion_summary()
             percentiles = tracker.get_percentiles()
+            device_health = tracker.get_device_health() if hasattr(tracker, "get_device_health") else {}
             telemetry_metrics = {
                 "motion": motion_summary,
                 "percentiles": percentiles,
+                "device_health": device_health,
             }
 
             if motion_summary.get("total_swipes", 0) >= 5:
@@ -468,6 +525,12 @@ class DogfoodOptimizer:
             "subscreen_escapes": 0,
             "subscreen_escape_failures": 0,
             "restart_profile_failures": 0,
+            "rpc_disconnects": 0,
+            "adb_timeouts": 0,
+            "watchdog_tier1_triggers": 0,
+            "watchdog_tier2_triggers": 0,
+            "watchdog_tier3_triggers": 0,
+            "grid_traps": 0,
         }
 
         if not os.path.exists(self.error_log_path):
@@ -498,6 +561,34 @@ class DogfoodOptimizer:
                         stats["subscreen_escape_failures"] += 1
                     if "Failed to navigate to profile after restart" in line:
                         stats["restart_profile_failures"] += 1
+
+                    # RPC Disconnects & Gateway Errors
+                    if (
+                        "disconnected/crashed UiAutomation service" in line
+                        or "GatewayError" in line
+                        or "reset_uiautomator attempt" in line
+                        or "RPC get_info failed" in line
+                    ):
+                        stats["rpc_disconnects"] += 1
+
+                    # ADB Command Timeouts
+                    if "[WATCHDOG] ADB command" in line and "timed out" in line:
+                        stats["adb_timeouts"] += 1
+
+                    # Watchdog Tier Triggers
+                    if "[WATCHDOG] Tier 1 Triggered" in line:
+                        stats["watchdog_tier1_triggers"] += 1
+                    if "[WATCHDOG] Tier 2 Triggered" in line:
+                        stats["watchdog_tier2_triggers"] += 1
+                    if "[WATCHDOG] Tier 3 Triggered" in line:
+                        stats["watchdog_tier3_triggers"] += 1
+
+                    # Grid Traps
+                    if (
+                        "Zero-displacement hashtag grid trap detected" in line
+                        or "Consecutive unidentifiable posts threshold reached" in line
+                    ):
+                        stats["grid_traps"] += 1
         except Exception as e:
             logger.debug(f"Failed scanning error trace log: {e}")
 

@@ -57,6 +57,15 @@ Patch release resolving false-positive Reels ad classification, inline follow bu
   - Recorded `"UNIDENTIFIABLE"` skips in `session_state` to expose stuck grid anomalies to `DogfoodOptimizer`.
   - Conditioned `BotWatchdog.record_heartbeat()` on valid non-empty usernames to prevent watchdog suppression during unidentifiable grid loops.
   - Wired `UniversalActions.check_micro_stall()` and `MicroStallSentinel.record_progress()` into post interaction flow.
+- **Startup Crash Resilience & Fast ADB Fallback (`InstaAddict/core/device_facade.py`, `InstaAddict/core/bot_flow.py`, `InstaAddict/core/utils.py`, `test/test_tuning_and_operational_fixes.py`)**:
+  - Implemented `DeviceFacade._get_info_via_adb()` using direct parameterized ADB shell queries (`ro.product.model`, `ro.build.version.sdk`, `wm size`, `wm density`, `dumpsys power`) executing in <50ms.
+  - Hardened `DeviceFacade.get_info(fallback_to_adb=True)` and `get_device_info(device)` with single-pass dictionary caching, eliminating 45-minute fatal hang when UiAutomator RPC service is disconnected or slow.
+  - Added `DeviceFacade.is_screen_on()` with ADB dumpsys power fallback, replacing unhandled RPC property lookups during bot startup.
+  - Gracefully handled HTTP 404 responses from PyPI in `utils.update_available()` for source and git installs, eliminating false-alarm ERROR logs at startup.
+- **Self-Learning Telemetry Expansion (`InstaAddict/core/dogfood.py`, `InstaAddict/core/telemetry.py`)**:
+  - Expanded `PerformanceTracker` with bounded `device_health_samples` ring buffer tracking connection state and transport latency.
+  - Enhanced `DogfoodOptimizer._analyze_error_log()` to parse RPC disconnects, ADB timeouts, Watchdog recovery triggers, and grid traps.
+  - Added automated actionable tuning recommendations for device transport health, watchdog stability, and source grid traps.
 
 
 

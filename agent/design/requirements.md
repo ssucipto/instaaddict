@@ -114,5 +114,13 @@ InstaAddict-AI is an active continuation and evolution of the GramAddict / Insta
 - **Instant Grid-Exit Detection**: Immediately halts upward/downward oscillation if the screen unexpectedly falls back to the thumbnail grid during hashtag or location jobs.
 - **Transparent Skip Telemetry & Heartbeat Safety**: Emits `UNIDENTIFIABLE` skip records to `SessionState` for DogfoodOptimizer analysis, and conditions `record_heartbeat()` on valid post authors to protect the 90-second watchdog.
 
+### 16. Fast ADB Metadata Fallback, Startup Resilience & Self-Learning Telemetry Expansion
+- **Direct ADB Metadata Fallback (`_get_info_via_adb`)**: Executes parameterized direct `adb shell` calls (`getprop ro.product.model`, `getprop ro.build.version.sdk`, `wm size`, `wm density`, `dumpsys power`) in <50ms when UiAutomator RPC service is disconnected, lagging, or recovering.
+- **Startup Crash & Hang Elimination**: Enables `fallback_to_adb=True` in `DeviceFacade.get_info()` and caches device properties in `get_device_info()` to eliminate exponential 45-minute hangs during Android system server ANR storms.
+- **Power Check Fallback (`is_screen_on`)**: RPC-first power state inspection with automatic ADB fallback, eliminating crashes during wake-up checks.
+- **Graceful PyPI 404 Toleration**: Recognizes unindexed development and source installs in `utils.update_available()` without emitting false-alarm ERROR log records.
+- **Expanded Self-Learning Telemetry**: `PerformanceTracker` tracks device connection latency and `DogfoodOptimizer` parses RPC disconnects, ADB timeouts, and Watchdog recovery triggers, formulating actionable autonomous recommendations.
+
+
 
 

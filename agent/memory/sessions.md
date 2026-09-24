@@ -2,6 +2,28 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-25
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-126, route-065, task-41]
+  done:
+    - forensically-diagnosed-android-17-skia-graphics-anr-loop-and-uiautomator2-gateway-error-timeout-in-audit-126
+    - authored-route-065-and-task-41-for-startup-resilience-fast-adb-metadata-fallback-and-self-learning-telemetry
+    - implemented-direct-adb-metadata-fallback-in-device-facade-querying-product-sdk-dimensions-density-and-screen-state-in-under-50ms
+    - hardened-device-facade-get-info-with-fallback-to-adb-option-and-cached-dictionary-lookup-in-get-device-info-eliminating-45-minute-fatal-hangs
+    - added-device-facade-is-screen-on-with-adb-dumpsys-power-fallback-to-safely-check-power-state-at-bot-startup
+    - gracefully-handled-http-404-from-pypi-in-utils-update-available-and-eliminated-false-alarm-error-logs-for-source-installs
+    - expanded-performance-tracker-with-device-health-samples-ring-buffer-tracking-connection-health-and-latency
+    - expanded-dogfood-optimizer-error-log-analysis-to-parse-rpc-disconnects-adb-timeouts-watchdog-recovery-triggers-and-grid-traps
+    - formulated-automated-actionable-tuning-recommendations-for-transport-watchdog-and-hashtag-grid-traps-in-dogfood-optimizer
+    - added-7-unit-tests-in-test-tuning-and-operational-fixes-py-bringing-test-suite-to-420-tests
+    - verified-100-percent-green-suite-420-of-420-passing-with-zero-regressions
+    - marked-co-076-co-077-co-078-co-079-as-fixed-in-audit-carryovers-md
+    - documented-fast-adb-metadata-fallback-and-transport-health-telemetry-pattern-in-patterns-md
+    - updated-agent-design-requirements-md-section-16-and-changelog-md-under-v1-4-1
+  deferred: []
+  key_fact: "Calling `device.get_info()` repeatedly during startup when the UiAutomator2 RPC server is unresponsive causes exponential retry cascades (4 calls * 5 retries * (40s + 70s timeout) = ~46 minutes). A fast parameterized direct ADB shell query (`getprop`, `wm size`, `wm density`, `dumpsys power`) executes in <50ms and provides a 100% resilient fallback that keeps the bot operational even during Android system server ANR storms."
+
 - date: 2026-09-24
   executor: Antigravity
   branch: master

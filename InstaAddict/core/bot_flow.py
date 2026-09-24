@@ -200,7 +200,10 @@ def start_bot(**kwargs):
             extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
         )
 
-        if not device.get_info()["screenOn"]:
+        if hasattr(device, "is_screen_on"):
+            if not device.is_screen_on():
+                device.press_power()
+        elif not device.get_info().get("screenOn", True):
             device.press_power()
         if device.is_screen_locked():
             device.unlock()
