@@ -41,6 +41,23 @@ from InstaAddict.core.views import (
 logger = logging.getLogger(__name__)
 
 
+def _record_source_skip(session_state, reason: str):
+    """Safely record a profile skip reason and increment checked/skipped profile counters."""
+    try:
+        from InstaAddict.core.session_state import SessionState
+
+        ss = session_state or SessionState.get_active()
+        if ss:
+            if hasattr(ss, "record_skip_reason"):
+                ss.record_skip_reason(reason)
+            if hasattr(ss, "increment_profiles_checked"):
+                ss.increment_profiles_checked()
+            if hasattr(ss, "increment_profiles_skipped"):
+                ss.increment_profiles_skipped()
+    except Exception:
+        pass
+
+
 def interact(
     storage,
     is_follow_limit_reached,
@@ -130,6 +147,7 @@ def handle_blogger(
     can_interact = False
     if storage.is_user_in_blacklist(blogger):
         logger.info(f"@{blogger} is in blacklist. Skip.")
+        _record_source_skip(session_state, "BLACKLIST")
     else:
         interacted, interacted_when = storage.check_user_was_interacted(blogger)
         if interacted:
@@ -141,6 +159,8 @@ def handle_blogger(
             )
             if can_reinteract:
                 can_interact = True
+            else:
+                _record_source_skip(session_state, "COOLDOWN")
         else:
             can_interact = True
 
@@ -227,6 +247,7 @@ def handle_blogger_from_file(
                 else:
                     if storage.is_user_in_blacklist(username):
                         logger.info(f"@{username} is in blacklist. Skip.")
+                        _record_source_skip(session_state, "BLACKLIST")
                     else:
                         (
                             interacted,
@@ -242,6 +263,8 @@ def handle_blogger_from_file(
                             )
                             if can_reinteract:
                                 can_interact = True
+                            else:
+                                _record_source_skip(session_state, "COOLDOWN")
                         else:
                             can_interact = True
 
@@ -477,6 +500,7 @@ def handle_likers(
                     can_interact = False
                     if storage.is_user_in_blacklist(username):
                         logger.info(f"@{username} is in blacklist. Skip.")
+                        _record_source_skip(session_state, "BLACKLIST")
                     else:
                         (
                             interacted,
@@ -492,6 +516,8 @@ def handle_likers(
                             )
                             if can_reinteract:
                                 can_interact = True
+                            else:
+                                _record_source_skip(session_state, "COOLDOWN")
                         else:
                             can_interact = True
 
@@ -628,6 +654,8 @@ def handle_posts(
     nr_same_post = 0
     nr_same_posts_max = 3
     nr_consecutive_already_interacted = 0
+    nr_consecutive_unidentifiable = 0
+    nr_consecutive_unidentifiable_max = 5
     already_liked_count = 0
     already_liked_count_limit = 20
     post_view_list = PostsViewList(device)
@@ -672,6 +700,23 @@ def handle_posts(
             )
             random_sleep(inf=1, sup=3)
             continue
+
+        is_hashtag_job = (
+            isinstance(current_job, str) and current_job.startswith("hashtag")
+        )
+        is_place_job = (
+            isinstance(current_job, str) and current_job.startswith("place")
+        )
+
+        if (is_hashtag_job or is_place_job) and not opened_post_view.is_post_opened():
+            logger.warning(
+                f"Detected exit from post detail view back to grid in {current_job} ({target}). Exiting loop to prevent grid trap.",
+                extra={"color": f"{Fore.YELLOW}"},
+            )
+            UniversalActions.check_micro_stall(
+                device, context=f"grid_trap_exit_{current_job}"
+            )
+            break
         (
             is_same_post,
             post_description,
@@ -703,10 +748,11 @@ def handle_posts(
         try:
             from InstaAddict.core.watchdog import record_heartbeat
 
-            record_heartbeat(
-                stage=f"{current_job} ({target})" if target else str(current_job),
-                action=f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)}",
-            )
+            if username and username != "False" and len(username.strip()) > 0:
+                record_heartbeat(
+                    stage=f"{current_job} ({target})" if target else str(current_job),
+                    action=f"Scanning post #{getattr(session_state, 'totalPostsChecked', 0)} (@{username})",
+                )
         except Exception:
             pass
 
@@ -739,13 +785,41 @@ def handle_posts(
             continue
         if not (is_ad or is_hashtag):
             if not username or username == "False" or len(username.strip()) == 0:
+                nr_consecutive_unidentifiable += 1
                 logger.info(
-                    "No valid username found for post (unidentifiable author or ad). Skip.",
+                    f"No valid username found for post (unidentifiable author or ad) [{nr_consecutive_unidentifiable}/{nr_consecutive_unidentifiable_max}]. Skip.",
                     extra={"color": f"{Fore.YELLOW}"},
                 )
+                _record_source_skip(session_state, "UNIDENTIFIABLE")
+
+                if nr_consecutive_unidentifiable >= nr_consecutive_unidentifiable_max:
+                    logger.warning(
+                        f"Exceeded max consecutive unidentifiable posts ({nr_consecutive_unidentifiable_max}) in {current_job} ({target}). "
+                        f"Zero-net displacement or UI grid trap detected. Breaking out of source...",
+                        extra={"color": f"{Fore.RED}"},
+                    )
+                    if is_hashtag_job:
+                        try:
+                            from InstaAddict.core.hashtag_manager import HashtagManager
+
+                            HashtagManager.get_instance(
+                                username=getattr(session_state, "my_username", None)
+                            ).record_hashtag_result(target, posts_found=False)
+                        except Exception as e:
+                            logger.debug(
+                                f"HashtagManager record unidentifiable trap failed: {e}"
+                            )
+                    UniversalActions.check_micro_stall(
+                        device, context=f"consecutive_unidentifiable_{current_job}"
+                    )
+                    break
+
                 UniversalActions.dismiss_peek_if_open(device)
                 post_view_list.swipe_to_fit_posts(SwipeTo.NEXT_POST)
                 continue
+
+            nr_consecutive_unidentifiable = 0
+            UniversalActions.get_micro_stall_sentinel().record_progress()
             if already_liked_count == already_liked_count_limit:
                 logger.info(
                     f"Limit of {already_liked_count_limit} already liked posts limit reached, finish."
@@ -783,6 +857,7 @@ def handle_posts(
                 can_interact = False
                 if storage.is_user_in_blacklist(username):
                     logger.info(f"@{username} is in blacklist. Skip.")
+                    _record_source_skip(session_state, "BLACKLIST")
                 else:
                     likes_in_range = profile_filter.is_num_likers_in_range(
                         number_of_likers
@@ -804,6 +879,7 @@ def handle_posts(
                                 nr_consecutive_already_interacted = 0
                             else:
                                 nr_consecutive_already_interacted += 1
+                                _record_source_skip(session_state, "COOLDOWN")
                         else:
                             can_interact = True
                             nr_consecutive_already_interacted = 0
@@ -1190,6 +1266,7 @@ def iterate_over_followers(
                 can_interact = False
                 if storage.is_user_in_blacklist(username):
                     logger.info(f"@{username} is in blacklist. Skip.")
+                    _record_source_skip(session_state, "BLACKLIST")
                 else:
                     interacted, interacted_when = storage.check_user_was_interacted(
                         username
@@ -1206,6 +1283,7 @@ def iterate_over_followers(
                             can_interact = True
                         else:
                             screen_skipped_followers_count += 1
+                            _record_source_skip(session_state, "COOLDOWN")
                     else:
                         can_interact = True
 

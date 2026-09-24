@@ -331,12 +331,23 @@ tasks:
     actual_hours: 2
     route_file: agent/routing/tasks/route-047-terminal-user-interface.md
     notes: Implement InstaAddict/core/tui.py with DashboardState, TuiLogHandler, and DashboardManager. Integrate with bot_flow, log.py, and utils.py.
+  - id: task-40
+    name: Hashtag Navigation Verification, Consecutive Unidentifiable Circuit Breaker, and Self-Healing Escape Hardening
+    status: completed
+    priority: 1
+    started: 2026-09-24
+    completed_date: '2026-09-24'
+    estimated_hours: 2
+    actual_hours: 2
+    route_file: agent/routing/tasks/route-064-hashtag-stuck-and-escape-hardening.md
+    notes: Implemented center-point tap retry and OpenedPostView.is_post_opened() verification in navigation.py, 5-consecutive unidentifiable breaker in handle_sources.py, conditional watchdog heartbeats, and wired micro-stall sentinel. 413/413 tests green.
+
 documentation:
   design_documents: 2
   milestone_documents: 8
   pattern_documents: 2
   task_documents: 0
-  last_updated: '2026-09-19'
+  last_updated: '2026-09-24'
 progress:
   planning: 100
   implementation: 100
@@ -344,6 +355,18 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-09-24'
+  description: 'Forensic Remediation of Zero-Net Displacement Hashtag Grid Trap, Stuck Detection & Watchdog Escape Hardening (Audit-123/124/125, Route-064, Review-061/062).'
+  items:
+  - "✓ Resolved 4.3h zero-net displacement grid trap on #jrtpost where 3 swipes up and 1 swipe down oscillated across same 6 thumbnails"
+  - "✓ Hardened nav_to_hashtag_or_place() with center-point bounds click, 2-attempt tap retry loop, and OpenedPostView.is_post_opened() verification (CO-073)"
+  - "✓ Expanded OpenedPostView.is_post_opened() to recognize modern Reels/Clips viewers (ROOT_CLIPS_LAYOUT, CLIPS_VIEWER_CONTAINER, CLIPS_VIDEO_CONTAINER) (CO-073)"
+  - "✓ Implemented nr_consecutive_unidentifiable circuit breaker (threshold 5) and instant grid exit detection in handle_sources.py (CO-074)"
+  - "✓ Exposed unidentifiable skips to DogfoodOptimizer via _record_source_skip(session_state, 'UNIDENTIFIABLE') (CO-075)"
+  - "✓ Conditioned record_heartbeat() on valid usernames, preventing blinded 90s BotWatchdog timeouts during empty loops (CO-075)"
+  - "✓ Wired UniversalActions.check_micro_stall() and MicroStallSentinel.record_progress() into hashtag browsing"
+  - "✓ Added 5 comprehensive unit tests in test_tuning_and_operational_fixes.py (413/413 test suite passing, 100% green)"
+  - "✓ Passed all 6/6 ACP CI fast gates (ci-validate, npm-test, validate-ts, review-measure, integrity-e2e, integrity-v2-e2e)"
 - date: '2026-09-23'
   description: 'Ported Upstream PR #28 (E1/E2/E3 Feed Improvements), Fixed Audit-116/117 Findings, and Cleaned ACP Memory Integrity.'
   items:

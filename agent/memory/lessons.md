@@ -2,6 +2,12 @@
 # Populated automatically when developer says "log it" or "wrong, log this"
 # Max 5 entries loaded per session, filtered to current task_type + priority:high
 
+- date: 2026-09-24
+  task_type: audit
+  mistake: Navigating to hashtags clicked thumbnails blindly without verifying OpenedPostView.is_post_opened(), and handle_posts() lacked a consecutive unidentifiable author circuit breaker while unconditionally emitting BotWatchdog heartbeats on empty passes. This blinded the watchdog and allowed 3x Direction.UP author-search swipes and 1x downward scroll swipes to cancel each other out, locking the screen onto the same 6 thumbnails in an infinite 4+ hour loop.
+  correction: Assert is_post_opened() with center-point tap retry in nav_to_hashtag_or_place(), add a strict nr_consecutive_unidentifiable limit (5) in handle_posts() that breaks out to the next hashtag, only record watchdog heartbeats on verified author/post progress, and wire UniversalActions.check_micro_stall() into feed loops.
+  priority: high
+
 - date: 2026-09-23
   task_type: feature
   mistake: _describes_a_post initially returned inner.get_desc() directly, which could

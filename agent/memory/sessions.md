@@ -2,6 +2,30 @@
 # Format: YAML blocks, last 3 loaded per session, auto-compacted at 15 entries
 # DO NOT edit manually — updated by /acp-commit
 
+- date: 2026-09-24
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-123, audit-124, route-064, audit-125, review-061, review-062]
+  done:
+    - forensically-diagnosed-4-3h-zero-net-displacement-hashtag-grid-trap-on-jrtpost-in-audit-123
+    - authored-pre-impl-gap-analysis-and-implementation-plan-in-audit-124-and-route-064
+    - hardened-nav-to-hashtag-or-place-with-center-point-tap-retry-loop-and-post-open-verification
+    - expanded-opened-post-view-is-post-opened-regex-to-cover-reels-and-clips-viewers-root-clips-layout-and-clips-viewer-container
+    - added-get-first-image-view-with-backward-compatible-get-fist-image-view-alias-to-hashtag-and-places-views
+    - implemented-nr-consecutive-unidentifiable-circuit-breaker-at-threshold-5-in-handle-posts
+    - added-instant-grid-exit-detection-breaking-out-when-ui-falls-back-to-thumbnail-grid-during-hashtag-or-place-jobs
+    - marked-dead-or-unnavigable-hashtags-as-posts-found-false-in-hashtag-manager-to-prevent-infinite-reselection
+    - recorded-unidentifiable-skip-reasons-in-session-state-to-give-dogfood-optimizer-full-visibility
+    - conditioned-watchdog-heartbeat-recording-on-valid-usernames-preventing-blinded-90s-watchdog-inactivity-timeouts
+    - connected-universal-actions-check-micro-stall-and-sentinel-record-progress-into-feed-and-hashtag-loops
+    - added-5-comprehensive-unit-tests-in-test-tuning-and-operational-fixes-py-bringing-total-tests-to-413
+    - verified-100-percent-green-suite-413-of-413-passing-with-zero-regressions
+    - executed-post-impl-audit-125-marked-co-073-co-074-co-075-as-fixed-in-audit-carryovers-md
+    - authored-64-rule-quality-review-061-and-coderabbit-diff-review-062
+    - passed-all-6-of-6-acp-ci-fast-parity-gates-locally-via-acp-ci-fast
+  deferred: []
+  key_fact: "In Instagram's RecyclerView hashtag grid, post thumbnails must never be clicked blindly without verifying OpenedPostView.is_post_opened(). Otherwise, if a thumbnail tap fails to navigate, consecutive upward corrective swipes (3x 500px UP) paired with NEXT_POST downward swipes (1x 500px DOWN) create a 0-displacement trap that locks the bot oscillating on the same 6 thumbnails indefinitely."
+
 - date: 2026-09-23
   executor: Antigravity
   branch: master

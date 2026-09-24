@@ -107,4 +107,12 @@ InstaAddict-AI is an active continuation and evolution of the GramAddict / Insta
 - **Anti-AI Formatting Regex Sanitizer**: Eradicates em-dashes (`—`) and en-dashes (`–`), replacing them with conversational punctuation.
 - **Subtle Aussie Dog Voice**: Prompt-level conditioning enforcing authentic Australian dog vernacular (*reckon*, *heaps*, *ripper*, *mate*, *cheers*, *keen*) restricted to punchy 3–6 word lengths without corporate jargon.
 
+### 15. Hashtag Detail Navigation Verification & Zero-Displacement Grid Trap Breakers
+- **Verified Detail Opening**: `nav_to_hashtag_or_place()` executes bounds-centered coordinate taps with a 2-attempt tap retry loop, verifying `OpenedPostView.is_post_opened()` before returning.
+- **Reels/Clips Full Screen Recognition**: `OpenedPostView.is_post_opened()` recognizes both single-post feeds and immersive Reels viewers (`ROOT_CLIPS_LAYOUT`, `CLIPS_VIEWER_CONTAINER`, `CLIPS_VIEWER_VIEW_PAGER`, `CLIPS_VIDEO_CONTAINER`).
+- **Consecutive Unidentifiable Circuit Breaker**: Caps unidentifiable post scans at 5 in `handle_posts()`, marks dead tags in `HashtagManager.record_hashtag_result(target, posts_found=False)`, and executes soft recovery via `UniversalActions.check_micro_stall()`.
+- **Instant Grid-Exit Detection**: Immediately halts upward/downward oscillation if the screen unexpectedly falls back to the thumbnail grid during hashtag or location jobs.
+- **Transparent Skip Telemetry & Heartbeat Safety**: Emits `UNIDENTIFIABLE` skip records to `SessionState` for DogfoodOptimizer analysis, and conditions `record_heartbeat()` on valid post authors to protect the 90-second watchdog.
+
+
 

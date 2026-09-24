@@ -814,3 +814,318 @@ def test_dogfood_optimizer_recommendation_stability_root_cause_not_placebo_delay
     # Parameter should NOT be delay-mean for crash issues
     assert rec["parameter"] == "stability_investigation"
     assert "crash traces" in rec["action"]
+
+
+def test_session_state_finalize_jobs():
+    """Verify finalize_jobs marks all in-progress jobs as interrupted and calculates duration (CO-072)."""
+    from InstaAddict.core.session_state import SessionState
+
+    ss = SessionState()
+    ss.start_job("hashtag-posts-recent")
+    ss.start_job("blogger-followers")
+    # Simulate blogger-followers completed normally
+    ss.end_job("blogger-followers", "completed")
+
+    assert ss.job_metrics["hashtag-posts-recent"]["status"] == "in_progress"
+    assert ss.job_metrics["hashtag-posts-recent"]["finished_at"] is None
+    assert ss.job_metrics["blogger-followers"]["status"] == "completed"
+
+    ss.finalize_jobs("interrupted")
+
+    assert ss.job_metrics["hashtag-posts-recent"]["status"] == "interrupted"
+    assert ss.job_metrics["hashtag-posts-recent"]["finished_at"] is not None
+    assert isinstance(ss.job_metrics["hashtag-posts-recent"]["duration_seconds"], float)
+    # blogger-followers should remain completed
+    assert ss.job_metrics["blogger-followers"]["status"] == "completed"
+    assert ss.current_job is None
+
+
+def test_session_state_encoder_auto_finalizes_jobs():
+    """Verify SessionStateEncoder automatically finalizes dangling in-progress jobs during serialization."""
+    from InstaAddict.core.session_state import SessionState, SessionStateEncoder
+
+    ss = SessionState()
+    ss.start_job("upload-posts")
+    encoder = SessionStateEncoder()
+    encoded = encoder.default(ss)
+
+    assert encoded["job_metrics"]["upload-posts"]["status"] == "interrupted"
+    assert encoded["job_metrics"]["upload-posts"]["finished_at"] is not None
+
+
+def test_record_source_skip_increments_profile_counters_and_skip_reasons():
+    """Verify _record_source_skip increments skip_reasons, totalProfilesChecked, and totalProfilesSkipped."""
+    from InstaAddict.core.handle_sources import _record_source_skip
+    from InstaAddict.core.session_state import SessionState
+
+    ss = SessionState()
+    SessionState.set_active(ss)
+    try:
+        assert ss.totalProfilesChecked == 0
+        assert ss.totalProfilesSkipped == 0
+        assert ss.skip_reasons == {}
+
+        _record_source_skip(ss, "COOLDOWN")
+        assert ss.totalProfilesChecked == 1
+        assert ss.totalProfilesSkipped == 1
+        assert ss.skip_reasons.get("COOLDOWN") == 1
+
+        _record_source_skip(ss, "BLACKLIST")
+        assert ss.totalProfilesChecked == 2
+        assert ss.totalProfilesSkipped == 2
+        assert ss.skip_reasons.get("BLACKLIST") == 1
+        assert ss.skip_reasons.get("COOLDOWN") == 1
+    finally:
+        SessionState.set_active(None)
+
+
+def test_hashtag_and_places_view_get_first_image_view_alias():
+    """Verify HashTagView and PlacesView expose _getFirstImageView and legacy _getFistImageView alias (CO-073)."""
+    from InstaAddict.core.views import HashTagView, PlacesView
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    ht = HashTagView(mock_device)
+    assert hasattr(ht, "_getFirstImageView")
+    assert hasattr(ht, "_getFistImageView")
+    assert ht._getFistImageView == ht._getFirstImageView
+
+    pv = PlacesView(mock_device)
+    assert hasattr(pv, "_getFirstImageView")
+    assert hasattr(pv, "_getFistImageView")
+    assert pv._getFistImageView == pv._getFirstImageView
+
+
+def test_opened_post_view_is_post_opened_includes_reels_and_clips():
+    """Verify OpenedPostView.is_post_opened recognizes both feed posts and Reels/Clips viewers (CO-073)."""
+    from InstaAddict.core.views import OpenedPostView
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    mock_post_media = MagicMock()
+    mock_post_media.exists.return_value = True
+    mock_device.find.return_value = mock_post_media
+
+    opened_view = OpenedPostView(mock_device)
+    result = opened_view.is_post_opened()
+
+    assert result is True
+    # Verify find was called with resourceIdMatches checking clips containers
+    call_kwargs = mock_device.find.call_args[1]
+    pattern = call_kwargs["resourceIdMatches"]
+    for expected_sub in ["zoomable_view_container", "clips_video_container", "root_clips_layout", "clips_viewer_container"]:
+        assert expected_sub in pattern.lower()
+
+
+def test_nav_to_hashtag_or_place_tap_and_open_verification(monkeypatch):
+    """Verify nav_to_hashtag_or_place taps center bounds, verifies is_post_opened, and returns True (CO-073)."""
+    from InstaAddict.core.navigation import nav_to_hashtag_or_place
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    mock_device.find.return_value.exists.return_value = False
+    mock_device.deviceV2.click = MagicMock()
+
+    mock_recycler = MagicMock()
+    mock_image = MagicMock()
+    mock_image.exists.return_value = True
+    mock_image.get_bounds.return_value = {"left": 10, "top": 100, "right": 110, "bottom": 200}
+
+    # Mock TargetView
+    mock_target_view_instance = MagicMock()
+    mock_target_view_instance._getRecentTab.return_value.exists.return_value = False
+    mock_target_view_instance._getRecyclerView.return_value = mock_recycler
+    mock_target_view_instance._getFirstImageView.return_value = mock_image
+
+    mock_search_view = MagicMock()
+    mock_search_view.navigate_to_target.return_value = True
+    monkeypatch.setattr("InstaAddict.core.navigation.TabBarView.navigateToSearch", lambda self: mock_search_view)
+    monkeypatch.setattr("InstaAddict.core.navigation.HashTagView", lambda dev: mock_target_view_instance)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_peek_preview_opened", lambda self: False)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_post_opened", lambda self: True)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions._check_if_no_posts", lambda self: False)
+
+    res = nav_to_hashtag_or_place(mock_device, "cats", "hashtag-posts-recent")
+    assert res is True
+    # Verify click was called at center point: x=(10+110)//2 = 60, y=(100+200)//2 = 150
+    mock_device.deviceV2.click.assert_called_with(60, 150)
+
+
+def test_nav_to_hashtag_or_place_retries_and_returns_false_on_failure(monkeypatch):
+    """Verify nav_to_hashtag_or_place retries once and returns False if post fails to open (CO-073)."""
+    from InstaAddict.core.navigation import nav_to_hashtag_or_place
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    mock_device.find.return_value.exists.return_value = False
+    mock_device.deviceV2.click = MagicMock()
+
+    mock_recycler = MagicMock()
+    mock_image = MagicMock()
+    mock_image.exists.return_value = True
+    mock_image.get_bounds.return_value = {"left": 0, "top": 0, "right": 100, "bottom": 100}
+
+    mock_target_view_instance = MagicMock()
+    mock_target_view_instance._getRecentTab.return_value.exists.return_value = False
+    mock_target_view_instance._getRecyclerView.return_value = mock_recycler
+    mock_target_view_instance._getFirstImageView.return_value = mock_image
+
+    mock_search_view = MagicMock()
+    mock_search_view.navigate_to_target.return_value = True
+    monkeypatch.setattr("InstaAddict.core.navigation.TabBarView.navigateToSearch", lambda self: mock_search_view)
+    monkeypatch.setattr("InstaAddict.core.navigation.HashTagView", lambda dev: mock_target_view_instance)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_peek_preview_opened", lambda self: False)
+    # is_post_opened returns False both times
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_post_opened", lambda self: False)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions._check_if_no_posts", lambda self: False)
+
+    res = nav_to_hashtag_or_place(mock_device, "dogs", "hashtag-posts-recent")
+    assert res is False
+    assert mock_device.deviceV2.click.call_count == 2
+
+
+def test_handle_posts_consecutive_unidentifiable_circuit_breaker(monkeypatch):
+    """Verify handle_posts breaks out after max consecutive unidentifiable posts and records dead hashtag (CO-074, CO-075)."""
+    from InstaAddict.core.handle_sources import handle_posts
+    from InstaAddict.core.session_state import SessionState
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    mock_storage = MagicMock()
+    mock_profile_filter = MagicMock()
+    mock_on_interaction = MagicMock()
+    mock_interaction = MagicMock()
+
+    mock_args = MagicMock()
+    mock_args.feed = None
+    mock_args.likes_count = "1-2"
+    mock_args.follow_percentage = 0
+    mock_args.comment_percentage = 0
+    mock_args.interact_percentage = 100
+    mock_args.skipped_posts_limit = "10"
+
+    class DummyCaller:
+        def __init__(self, args):
+            self.args = args
+
+    caller = DummyCaller(mock_args)
+    ss = SessionState()
+    SessionState.set_active(ss)
+
+    recorded_dead_tag = []
+
+    # Mock HashtagManager
+    class MockHashtagManager:
+        @classmethod
+        def get_instance(cls, username=None):
+            return cls()
+
+        def record_hashtag_result(self, tag, posts_found=True, already_liked_exhausted=False):
+            if not posts_found:
+                recorded_dead_tag.append(tag)
+
+    monkeypatch.setattr("InstaAddict.core.hashtag_manager.HashtagManager", MockHashtagManager)
+    monkeypatch.setattr("InstaAddict.core.handle_sources.nav_to_hashtag_or_place", lambda *args, **kwargs: True)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions.escape_in_app_browser", lambda dev: False)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions.dismiss_peek_if_open", lambda dev: False)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_post_opened", lambda self: True)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView._is_post_liked", lambda self: (False, None))
+    monkeypatch.setattr("InstaAddict.core.views.PostsViewList._find_likers_container", lambda self: (False, 0))
+    monkeypatch.setattr("InstaAddict.core.views.PostsViewList.swipe_to_fit_posts", lambda self, swipe: None)
+    monkeypatch.setattr("InstaAddict.core.views.TabBarView.navigateToProfile", lambda self: None)
+
+    # Return unidentifiable post (username = "")
+    monkeypatch.setattr(
+        "InstaAddict.core.views.PostsViewList._check_if_last_post",
+        lambda self, desc, job: (False, "", "", False, False, False),
+    )
+
+    micro_stall_calls = []
+    monkeypatch.setattr(
+        "InstaAddict.core.views.UniversalActions.check_micro_stall",
+        lambda dev, context="": micro_stall_calls.append(context),
+    )
+
+    try:
+        handle_posts(
+            caller,
+            device=mock_device,
+            session_state=ss,
+            target="jrtpost",
+            current_job="hashtag-posts-recent",
+            storage=mock_storage,
+            profile_filter=mock_profile_filter,
+            on_interaction=mock_on_interaction,
+            interaction=mock_interaction,
+            is_follow_limit_reached=lambda: False,
+            interact_percentage=100,
+            scraping_file=None,
+        )
+
+        # Circuit breaker should have fired at 5 unidentifiable posts
+        assert ss.skip_reasons.get("UNIDENTIFIABLE") == 5
+        assert "jrtpost" in recorded_dead_tag
+        assert len(micro_stall_calls) == 1
+        assert "consecutive_unidentifiable" in micro_stall_calls[0]
+    finally:
+        SessionState.set_active(None)
+
+
+def test_handle_posts_grid_exit_detection_breaks_out(monkeypatch):
+    """Verify handle_posts detects when screen drops out to thumbnail grid and exits immediately (CO-074)."""
+    from InstaAddict.core.handle_sources import handle_posts
+    from InstaAddict.core.session_state import SessionState
+    from unittest.mock import MagicMock
+
+    mock_device = MagicMock()
+    mock_storage = MagicMock()
+    mock_profile_filter = MagicMock()
+    mock_on_interaction = MagicMock()
+    mock_interaction = MagicMock()
+    mock_args = MagicMock()
+    mock_args.feed = None
+    mock_args.skipped_posts_limit = "5"
+
+    class DummyCaller:
+        def __init__(self, args):
+            self.args = args
+
+    caller = DummyCaller(mock_args)
+    ss = SessionState()
+    SessionState.set_active(ss)
+
+    monkeypatch.setattr("InstaAddict.core.handle_sources.nav_to_hashtag_or_place", lambda *args, **kwargs: True)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions.escape_in_app_browser", lambda dev: False)
+    monkeypatch.setattr("InstaAddict.core.views.UniversalActions.dismiss_peek_if_open", lambda dev: False)
+    monkeypatch.setattr("InstaAddict.core.views.TabBarView.navigateToProfile", lambda self: None)
+
+    # Once entered handle_posts, is_post_opened returns False (simulating grid drop)
+    monkeypatch.setattr("InstaAddict.core.views.OpenedPostView.is_post_opened", lambda self: False)
+
+    micro_stall_calls = []
+    monkeypatch.setattr(
+        "InstaAddict.core.views.UniversalActions.check_micro_stall",
+        lambda dev, context="": micro_stall_calls.append(context),
+    )
+
+    try:
+        handle_posts(
+            caller,
+            device=mock_device,
+            session_state=ss,
+            target="jrtpost",
+            current_job="hashtag-posts-recent",
+            storage=mock_storage,
+            profile_filter=mock_profile_filter,
+            on_interaction=mock_on_interaction,
+            interaction=mock_interaction,
+            is_follow_limit_reached=lambda: False,
+            interact_percentage=100,
+            scraping_file=None,
+        )
+
+        assert len(micro_stall_calls) == 1
+        assert "grid_trap_exit" in micro_stall_calls[0]
+    finally:
+        SessionState.set_active(None)
+

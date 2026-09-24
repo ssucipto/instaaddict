@@ -888,3 +888,77 @@ carryovers:
     affected_files:
       - InstaAddict/core/dogfood.py
       - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-070
+    audit_report: agent/reports/audit-119-bot-implementation-zero-likes-and-improvements.md
+    date_raised: 2026-09-23
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: audit-119
+    summary: "Wire COOLDOWN skip reason telemetry in handle_sources.py (blogger and hashtag/feed cooldown skip branches) so sessions.json skip_reasons shows COOLDOWN counts, enabling dogfood pool saturation detection."
+    affected_files:
+      - InstaAddict/core/handle_sources.py
+
+  - id: CO-071
+    audit_report: agent/reports/audit-119-bot-implementation-zero-likes-and-improvements.md
+    date_raised: 2026-09-23
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: audit-119
+    summary: "Expand blogger-followers pool from 10 to 20 targets, reduce can-reinteract-after from 72h to 48h, reduce evaluate-percentage from 15 to 8 (Gemini 429 mitigation), raise total-interactions-limit from 50-70 to 70-110."
+    affected_files:
+      - accounts/lolatheozjack/config.yml
+
+  - id: CO-072
+    audit_report: agent/reports/audit-119-bot-implementation-zero-likes-and-improvements.md
+    date_raised: 2026-09-23
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-23'
+    verified_in_audit: audit-120
+    summary: "Add SessionState.finalize_jobs() to terminate all dangling in_progress job metrics with duration calculation, invoke finalize_jobs in stop_bot() and SessionStateEncoder.default, and wrap bot_flow session persistence."
+    affected_files:
+      - InstaAddict/core/session_state.py
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/bot_flow.py
+  - id: CO-073
+    audit_report: agent/reports/audit-123-hashtag-browsing-stuck-and-escape-mechanism.md
+    date_raised: 2026-09-24
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-24'
+    verified_in_audit: audit-125-post-impl-hashtag-stuck-and-escape-verification.md
+    summary: "Add OpenedPostView.is_post_opened() verification and center-point tap retry in navigation.py:nav_to_hashtag_or_place(), preventing blind return on thumbnail clicks."
+    affected_files:
+      - InstaAddict/core/navigation.py
+      - InstaAddict/core/views.py
+      - InstaAddict/core/handle_sources.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-074
+    audit_report: agent/reports/audit-123-hashtag-browsing-stuck-and-escape-mechanism.md
+    date_raised: 2026-09-24
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-24'
+    verified_in_audit: audit-125-post-impl-hashtag-stuck-and-escape-verification.md
+    summary: "Implement nr_consecutive_unidentifiable circuit breaker (threshold 5) and instant grid exit detection in handle_sources.py:handle_posts() to break out of zero-net displacement grid traps and advance to next hashtag."
+    affected_files:
+      - InstaAddict/core/handle_sources.py
+      - test/test_tuning_and_operational_fixes.py
+
+  - id: CO-075
+    audit_report: agent/reports/audit-123-hashtag-browsing-stuck-and-escape-mechanism.md
+    date_raised: 2026-09-24
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-24'
+    verified_in_audit: audit-125-post-impl-hashtag-stuck-and-escape-verification.md
+    summary: "Condition BotWatchdog heartbeats in handle_posts() on verified progress/author identification rather than empty skips, record UNIDENTIFIABLE skips in session_state, and wire UniversalActions.check_micro_stall() into feed loops."
+    affected_files:
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/core/views.py
+      - test/test_tuning_and_operational_fixes.py
+

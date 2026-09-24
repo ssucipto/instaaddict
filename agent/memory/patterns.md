@@ -38,3 +38,9 @@
   context: "Social platform automation (Instagram) where verifying follow-back status previously required scraping thousands of followers and navigating deep into candidate following lists."
   solution: "Compare session_state.my_followers_count with storage cached count; if delta is 0, skip follower scraping entirely. Cache harvested followers in a persistent JSON set for O(1) membership check. When candidate profile is opened, inspect the profile header for 'Follows you' badge across 4 resilient fallback tiers, completely eliminating candidate following-list navigation."
 
+- date: 2026-09-24
+  name: zero-displacement-grid-trap-breaker-and-detail-verification
+  description: "Verify detail view transitions via OpenedPostView.is_post_opened() with coordinate-calculated center taps and 2-attempt retries, paired with consecutive unidentifiable author circuit breakers to defeat zero-net displacement oscillations in list and grid traversals."
+  context: "Android mobile automation when clicking thumbnail cells in a RecyclerView (such as hashtag/location grids) may trigger long-press peek previews or fail to navigate, leaving the UI trapped on the grid where upward corrective swipes (3x UP) and downward pagination swipes (1x NEXT) create an infinite 0-displacement loop."
+  solution: "In nav_to_hashtag_or_place(), compute element center bounds to execute crisp coordinate taps, dismiss lingering peek modals, and verify is_post_opened() across both feed and Reels/Clips root containers before entering handling loops. In handle_posts(), implement an instant grid-exit breakout check and a 5-consecutive unidentifiable author circuit breaker that marks the source dead in HashtagManager, triggers soft recovery via check_micro_stall(), and conditions watchdog heartbeats strictly on verified progress."
+

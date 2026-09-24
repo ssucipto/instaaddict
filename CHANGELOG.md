@@ -49,6 +49,14 @@ Patch release resolving false-positive Reels ad classification, inline follow bu
   - Hardened `HomeView.navigateToSearch()` and `SearchView.navigate_to_target()` against transient `JsonRpcError` and `UiObjectNotFoundError`.
   - Decoupled `EmptyList` from `restart()` in `@run_safely`, advancing task flow gracefully without killing Instagram or incrementing crash counters.
   - Modernized `DogfoodOptimizer` with sliding session window (`window_sessions=5`) and accurate uncaught error parsing.
+- **Hashtag Grid Stuck & Escape Hardening (`InstaAddict/core/navigation.py`, `InstaAddict/core/handle_sources.py`, `InstaAddict/core/views.py`, `test/test_tuning_and_operational_fixes.py`)**:
+  - Hardened `nav_to_hashtag_or_place()` with center-point bounds coordinate click, 2-attempt tap retry loop, and `OpenedPostView.is_post_opened()` verification.
+  - Expanded `OpenedPostView.is_post_opened()` regex locators to recognize modern Reels/Clips root containers (`ROOT_CLIPS_LAYOUT`, `CLIPS_VIEWER_CONTAINER`, `CLIPS_VIEWER_VIEW_PAGER`, `CLIPS_VIDEO_CONTAINER`).
+  - Added `nr_consecutive_unidentifiable` circuit breaker (threshold 5) in `handle_posts()` to immediately break out of zero-displacement grid traps.
+  - Added instant grid exit detection: immediately aborts grid browsing and returns to top level if UI state shifts out of post views.
+  - Recorded `"UNIDENTIFIABLE"` skips in `session_state` to expose stuck grid anomalies to `DogfoodOptimizer`.
+  - Conditioned `BotWatchdog.record_heartbeat()` on valid non-empty usernames to prevent watchdog suppression during unidentifiable grid loops.
+  - Wired `UniversalActions.check_micro_stall()` and `MicroStallSentinel.record_progress()` into post interaction flow.
 
 
 

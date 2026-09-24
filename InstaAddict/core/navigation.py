@@ -4,8 +4,10 @@ import sys
 from colorama import Fore
 
 from InstaAddict.core.device_facade import Timeout
+from InstaAddict.core.utils import random_sleep
 from InstaAddict.core.views import (
     HashTagView,
+    OpenedPostView,
     PlacesView,
     PostsGridView,
     ProfileView,
@@ -81,12 +83,52 @@ def nav_to_hashtag_or_place(device, target, current_job):
             if UniversalActions(device)._check_if_no_posts():
                 return False
 
-    result_view = TargetView(device)._getRecyclerView()
-    FistImageInView = TargetView(device)._getFistImageView(result_view)
-    if FistImageInView.exists():
+    target_view = TargetView(device)
+    result_view = target_view._getRecyclerView()
+    first_image_in_view = (
+        target_view._getFirstImageView(result_view)
+        if hasattr(target_view, "_getFirstImageView")
+        else target_view._getFistImageView(result_view)
+    )
+    if first_image_in_view.exists():
         logger.info(f"Opening the first result for {target}.")
-        FistImageInView.click()
-        return True
+        opened_post_view = OpenedPostView(device)
+        for attempt in range(2):
+            try:
+                bounds = first_image_in_view.get_bounds()
+                x_center = (bounds["left"] + bounds["right"]) // 2
+                y_center = (bounds["top"] + bounds["bottom"]) // 2
+                if hasattr(device, "deviceV2") and hasattr(device.deviceV2, "click"):
+                    device.deviceV2.click(x_center, y_center)
+                else:
+                    first_image_in_view.click()
+            except Exception:
+                first_image_in_view.click()
+
+            random_sleep(inf=1, sup=2, modulable=False)
+
+            if opened_post_view.is_peek_preview_opened():
+                logger.info("Peek Preview detected on thumbnail. Dismissing...")
+                opened_post_view.dismiss_peek()
+
+            if opened_post_view.is_post_opened():
+                logger.info(f"First post for {target} successfully opened.")
+                return True
+
+            if attempt == 0:
+                logger.debug("Post did not open on first tap, retrying tap...")
+                first_image_in_view = (
+                    target_view._getFirstImageView(result_view)
+                    if hasattr(target_view, "_getFirstImageView")
+                    else target_view._getFistImageView(result_view)
+                )
+                if not first_image_in_view.exists():
+                    break
+
+        logger.warning(
+            f"Failed to open first post for {target}: thumbnail tap did not navigate to post view."
+        )
+        return False
     else:
         logger.info(
             f"There is any result for {target} (not exists or doesn't load). Skip."

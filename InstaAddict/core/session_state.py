@@ -218,6 +218,25 @@ class SessionState:
             except Exception:
                 pass
 
+    def finalize_jobs(self, default_status: str = "interrupted"):
+        """Ensure no jobs remain 'in_progress' when a session finishes or is aborted."""
+        if not hasattr(self, "job_metrics") or self.job_metrics is None:
+            self.job_metrics = {}
+            return
+        now_iso = datetime.now().isoformat()
+        for job_name, metrics in self.job_metrics.items():
+            if metrics.get("status") == "in_progress":
+                metrics["status"] = default_status
+                metrics["finished_at"] = now_iso
+                try:
+                    start_dt = datetime.fromisoformat(metrics["started_at"])
+                    metrics["duration_seconds"] = round(
+                        (datetime.now() - start_dt).total_seconds(), 1
+                    )
+                except Exception:
+                    pass
+        self.current_job = None
+
     def record_job_interaction(
         self,
         job_name: str,
@@ -491,6 +510,8 @@ class SessionState:
 
 class SessionStateEncoder(JSONEncoder):
     def default(self, session_state: SessionState):
+        if hasattr(session_state, "finalize_jobs"):
+            session_state.finalize_jobs()
         return {
             "id": session_state.id,
             "total_interactions": sum(session_state.totalInteractions.values()),

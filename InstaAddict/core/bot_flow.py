@@ -680,6 +680,8 @@ def start_bot(**kwargs):
                 print_limits = True
 
         # save the session in sessions.json
+        if hasattr(session_state, "finalize_jobs"):
+            session_state.finalize_jobs("completed")
         session_state.finishTime = datetime.now()
         sessions.persist(directory=session_state.my_username)
 

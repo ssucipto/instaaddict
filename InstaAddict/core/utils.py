@@ -862,6 +862,8 @@ def stop_bot(device, sessions, session_state, was_sleeping=False):
         extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
     )
     if session_state is not None:
+        if hasattr(session_state, "finalize_jobs"):
+            session_state.finalize_jobs("interrupted")
         if getattr(session_state, "finishTime", None) is None:
             session_state.finishTime = datetime.now()
         scrape_to_file = getattr(getattr(configs, "args", None), "scrape_to_file", None)

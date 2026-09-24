@@ -449,7 +449,7 @@ class HashTagView:
             logger.debug("RecyclerView doesn't exists.")
         return obj
 
-    def _getFistImageView(self, recycler):
+    def _getFirstImageView(self, recycler):
         obj = recycler.child(
             resourceIdMatches=ResourceID.IMAGE_BUTTON,
         )
@@ -462,6 +462,8 @@ class HashTagView:
         else:
             logger.debug("First image in view doesn't exists.")
         return obj
+
+    _getFistImageView = _getFirstImageView
 
     def _getRecentTab(self):
         obj = self.device.find(
@@ -491,7 +493,7 @@ class PlacesView:
             logger.debug("RecyclerView doesn't exists.")
         return obj
 
-    def _getFistImageView(self, recycler):
+    def _getFirstImageView(self, recycler):
         obj = recycler.child(
             resourceIdMatches=ResourceID.IMAGE_BUTTON,
         )
@@ -504,6 +506,8 @@ class PlacesView:
         else:
             logger.debug("First image in view doesn't exists.")
         return obj
+
+    _getFistImageView = _getFirstImageView
 
     def _getRecentTab(self):
         return self.device.find(
@@ -2402,6 +2406,10 @@ class OpenedPostView:
                         ResourceID.VIDEO_CONTAINER_AND_CLIPS_VIDEO_CONTAINER,
                         ResourceID.ROW_FEED_BUTTON_LIKE,
                         ResourceID.LIKE_BUTTON,
+                        ResourceID.ROOT_CLIPS_LAYOUT,
+                        ResourceID.CLIPS_VIEWER_CONTAINER,
+                        ResourceID.CLIPS_VIEWER_VIEW_PAGER,
+                        ResourceID.CLIPS_VIDEO_CONTAINER,
                     ]
                 )
             )
