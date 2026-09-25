@@ -145,6 +145,25 @@ def start_bot(**kwargs):
     )
     watchdog.start()
 
+    # Initialize and start status beacon writer for IPC monitoring (GAP-03, GAP-06)
+    from InstaAddict.core.beacon import StatusBeaconWriter, set_active_beacon_writer
+
+    beacon_writer = StatusBeaconWriter(
+        username=getattr(configs.args, "username", None) or getattr(configs, "username", "default")
+    )
+    set_active_beacon_writer(beacon_writer)
+
+    def _on_stop_sentinel_detected():
+        logger.info("Graceful stop sentinel detected from orchestrator (.stop). Shutting down bot...")
+        try:
+            stop_bot(device, sessions, session_state, was_sleeping=False)
+        except Exception:
+            pass
+        sys.exit(0)
+
+    beacon_writer.stop_requested_callback = _on_stop_sentinel_detected
+    beacon_writer.start()
+
     while True:
         if use_tui and not dashboard_manager.is_active():
             dashboard_manager.start()
@@ -155,6 +174,7 @@ def start_bot(**kwargs):
         )
         if not inside_working_hours:
             watchdog.pause()
+            beacon_writer.set_status("sleeping")
             if dashboard_manager.is_active():
                 dashboard_manager.state.status_message = "SLEEPING"
                 wh_str = getattr(configs.args, "working_hours", "configured hours")
@@ -166,9 +186,11 @@ def start_bot(**kwargs):
                 dashboard_manager.update_render()
             wait_for_next_session(time_left, session_state, sessions, device)
             watchdog.resume()
+            beacon_writer.set_status("running")
         pre_post_script(path=configs.args.pre_script)
-        if getattr(configs.args, "telegram_inbox", False) or getattr(
-            configs.args, "telegram_reports", False
+        if (
+            (getattr(configs.args, "telegram_inbox", False) or getattr(configs.args, "telegram_reports", False))
+            and os.environ.get("INSTAADDICT_NO_TELEGRAM_INBOX", "0") != "1"
         ):
             try:
                 from InstaAddict.plugins.telegram import check_telegram_inbox

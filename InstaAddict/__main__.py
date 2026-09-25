@@ -80,6 +80,102 @@ def cmd_dump(args):
     print(Fore.BLUE + Style.BRIGHT + f"{os.getcwd()}\\screen_{archive_name}.zip")
 
 
+def cmd_multi(args):
+    import json
+    import sys
+    from datetime import datetime
+    from InstaAddict.core.multi_config import MultiAccountConfig, MultiConfigValidationError
+    from InstaAddict.core.orchestrator import AccountOrchestrator
+    from InstaAddict.core.beacon import BeaconReader
+
+    config_path = getattr(args, "config", None) or "multi_config.yml"
+
+    # Handle --status query without spawning orchestrator
+    if getattr(args, "status", False):
+        if not os.path.exists(config_path):
+            print(f"Error: Multi-account config file '{config_path}' not found.")
+            sys.exit(1)
+        try:
+            cfg = MultiAccountConfig.load(config_path)
+            print(f"\nInstaAddict-AI Fleet Status ({config_path}):")
+            print("-" * 75)
+            for acc in cfg.accounts:
+                beacon = BeaconReader.read_beacon(acc.username)
+                status = beacon.get("status", "offline") if beacon else ("enabled" if acc.enabled else "disabled")
+                likes = beacon.get("metrics", {}).get("total_likes", "-") if beacon else "-"
+                follows = beacon.get("metrics", {}).get("total_follows", "-") if beacon else "-"
+                print(f"@{acc.username:<20} Device: {acc.device_id:<18} Status: {status:<15} Likes: {likes:<5} Follows: {follows}")
+            print("-" * 75)
+            return
+        except Exception as e:
+            print(f"Error reading fleet status: {e}")
+            sys.exit(1)
+
+    # Handle --reload signal to running orchestrator
+    if getattr(args, "reload", False):
+        pid_file = os.path.join("logs", "orchestrator", "orchestrator.pid")
+        if not os.path.exists(pid_file):
+            print("No active AccountOrchestrator found running.")
+            sys.exit(1)
+        cmd_file = os.path.join("logs", "orchestrator", ".cmd.json")
+        try:
+            with open(cmd_file, "w", encoding="utf-8") as f:
+                json.dump({"cmd": "reload", "timestamp": datetime.now().isoformat()}, f)
+            print("Reload signal dispatched to running orchestrator.")
+        except Exception as e:
+            print(f"Failed to send reload signal: {e}")
+        return
+
+    # Handle --stop signal
+    if getattr(args, "stop", None) is not None:
+        target_user = args.stop
+        if target_user:
+            clean_u = target_user.lstrip("@").strip()
+            stop_file = os.path.join("accounts", clean_u, ".stop")
+            os.makedirs(os.path.dirname(stop_file), exist_ok=True)
+            with open(stop_file, "w", encoding="utf-8") as f:
+                f.write(f"STOP {datetime.now().isoformat()}\n")
+            print(f"Stop signal sent to @{clean_u}.")
+        else:
+            cmd_file = os.path.join("logs", "orchestrator", ".cmd.json")
+            with open(cmd_file, "w", encoding="utf-8") as f:
+                json.dump({"cmd": "stop_all", "timestamp": datetime.now().isoformat()}, f)
+            print("Stop all signal dispatched to running orchestrator.")
+        return
+
+    # Regular orchestrator startup
+    try:
+        cfg = MultiAccountConfig.load(config_path)
+    except FileNotFoundError:
+        print(f"Error: Config file '{config_path}' not found. Please create it or copy from config-examples/multi_config.yml")
+        sys.exit(1)
+    except MultiConfigValidationError as e:
+        print(f"Configuration Validation Error: {e}")
+        sys.exit(1)
+
+    orchestrator = AccountOrchestrator(cfg)
+
+    # Check --only
+    only_user = getattr(args, "only", None)
+    if only_user:
+        acc = cfg.get_account(only_user)
+        if not acc:
+            print(f"Error: Account @{only_user} not found in {config_path}.")
+            sys.exit(1)
+        print(f"Starting only @{only_user} under orchestrator...")
+        orchestrator.start_account(acc.username)
+    else:
+        orchestrator.start_all()
+
+    # Launch dashboard or headless loop
+    from InstaAddict.core.multi_dashboard import MultiAccountDashboard
+    dashboard = MultiAccountDashboard(orchestrator)
+    if getattr(args, "no_tui", False) or not sys.stdout.isatty():
+        dashboard.run_headless()
+    else:
+        dashboard.run()
+
+
 _commands = [
     dict(
         action=cmd_init,
@@ -119,12 +215,26 @@ _commands = [
             ),
         ],
     ),
+    dict(
+        action=cmd_multi,
+        command="multi",
+        help="manage multiple Instagram accounts simultaneously",
+        flags=[
+            dict(args=["--config"], nargs="?", default="multi_config.yml", help="provide the multi_config.yml path"),
+            dict(args=["--only"], nargs="?", default=None, help="run only a specific account under orchestrator"),
+            dict(args=["--status"], action="store_true", help="query and display fleet status then exit"),
+            dict(args=["--stop"], nargs="?", const="", default=None, help="send stop signal to running orchestrator or specific account"),
+            dict(args=["--restart"], nargs="?", default=None, help="send restart signal to specific account"),
+            dict(args=["--reload"], action="store_true", help="trigger zero-downtime config hot-reload on running orchestrator (GAP-21)"),
+            dict(args=["--no-tui"], action="store_true", help="run in headless mode without TUI"),
+        ],
+    ),
 ]
 
 
 def main() -> None:
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] not in ("init", "run", "dump", "-h", "--help", "-v", "--version"):
+    if len(sys.argv) > 1 and sys.argv[1] not in ("init", "run", "dump", "multi", "-h", "--help", "-v", "--version"):
         sys.argv.insert(1, "run")
 
     parser = argparse.ArgumentParser(

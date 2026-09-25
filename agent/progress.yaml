@@ -2,8 +2,8 @@ project:
   name: InstaAddict-AI
   version: 1.4.1
   started: 2026-09-11
-  status: completed
-  current_milestone: null
+  status: in_progress
+  current_milestone: M11
   description: Human-like Instagram automation bot powered by ADB and UIAutomator2. Features content queue upload pipeline and IG v447+ compatibility.
 milestones:
 - id: M1
@@ -107,6 +107,17 @@ milestones:
   completed: '2026-09-17'
   notes: Design and implement a modern terminal user interface with live session statistics, progress bars against configured safety limits, active target inspection, and a rolling log stream with graceful headless fallback.
   file: agent/milestones/milestone-10-terminal-user-interface.md
+- id: M11
+  name: Multi-Account Orchestration & Management Interface
+  status: completed
+  progress: 100
+  tasks_total: 8
+  tasks_completed: 8
+  started: '2026-09-25'
+  completed: '2026-09-25'
+  estimated_weeks: 3-4
+  notes: Enable InstaAddict-AI to manage multiple Instagram accounts simultaneously, each running on its own assigned Android emulator, supervised by a centralized orchestrator with a unified management dashboard, aggregated telemetry, and health monitoring.
+  file: agent/milestones/milestone-11-multi-account-orchestration.md
 tasks:
   milestone_1:
   - id: task-1
@@ -351,12 +362,101 @@ tasks:
     actual_hours: 2
     route_file: agent/routing/tasks/route-065-startup-resilience-and-telemetry-optimization.md
     notes: Fast ADB metadata fallback in DeviceFacade.get_info() and get_device_info(), PyPI 404 update check graceful handling, and DogfoodOptimizer/PerformanceTracker expanded telemetry for RPC/ADB/Watchdog metrics. 420/420 tests passing.
+  milestone_11:
+  - id: task-42
+    name: Multi-Account Configuration Schema & Parser
+    status: completed
+    priority: 1
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 3
+    actual_hours: 3
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-42-multi-account-config.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Create multi_config.yml YAML schema and parser class with validation, unique device/account enforcement, and priority sorting.
+  - id: task-43
+    name: Account Orchestrator Process Lifecycle Manager
+    status: completed
+    priority: 1
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 4
+    actual_hours: 4
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-43-account-orchestrator.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Build AccountOrchestrator class spawning, monitoring, and managing N independent bot subprocesses with staggered starts and graceful shutdown.
+  - id: task-44
+    name: Status Beacon Writer & IPC System
+    status: completed
+    priority: 1
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 3
+    actual_hours: 3
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-44-status-beacon-ipc.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Implement StatusBeaconWriter daemon thread writing atomic .status.json beacons and BeaconReader utility for cross-process state observation.
+  - id: task-45
+    name: Unified Multi-Account Rich TUI Dashboard
+    status: completed
+    priority: 2
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 4
+    actual_hours: 4
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-45-multi-account-dashboard.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Build MultiAccountDashboard with Rich Live rendering, real-time KPI metrics, per-account status cards, summary tables, and keyboard command bindings.
+  - id: task-46
+    name: CLI multi Subcommand and Control Interface
+    status: completed
+    priority: 2
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 3
+    actual_hours: 3
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-46-cli-multi-command.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Add multi subcommand in core_arguments.py and __main__.py supporting --config, --only, --status, --stop, --restart, and --no-tui.
+  - id: task-47
+    name: Health Monitoring & Auto-Recovery Engine
+    status: completed
+    priority: 2
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 4
+    actual_hours: 4
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-47-health-monitor-auto-recovery.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Autonomous HealthMonitor daemon detecting stale heartbeats, crashes, and ADB disconnects with exponential restart backoff and crash-loop guards.
+  - id: task-48
+    name: Multi-Account Telemetry Aggregation & Cross-Account Insights
+    status: completed
+    priority: 3
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 4
+    actual_hours: 4
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-48-multi-account-telemetry.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Centralized telemetry aggregation engine synthesizing sessions.json, DogfoodOptimizer suggestions, and latency distributions across accounts.
+  - id: task-49
+    name: Telegram Multi-Account Supervision & Remote Commands
+    status: completed
+    priority: 3
+    started: '2026-09-25'
+    completed_date: '2026-09-25'
+    estimated_hours: 4
+    actual_hours: 4
+    file: agent/tasks/milestone-11-multi-account-orchestration/task-49-telegram-multi-account.md
+    route_file: agent/routing/tasks/route-066-multi-account-orchestration.md
+    notes: Extend Telegram bot engine with targeted @account commands (/status, /restart, /post), media ingestion routing, and fleet alerts.
 
 documentation:
-  design_documents: 2
-  milestone_documents: 8
+  design_documents: 3
+  milestone_documents: 11
   pattern_documents: 2
-  task_documents: 0
+  task_documents: 8
   last_updated: '2026-09-25'
 progress:
   planning: 100
@@ -365,6 +465,33 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-09-25'
+  description: 'Completed Documentation Synchronization, User Guide Creation & Milestone 11 Documentation Signoff.'
+  items:
+  - "✓ Created comprehensive 10-section operator manual docs/USER_GUIDE.md (480+ lines) covering all features and troubleshooting"
+  - "✓ Synchronized README.md with Milestones 8-11 sections, Quick Start multi-account commands, and CLI tables"
+  - "✓ Appended Section 17 to agent/design/requirements.md for Multi-Account Fleet Orchestration and 21 safeguards (GAP-01 to GAP-21)"
+  - "✓ Updated agent/milestones/milestone-11-multi-account-orchestration.md to Completed with all criteria checked"
+  - "✓ Appended multi_account_orchestration domain entity model to agent/wiki/domain.yml"
+  - "✓ Verified full test suite parity: 445/445 tests passing (100% green)"
+  - "✓ Passed ACP CI fast gates with zero errors and zero warnings"
+- date: '2026-09-25'
+  description: 'Completed Milestone 11: Multi-Account Orchestration & Management Architecture (Route-066, Tasks 42-49, Audits #127/#128/#129/#130, Reviews #063/#064).'
+  items:
+  - "✓ Implemented MultiAccountConfig parser, schema validation, and MultiConfigValidationError with line diagnostics (GAP-20, Task 42)"
+  - "✓ Built StatusBeaconWriter atomic disk serialization (.status.json) with 3-attempt NTFS lock retry reader (GAP-06, Task 44)"
+  - "✓ Built AccountOrchestrator multi-process supervisor with exclusive PID locking and zombie reaping (GAP-11, Task 43)"
+  - "✓ Implemented dual-phase graceful termination via .stop sentinels and process fallback (GAP-03, Task 43)"
+  - "✓ Hardened targeted ADB transport recovery, suppressing global adb kill-server during multi-account runs (GAP-08, Task 43)"
+  - "✓ Added 10MB bounded stdout log rotation and emulator boot property assertion (sys.boot_completed, bootanim) (GAP-15, GAP-16, Task 43)"
+  - "✓ Built MultiAccountDashboard Rich Live TUI with 3 view modes, 1 FPS render governor, and mtime dirty-checking (GAP-19, Task 45)"
+  - "✓ Engineered autonomous HealthMonitor with limit_reached exit tolerance and serialized jittered recovery (GAP-12, GAP-18, Task 47)"
+  - "✓ Implemented zero-downtime hot reloading (reload_config) with [C] hotkey and --reload CLI signal (GAP-21, Task 43/45/46)"
+  - "✓ Extended Telegram supervision with targeted @account command and photo caption routing (GAP-14, Task 46)"
+  - "✓ Built MultiAccountTelemetryAggregator generating Markdown/JSON fleet reports with auto-tuning hooks (GAP-10, Task 48)"
+  - "✓ Created 25-case headless integration test suite in test_multi_account_orchestration.py (<2s run, 0 device requirement, GAP-17, Task 49)"
+  - "✓ Verified zero regressions: 445/445 full repository tests passing (100% green)"
+  - "✓ Passed all 6/6 ACP CI fast gates (validate-ts, review-measure, npm-test, ci-validate, integrity-e2e, integrity-v2-e2e)"
 - date: '2026-09-25'
   description: 'Forensic Remediation of Startup Crash, UiAutomator Disconnects, Fast ADB Metadata Fallback, PyPI 404 Toleration & Self-Learning Telemetry Expansion (Audit-126, Route-065, CO-076/077/078/079).'
   items:

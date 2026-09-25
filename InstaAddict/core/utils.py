@@ -841,6 +841,16 @@ def trim_txt(source: str, target: str) -> None:
 
 def stop_bot(device, sessions, session_state, was_sleeping=False):
     try:
+        from InstaAddict.core.beacon import get_active_beacon_writer, set_active_beacon_writer
+
+        active_writer = get_active_beacon_writer()
+        if active_writer is not None:
+            active_writer.set_status("stopped")
+            active_writer.stop()
+            set_active_beacon_writer(None)
+    except Exception:
+        pass
+    try:
         from InstaAddict.core.watchdog import BotWatchdog
 
         BotWatchdog.get_instance().stop()

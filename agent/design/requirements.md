@@ -121,6 +121,12 @@ InstaAddict-AI is an active continuation and evolution of the GramAddict / Insta
 - **Graceful PyPI 404 Toleration**: Recognizes unindexed development and source installs in `utils.update_available()` without emitting false-alarm ERROR log records.
 - **Expanded Self-Learning Telemetry**: `PerformanceTracker` tracks device connection latency and `DogfoodOptimizer` parses RPC disconnects, ADB timeouts, and Watchdog recovery triggers, formulating actionable autonomous recommendations.
 
-
-
-
+### 17. Multi-Account Fleet Orchestration, IPC Status Beaconing & Management Interface
+- **Concurrent Multi-Process Supervisor (`AccountOrchestrator`)**: Spawns isolated worker processes per configured account in `multi_config.yml`, preventing state collision, thread contention, and memory leaks.
+- **IPC Status Beaconing (`StatusBeaconWriter` & `.ipc/accounts/<username>.json`)**: Non-blocking atomic JSON state beacons emitted every ~5 seconds with microsecond timestamps (`last_heartbeat`), active action, target username, session duration, likes/follows/comments counters, and error states.
+- **Emulator & ADB Connection Lifecycle Watchdog (`HealthMonitor`)**: Continuously monitors worker health; detects frozen emulators, dead ADB connections, or silent worker stalls (>90s stale beacon), triggering headless device reboots, app relaunches, and supervised worker recovery.
+- **Interactive TUI Dashboard (`MultiAccountDashboard`)**: Curses/Rich terminal interface rendering dynamic per-account progress bars, active jobs, counters, cooldown timers, and global fleet metrics with non-blocking keybindings (`q`, `p`, `tab`).
+- **Headless & Plain Mode Ergonomics (`--no-tui`)**: Automatically detects non-interactive TTYs or accepts `--no-tui` to emit clean linear logs for CI, Docker, or systemd services.
+- **Hot-Reloading & Signal Traps (`--reload`, `--stop`)**: Monitors `.ipc/signals/` for hot-reload and graceful shutdown requests; catches OS `SIGINT`/`SIGTERM` to allow in-flight post interactions and atomic state caches to flush cleanly before process termination.
+- **Granular Account Filtering (`--only <acc1> <acc2>`)**: Allows operators to target a subset of the fleet dynamically without altering `multi_config.yml`.
+- **21 Production Safeguards (GAP-01 to GAP-21)**: Comprehensive hardening spanning safe cross-platform file locking (`msvcrt`/`fcntl`), atomic temporary file replacement, process isolation, quota synchronization, and automated error recovery.

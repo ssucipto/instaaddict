@@ -591,11 +591,12 @@ def check_telegram_inbox(
                 continue
 
             elif cmd == "/status":
-                status_lines = ["🤖 *InstaAddict-AI Bot Status*:"]
+                target_user = arg.lstrip("@").strip() if (arg and arg.startswith("@")) else username
+                status_lines = [f"🤖 *InstaAddict-AI Bot Status* (@{target_user}):"]
                 adb_status = get_adb_device_status()
                 status_lines.append(f"• *Android Device*: {adb_status}")
 
-                cfg_path = os.path.join("accounts", username, "config.yml")
+                cfg_path = os.path.join("accounts", target_user, "config.yml")
                 wh_str = "00.00-23.59"
                 if os.path.exists(cfg_path):
                     try:
@@ -606,23 +607,34 @@ def check_telegram_inbox(
                         pass
 
                 from InstaAddict.core.session_state import SessionState
-                active_sess = SessionState.get_active()
-                if active_sess:
-                    status_lines.append("• *Session State*: 🟢 Running")
+                from InstaAddict.core.beacon import BeaconReader
+                beacon = BeaconReader.read_beacon(target_user)
+                if beacon:
+                    b_status = beacon.get("status", "running").upper()
+                    status_lines.append(f"• *Session State*: `{b_status}` (PID: {beacon.get('pid', '-')})")
+                    m = beacon.get("metrics", {})
+                    status_lines.append(
+                        f"• *Session KPIs*: Likes {m.get('total_likes', 0)} │ Follows {m.get('total_follows', 0)} │ Comments {m.get('total_comments', 0)}"
+                    )
                 else:
-                    inside_wh, time_left = SessionState.inside_working_hours(wh_str, 0)
-                    if inside_wh:
-                        status_lines.append("• *Session State*: 🟡 Ready / Starting Up")
+                    active_sess = SessionState.get_active()
+                    if active_sess and target_user == username:
+                        status_lines.append("• *Session State*: 🟢 Running")
                     else:
-                        hours, rem = divmod(time_left.seconds, 3600)
-                        mins, _ = divmod(rem, 60)
-                        next_start = (datetime.now() + time_left).strftime("%H:%M:%S")
-                        status_lines.append(
-                            f"• *Session State*: 🌙 Sleeping until {next_start} ({hours}h {mins}m left)"
-                        )
+                        inside_wh, time_left = SessionState.inside_working_hours(wh_str, 0)
+                        if inside_wh:
+                            status_lines.append("• *Session State*: 🟡 Ready / Starting Up")
+                        else:
+                            hours, rem = divmod(time_left.seconds, 3600)
+                            mins, _ = divmod(rem, 60)
+                            next_start = (datetime.now() + time_left).strftime("%H:%M:%S")
+                            status_lines.append(
+                                f"• *Session State*: 🌙 Sleeping until {next_start} ({hours}h {mins}m left)"
+                            )
+
                 status_lines.append(f"• *Working Hours*: `{wh_str}`")
 
-                sessions = load_sessions(username)
+                sessions = load_sessions(target_user)
                 if sessions and len(sessions) > 0:
                     last_s = sessions[-1]
                     status_lines.append(
@@ -634,15 +646,43 @@ def check_telegram_inbox(
                     status_lines.append(
                         f"• *Follows last session*: {last_s.get('total_followed', 0)}"
                     )
+                t_pending_dir = os.path.join("accounts", target_user, "content_queue", "pending")
                 pending_count = (
-                    len(_get_pending_media(pending_dir))
-                    if os.path.exists(pending_dir)
+                    len(_get_pending_media(t_pending_dir))
+                    if os.path.exists(t_pending_dir)
                     else 0
                 )
                 status_lines.append(f"• *Queued uploads*: {pending_count} pending")
                 telegram_bot_send_text(
                     token, auth_chat_id, "\n".join(status_lines)
                 )
+                continue
+
+            elif cmd in ("/stop", "/stop_bot"):
+                target_user = arg.lstrip("@").strip() if (arg and arg.startswith("@")) else username
+                stop_file = os.path.join("accounts", target_user, ".stop")
+                os.makedirs(os.path.dirname(stop_file), exist_ok=True)
+                with open(stop_file, "w", encoding="utf-8") as f:
+                    f.write(f"STOP {datetime.now().isoformat()}\n")
+                telegram_bot_send_text(
+                    token, auth_chat_id, f"🛑 *Graceful stop signal sent* to @{target_user}."
+                )
+                continue
+
+            elif cmd in ("/restart", "/restart_bot"):
+                target_user = arg.lstrip("@").strip() if (arg and arg.startswith("@")) else username
+                cmd_file = os.path.join("logs", "orchestrator", ".cmd.json")
+                try:
+                    os.makedirs(os.path.dirname(cmd_file), exist_ok=True)
+                    with open(cmd_file, "w", encoding="utf-8") as f:
+                        json.dump({"cmd": "restart", "target": target_user, "timestamp": datetime.now().isoformat()}, f)
+                    telegram_bot_send_text(
+                        token, auth_chat_id, f"🔄 *Restart command dispatched* for @{target_user}."
+                    )
+                except Exception as e:
+                    telegram_bot_send_text(
+                        token, auth_chat_id, f"⚠️ Failed to dispatch restart for @{target_user}: {e}"
+                    )
                 continue
 
             elif cmd == "/caption":
@@ -793,14 +833,28 @@ def check_telegram_inbox(
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 short_id = file_id[-6:] if len(file_id) >= 6 else file_id
                 base_name = f"{ts}_{short_id}"
-                dest_media_path = os.path.join(pending_dir, f"{base_name}{ext}")
+
+                caption = (msg.get("caption") or "").strip()
+                target_pending = pending_dir
+                target_acc = username
+                if caption and "@" in caption:
+                    import re
+                    m = re.search(r"@([a-zA-Z0-9._]+)", caption)
+                    if m:
+                        candidate_acc = m.group(1)
+                        candidate_dir = os.path.join("accounts", candidate_acc, "content_queue", "pending")
+                        if os.path.exists(os.path.join("accounts", candidate_acc)):
+                            os.makedirs(candidate_dir, exist_ok=True)
+                            target_pending = candidate_dir
+                            target_acc = candidate_acc
+
+                dest_media_path = os.path.join(target_pending, f"{base_name}{ext}")
 
                 if telegram_bot_download_file(token, file_path, dest_media_path):
                     queued_count += 1
-                    caption = (msg.get("caption") or "").strip()
                     if caption:
                         dest_txt_path = os.path.join(
-                            pending_dir, f"{base_name}.txt"
+                            target_pending, f"{base_name}.txt"
                         )
                         try:
                             with open(dest_txt_path, "w", encoding="utf-8") as cf:
@@ -812,7 +866,7 @@ def check_telegram_inbox(
 
                     all_pending = [
                         f
-                        for f in os.listdir(pending_dir)
+                        for f in os.listdir(target_pending)
                         if f.lower().endswith(
                             (".jpg", ".jpeg", ".png", ".mp4")
                         )

@@ -245,11 +245,24 @@ class DeviceFacade:
         self.ensure_uiautomator_alive()
 
     @staticmethod
-    def _recover_adb():
-        """Recovers stale or offline ADB transport connections by restarting the ADB server daemon."""
+    def _recover_adb(device_id: Optional[str] = None):
+        """Recovers stale or offline ADB transport connections by restarting the ADB server daemon, or reconnecting specific device in multi-account mode."""
         import subprocess
 
         try:
+            if os.environ.get("INSTAADDICT_MULTI_ACCOUNT") == "1":
+                if device_id:
+                    logger.info(
+                        f"Multi-account mode active: executing targeted 'adb -s {device_id} reconnect' without killing shared ADB server (GAP-08)..."
+                    )
+                    subprocess.run(["adb", "-s", device_id, "reconnect"], capture_output=True, timeout=10)
+                    sleep(1)
+                    subprocess.run(["adb", "-s", device_id, "reconnect", "device"], capture_output=True, timeout=10)
+                    sleep(2)
+                else:
+                    logger.warning("Multi-account mode active: suppressing global adb kill-server to protect sibling bots.")
+                return
+
             logger.info("Executing 'adb kill-server && adb start-server' to refresh transport...")
             subprocess.run(["adb", "kill-server"], capture_output=True, timeout=10)
             sleep(1)
@@ -271,9 +284,9 @@ class DeviceFacade:
             for line in res.stdout.splitlines():
                 if device_id in line and "offline" in line:
                     logger.warning(
-                        f"Device {device_id} detected as 'offline' in ADB. Automatically refreshing ADB daemon..."
+                        f"Device {device_id} detected as 'offline' in ADB. Automatically refreshing ADB transport..."
                     )
-                    self._recover_adb()
+                    self._recover_adb(device_id)
                     break
         except Exception:
             pass

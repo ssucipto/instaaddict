@@ -33,6 +33,7 @@
 
 ## Table of Contents
 
+* [📖 Complete User & Operator Guide](docs/USER_GUIDE.md) — Comprehensive guide covering Single-Account, Multi-Account Fleet, Vision AI, Telegram, and Troubleshooting
 * [About This Project & Our Fork](#about-this-project--our-fork)
 * [What's New in This Fork (InstaAddict-AI vs GramAddict)](#whats-new-in-this-fork-instaaddict-ai-vs-gramaddict)
   * [1. Full-Screen Reels & Modern IG (v446+) Compatibility](#1-full-screen-reels--modern-ig-v446-compatibility)
@@ -42,15 +43,18 @@
   * [5. Fluid 200ms ADB Native Swiping & Single-Swipe Flick Physics](#5-fluid-200ms-adb-native-swiping--single-swipe-flick-physics)
   * [6. Multimodal Gemini Vision AI Post Evaluation & Contextual Commenting](#6-multimodal-gemini-vision-ai-post-evaluation--contextual-commenting)
   * [7. Autonomous Content Queue & Post Uploader](#7-autonomous-content-queue--post-uploader)
-  * [8. Task Sequence Randomizer](#8-task-sequence-randomizer)
-  * [9. Production Telemetry & Self-Learning Dogfood Optimizer](#9-production-telemetry--self-learning-dogfood-optimizer)
-  * [10. Android 14+ UIAutomator2 & FastInputIME Mode.PASTE](#10-android-14-uiautomator2--fastinputime-modepaste)
+  * [8. Two-Way Telegram Ingestion & Mobile Bot Control](#8-two-way-telegram-ingestion--mobile-bot-control)
+  * [9. Modern Terminal User Interface (TUI) & Live Dashboard](#9-modern-terminal-user-interface-tui--live-dashboard)
+  * [10. Multi-Account Fleet Orchestration & Emulator Management](#10-multi-account-fleet-orchestration--emulator-management)
+  * [11. Production Telemetry & Self-Learning Dogfood Optimizer](#11-production-telemetry--self-learning-dogfood-optimizer)
 * [Why Automate Your Instagram?](#why-automate-your-instagram)
 * [Why InstaAddict-AI Over Other Bots?](#why-instaaddict-ai-over-other-bots)
 * [How It Works](#how-it-works)
 * [Compatibility & Known Working Versions](#compatibility--known-working-versions)
 * [Features & Interaction Jobs](#features--interaction-jobs)
 * [Quick Start Guide](#quick-start-guide)
+  * [Single-Account Mode](#single-account-mode)
+  * [Multi-Account Fleet Mode (Milestone 11)](#multi-account-fleet-mode-milestone-11)
 * [Configuration & CLI Reference](#configuration--cli-reference)
 * [Common Setup Issues & Troubleshooting](#common-setup-issues--troubleshooting)
 * [Support This Project](#support-this-project)
@@ -160,22 +164,37 @@ InstaAddict-AI introduces major architectural enhancements, new subsystems, and 
 
 ---
 
-### 8. Task Sequence Randomizer
-- **Humanized Job Scheduling**: Added `--randomize-tasks` / `randomize_task_sequence: true` to shuffle active interaction jobs every session, preventing predictable algorithmic patterns that Instagram detects.
+### 8. Two-Way Telegram Ingestion & Mobile Bot Control
+- **Interactive Control Commands**: Full remote command and control directly from your phone via Telegram (`/status`, `/pause`, `/resume`, `/stop`, `/skip`, `/queue`, `/addphoto`, `/stats`, `/help`).
+- **Direct Content Ingestion**: Send media (photos and videos) with captions directly to the Telegram bot; it validates, stages, and enqueues items into `accounts/<username>/content_queue/pending/` with accompanying sidecars.
+- **Real-Time Event Alerts**: Immediate push notifications for soft-blocks, CAPTCHAs, successful post uploads, and session milestones.
+- **Access Control Whitelist**: Strict `chat_id` filtering ensures only authorized operator Telegram IDs can query or dispatch commands.
 
 ---
 
-### 9. Production Telemetry & Self-Learning Dogfood Optimizer
+### 9. Modern Terminal User Interface (TUI) & Live Dashboard
+- **Real-Time Curses/Rich Dashboard**: Full live terminal visualization showing all active accounts, current actions, running timers, likes/follows/comments quotas, and emulator health in real time.
+- **Headless & Plain Mode**: Automatically falls back or disables TUI via `--no-tui` for background daemons, cron jobs, and CI/CD pipelines.
+- **Keyboard Shortcuts**: Quick hotkeys (`q` to quit, `p` to pause/resume accounts, `tab` to cycle views).
+
+---
+
+### 10. Multi-Account Fleet Orchestration & Emulator Management
+- **Concurrent Multi-Process Supervisor**: Run multiple accounts across multiple emulators simultaneously with zero crosstalk (`python run.py multi`).
+- **IPC Status Beaconing**: Atomic JSON state beaconing (`.ipc/accounts/<username>.json`) enables external dashboards and CLI queries (`python run.py multi --status`) with zero lock contention.
+- **Cold Boot & Emulator Health Watchdog**: Automatically detects frozen emulators, dead ADB connections, or crashed instances, and triggers clean headless reboots and app relaunches.
+- **Dynamic Hot-Reloading**: Modify schedules, limits, or account pools in `multi_config.yml` and hot-reload active workers (`python run.py multi --reload`) without stopping running tasks.
+- **Graceful Signal Management**: Send clean termination signals (`python run.py multi --stop [user]`) to allow in-flight post interactions to finish cleanly before process teardown.
+
+---
+
+### 11. Production Telemetry & Self-Learning Dogfood Optimizer
 - **Unhandled Crash Interception**: Installed a global `sys.excepthook` interceptor that logs fatal Python exceptions and third-party stack traces into `_error_trace.log` before exit.
 - **Windows File Lock Safety**: Explicitly closes file handlers before unlinking, eliminating `PermissionError: [WinError 32]` collisions on Windows.
 - **Continuous Markdown History**: Automatically appends run logs to `accounts/<username>/history.md` (never overwritten) and generates timestamped markdown session reports in `accounts/<username>/reports/`.
 - **Dogfood Self-Learning Optimizer (`dogfood.py`)**: Analyzes session outcomes, conversion yields, and error patterns to produce automated parameter tuning recommendations in `tuning_suggestions.md`.
-
----
-
-### 10. Android 14+ UIAutomator2 & FastInputIME Mode.PASTE
-- **Android 14 IME Patch**: Fixed regex matching for `mCurImeId` / `mSelectedImeId` in dumpsys, resolving typing timeouts on modern Android builds.
-- **Mode.PASTE Input**: Uses `ACTION_SET_TEXT` directly to enter search queries and comments instantaneously without keyboard dropdown jitter.
+- **Task Sequence Randomizer**: Shuffles active interaction jobs every session (`--randomize-tasks`), preventing predictable algorithmic patterns that Instagram detects.
+- **Android 14+ UIAutomator2 & FastInputIME**: Patched regex dumpsys parsing and native `Mode.PASTE` direct text injection to prevent keyboard stutter and timeouts on modern Android versions.
 
 <br />
 
@@ -322,6 +341,9 @@ Edit `accounts/my_instagram_user/config.yml` to specify your targeted hashtags, 
 
 ### Step 4: Run the Bot
 
+#### Single-Account Mode
+Run the bot against a single account configuration:
+
 ```bash
 # Run with standard configuration
 python run.py --config accounts/my_instagram_user/config.yml
@@ -333,13 +355,51 @@ python run.py --config accounts/my_instagram_user/config.yml --randomize-tasks
 python run.py --config accounts/my_instagram_user/config.yml --expand-hashtags
 ```
 
+#### Multi-Account Fleet Mode (Milestone 11)
+Orchestrate a concurrent fleet of accounts across multiple emulators simultaneously with live TUI monitoring, automated health watchdogs, and IPC beaconing:
+
+```bash
+# Launch the fleet supervisor with interactive TUI dashboard
+python run.py multi
+
+# Launch in headless/plain logging mode (for servers/cron/CI)
+python run.py multi --no-tui
+
+# Run only specific accounts from the fleet
+python run.py multi --only dog_fanpage cat_lovers
+
+# Query active fleet status and live counters from IPC beacons
+python run.py multi --status
+
+# Hot-reload configuration without stopping active workers
+python run.py multi --reload
+
+# Gracefully stop a specific account or the entire fleet
+python run.py multi --stop dog_fanpage
+python run.py multi --stop
+```
+
+> 📖 **Need more detailed walkthroughs?** See the [Complete User & Operator Guide](docs/USER_GUIDE.md) for deep-dive tutorials on Telegram pairing, Vision AI prompting, multi-emulator setup, and safety configurations.
+
 <br />
 
 # Configuration & CLI Reference
 
 InstaAddict-AI features rich command-line flags and configuration files:
 
-### New Command-Line Flags
+### Multi-Account Fleet Commands (`python run.py multi`)
+
+| Command / Flag | Description |
+| :--- | :--- |
+| `python run.py multi` | Launches the multi-account supervisor with rich TUI dashboard. |
+| `--status` | Queries active IPC state beacons and outputs an instantaneous tabular status summary without starting workers. |
+| `--only <acc1> [acc2...]` | Filters the fleet to run only the specified accounts. |
+| `--reload` | Signals active supervisor to hot-reload `multi_config.yml` schedules and limits. |
+| `--stop [username]` | Sends a graceful stop signal to a specific account worker or all running workers. |
+| `--no-tui` | Forces standard linear terminal logging, disabling the interactive curses dashboard. |
+| `--config <path>` | Custom path to the fleet configuration file (default: `multi_config.yml`). |
+
+### Single-Account Command-Line Flags (`python run.py`)
 
 | Flag | Description |
 | :--- | :--- |
@@ -357,17 +417,22 @@ InstaAddict-AI features rich command-line flags and configuration files:
 ### Configuration Files Overview
 
 ```
-accounts/<your_username>/
-├── config.yml                # Main configuration: limits, jobs, working hours, speeds
-├── filters.yml               # Demographic filters: business, private, follower ranges
-├── hashtags.yml              # Tiered masterlist: Local, Breed, Lifestyle, Reach pools
-├── ai-persona.yml            # Character prompt definition for Gemini Vision AI commenting
-├── non_bot_followings.json   # Persistent cache of verified non-bot accounts (atomic writes)
-├── discovered_hashtags.json  # Harvested caption hashtag frequency counts
-├── history.md                # Continuous, non-overwritten markdown run history
-├── reports/                  # Timestamped per-session analytics markdown reports
-├── content_queue/            # Autonomous post queue (pending/ and published/ archives)
-└── upload_queue/             # Legacy upload directory (backwards-compatible)
+instaaddict/
+├── multi_config.yml         # Fleet orchestration: accounts, emulators, schedules, concurrency
+├── .ipc/                     # Transient IPC beacons and control signals
+│   ├── accounts/             # Atomic per-account state beacons (.json)
+│   └── signals/              # Hot-reload and stop signal triggers (.stop, .reload)
+└── accounts/<your_username>/
+    ├── config.yml            # Main configuration: limits, jobs, working hours, speeds
+    ├── filters.yml           # Demographic filters: business, private, follower ranges
+    ├── hashtags.yml          # Tiered masterlist: Local, Breed, Lifestyle, Reach pools
+    ├── ai-persona.yml        # Character prompt definition for Gemini Vision AI commenting
+    ├── non_bot_followings.json   # Persistent cache of verified non-bot accounts (atomic writes)
+    ├── discovered_hashtags.json  # Harvested caption hashtag frequency counts
+    ├── history.md            # Continuous, non-overwritten markdown run history
+    ├── reports/              # Timestamped per-session analytics markdown reports
+    ├── content_queue/        # Autonomous post queue (pending/ and published/ archives)
+    └── upload_queue/         # Legacy upload directory (backwards-compatible)
 ```
 
 <br />

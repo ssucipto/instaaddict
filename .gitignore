@@ -30,6 +30,9 @@ gramaddict-*/
 /crashes/
 /logs/
 __pycache__/
+*.status.json
+*.stop
+.ipc/
 
 # ADR-28 — field-feedback file local
 docs/acp-enhanced-dev-team-feedback-consolidated.md

@@ -573,3 +573,42 @@ ux_review:
   file: "agent/design/acp-ux-review.md"
   category: design
   version_introduced: "6.8.0"
+
+multi_account_orchestration:
+  # Added: 2026-09-25 (v1.3.0, Milestone 11)
+  description: >
+    Concurrent multi-account supervisor architecture for InstaAddict-AI.
+    Coordinates multiple bot worker processes across dedicated Android emulators,
+    providing centralized process supervision, atomic IPC status beaconing,
+    automated health and cold-boot recovery, and unified TUI/CLI management.
+  config_file: "multi_config.yml"
+  ipc_directory: ".ipc/"
+  subdirectories:
+    beacons: ".ipc/accounts/<username>.json"
+    signals: ".ipc/signals/<username>.stop, .ipc/signals/fleet.stop, .ipc/signals/fleet.reload"
+  components:
+    - name: "AccountOrchestrator"
+      path: "InstaAddict/core/orchestrator.py"
+      role: "Multi-process supervisor handling worker lifecycle, concurrency limits, and signal handling"
+    - name: "StatusBeaconWriter"
+      path: "InstaAddict/core/beacon.py"
+      role: "Non-blocking atomic JSON state writer updating .ipc/accounts/<username>.json every ~5s"
+    - name: "HealthMonitor"
+      path: "InstaAddict/core/health_monitor.py"
+      role: "Background watchdog thread detecting frozen emulators, dead ADB connections, and stale beacons"
+    - name: "MultiAccountDashboard"
+      path: "InstaAddict/ui/multi_dashboard.py"
+      role: "Curses/Rich real-time terminal UI displaying live fleet status, counters, timers, and health"
+  cli_commands:
+    - command: "python run.py multi"
+      purpose: "Run fleet supervisor with interactive live TUI"
+    - command: "python run.py multi --status"
+      purpose: "Output instantaneous tabular status from IPC beacons"
+    - command: "python run.py multi --only <acc1> [acc2...]"
+      purpose: "Filter and run only targeted accounts"
+    - command: "python run.py multi --reload"
+      purpose: "Hot-reload configuration without stopping active workers"
+    - command: "python run.py multi --stop [user]"
+      purpose: "Gracefully stop a specific account or entire fleet"
+    - command: "python run.py multi --no-tui"
+      purpose: "Run in headless mode with plain linear stdout logging"

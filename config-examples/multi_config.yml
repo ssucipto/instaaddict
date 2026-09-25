@@ -1,0 +1,30 @@
+# InstaAddict-AI Multi-Account Orchestration Configuration
+# Manage multiple Instagram accounts running simultaneously across separate Android emulators/devices.
+
+orchestrator:
+  max_concurrent: 5              # Maximum number of simultaneously running bot instances
+  stagger_start_seconds: "30-60" # Staggered startup delay range between account boots (reduces ADB load)
+  health_check_interval: 15      # Seconds between liveness and beacon checks
+  auto_restart: true             # Automatically restart crashed or stale bots
+  max_restart_attempts: 3        # Maximum auto-restarts allowed per account within a rolling hour
+  log_dir: "logs/orchestrator"   # Directory for orchestrator logs and stdout capture
+  # global_blacklist: "blacklist.txt" # Optional fleet-wide blacklist merged with per-account lists
+  # global_whitelist: "whitelist.txt" # Optional fleet-wide whitelist merged with per-account lists
+
+accounts:
+  - username: "my_first_account"
+    config: "accounts/my_first_account/config.yml"
+    device: "emulator-5554"       # Dedicated Android emulator serial or IP:port (127.0.0.1:5555)
+    enabled: true
+    priority: 1                  # Launch order priority (lower numbers boot first)
+    # gemini_api_key: "AIzaSy..." # Optional account-specific Gemini API key for quota segregation
+    schedule:
+      working_hours: "09:00-22:00"
+
+  - username: "my_second_account"
+    config: "accounts/my_second_account/config.yml"
+    device: "emulator-5556"
+    enabled: true
+    priority: 2
+    schedule:
+      working_hours: "10:00-23:00"

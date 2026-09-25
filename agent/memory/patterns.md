@@ -49,5 +49,8 @@
   description: "Bypass hung or lagging accessibility RPC daemons by falling back to parameterized direct ADB shell commands (<50ms) for core device metadata, and feed transport metrics into self-learning dogfood optimizers."
   context: "Android mobile automation where UiAutomator/atx-agent daemons crash or disconnect (e.g. Android 17 emulator Skia rendering ANR loops or HTTP timeouts), multiplying exponential retries into fatal 45-minute hangs before bot start."
   solution: "In DeviceFacade.get_info() and get_device_info(), reduce RPC attempts and query ro.product.model, ro.build.version.sdk, wm size, wm density, and dumpsys power via direct adb shell. Cache results in a single query pass. Track RPC disconnects, ADB timeouts, and device health latency in PerformanceTracker and expose them to DogfoodOptimizer for autonomous health recommendations."
-
-
+- date: 2026-09-25
+  name: multi-process-fleet-supervision-and-atomic-beacon-ipc
+  description: "Supervise N independent mobile automation bot processes across separate Android emulators with atomic status beaconing, targeted ADB reconnects, bounded log rotation, and zero-downtime hot-reloads."
+  context: "Multi-account mobile app automation where running multiple accounts in threads or via sequential in-app account switching causes global singleton collisions, memory leaks, crash cascades, and shared quota starvation."
+  solution: "Isolate each account into a distinct OS subprocess targeting an emulator via --device; write telemetry atomically to .status.json using tmpfile rename; handle Windows file-lock sharing violations via retry loops; assert sys.boot_completed and init.svc.bootanim before start; bound stdout logs to 10MB; suppress global adb kill-server in favor of adb -s <id> reconnect; and implement zero-downtime configuration reload with diff-based process recycling."

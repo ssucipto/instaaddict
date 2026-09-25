@@ -5,6 +5,61 @@
 - date: 2026-09-25
   executor: Antigravity
   branch: master
+  tasks_completed: [acp-validate, acp-sync, acp-update, acp-commit, docs-user-guide]
+  done:
+    - authored-comprehensive-480-line-user-guide-docs-user-guide-md-covering-all-10-operational-domains
+    - documented-system-architecture-prerequisites-and-multi-emulator-setup-for-android-studio-bluestacks-and-ldplayer
+    - documented-single-account-mode-configuration-working-hours-and-interaction-limits
+    - documented-multi-account-fleet-orchestration-multi-config-yml-schema-supervisor-execution-and-tui-modes
+    - documented-hotkeys-zero-downtime-hot-reloading-headless-server-execution-and-cli-management-subcommands
+    - documented-multimodal-gemini-vision-ai-setup-australian-dog-persona-and-429-backoff-quota-handling
+    - documented-autonomous-content-queue-directory-structure-sidecars-and-rate-limiting
+    - documented-two-way-telegram-assistant-remote-photo-queueing-interactive-commands-and-fleet-targeting
+    - documented-autonomous-reliability-and-safety-shields-watchdogs-peek-liking-grid-trap-breakers-and-adb-fallbacks
+    - documented-self-learning-dogfood-optimizer-history-md-automated-tuning-and-fleet-aggregation
+    - updated-readme-md-with-table-of-contents-milestones-8-through-11-sections-quick-start-modes-and-cli-flags
+    - updated-agent-design-requirements-md-with-section-17-for-multi-account-fleet-orchestration-and-21-safeguards
+    - updated-agent-milestones-milestone-11-multi-account-orchestration-md-status-to-completed-with-checked-criteria
+    - added-multi-account-orchestration-domain-entity-to-agent-wiki-domain-yml
+    - validated-entire-acp-documentation-tree-with-python-scripts-validate-acp-py-achieving-zero-errors-and-zero-warnings
+    - verified-full-test-suite-parity-with-445-of-445-tests-passing-100-percent-green-in-124s
+    - passed-all-6-of-6-acp-ci-fast-tier-gates-with-100-percent-pass-rate
+  deferred: []
+  key_fact: "Providing a unified 10-section User Guide alongside synchronized README and domain entities connects complex technical safeguards (such as 21 GAP mitigations, atomic status beaconing, and targeted ADB reconnects) into actionable, developer-friendly operator runbooks."
+
+- date: 2026-09-25
+  executor: Antigravity
+  branch: master
+  tasks_completed: [audit-127, audit-128, audit-129, audit-130, review-063, review-064, route-066, milestone-11, task-42, task-43, task-44, task-45, task-46, task-47, task-48, task-49]
+  done:
+    - engineered-multi-process-supervision-architecture-for-n-instagram-accounts-across-assigned-android-emulators
+    - implemented-multi-account-config-schema-parser-and-diagnostics-with-multiconfigvalidationerror-in-multi-config-py
+    - created-production-ready-config-examples-multi-config-yml-template-with-staggered-intervals-and-device-mappings
+    - implemented-status-beacon-writer-atomic-json-serialization-and-stop-sentinel-detection-in-beacon-py
+    - engineered-beacon-reader-with-3-attempt-exponential-retry-loop-resilient-to-windows-ntfs-file-locks
+    - built-account-orchestrator-process-supervisor-with-exclusive-pid-lock-zombie-reaping-and-clean-signal-handling
+    - implemented-bounded-10mb-stdout-log-rotation-preventing-disk-exhaustion-in-long-running-24-7-runs
+    - added-emulator-boot-property-assertions-sys-boot-completed-and-bootanim-avoiding-early-connection-timeouts
+    - hardened-device-facade-to-suppress-global-adb-kill-server-and-perform-targeted-adb-reconnect-in-multi-account-mode
+    - isolated-gemini-api-keys-per-account-injected-via-child-process-environment-variables-preventing-quota-starvation
+    - built-rich-live-tui-multi-account-dashboard-with-table-card-and-telemetry-views-and-1-fps-render-governor
+    - added-mtime-dirty-checking-in-dashboard-limiting-supervisor-cpu-utilization-to-under-0-5-percent
+    - implemented-zero-downtime-hot-reload-reload-config-with-c-hotkey-and-reload-cli-signal
+    - engineered-autonomous-health-monitor-daemon-with-limit-reached-exit-tolerance-and-serialized-jittered-recovery
+    - implemented-multi-account-telemetry-aggregator-generating-markdown-and-json-fleet-reports-with-auto-tuning-hooks
+    - added-cmd-multi-cli-subcommand-supporting-status-stop-restart-reload-and-only-flags
+    - extended-telegram-bot-with-targeted-account-command-routing-and-caption-photo-routing
+    - authored-25-case-headless-integration-test-suite-in-test-multi-account-orchestration-py-passing-in-under-2s
+    - preserved-100-percent-backward-compatibility-for-legacy-single-account-mode-run-py-config
+    - verified-zero-regressions-across-entire-445-test-repository-suite-445-of-445-passing-100-percent-green
+    - passed-all-6-of-6-acp-ci-fast-tier-gates-validate-ts-review-measure-npm-test-ci-validate-integrity-e2e-integrity-v2-e2e
+    - authored-audit-reports-127-128-129-and-130-and-reviews-063-and-064-certifying-production-quality
+  deferred: []
+  key_fact: "Running multi-account Instagram automation requires true multi-process isolation (one Python subprocess per account/emulator) rather than multi-threading or in-app account switching. Isolating singletons, bounding stdout logs to 10MB, using atomic `.status.json` with NT file-lock retry readers, checking boot completion (`sys.boot_completed == '1'`), and suppressing global `adb kill-server` in favor of targeted `adb reconnect` delivers a resilient 24/7 supervisor architecture with zero regressions on existing single-account mode."
+
+- date: 2026-09-25
+  executor: Antigravity
+  branch: master
   tasks_completed: [audit-126, route-065, task-41]
   done:
     - forensically-diagnosed-android-17-skia-graphics-anr-loop-and-uiautomator2-gateway-error-timeout-in-audit-126

@@ -1,6 +1,34 @@
 # Changelog
 
-## v1.4.1 — Engagement Pipeline Hardening, Reels Ad Filtering & Invariant Robustness
+## v1.4.1 (2026-09-25) — Milestone 11 Multi-Account Fleet Orchestration & Comprehensive Operator Guide
+
+Major milestone release delivering full multi-process fleet orchestration, atomic IPC status beaconing, autonomous emulator and process health monitoring, real-time live TUI dashboard, zero-downtime hot reloading, 21 production safeguards (GAP-01 to GAP-21), and the complete 10-section User & Operator Guide (`docs/USER_GUIDE.md`).
+
+### Added
+- **Multi-Account Fleet Supervisor (`InstaAddict/core/orchestrator.py`, `python run.py multi`)**:
+  - Independent OS subprocess execution per account with exclusive PID locking and zombie process reaping.
+  - Staggered emulator launch delays (10–20s) preventing CPU/IO contention storms.
+  - Granular account filtering via `--only <acc1> [acc2...]`.
+  - Graceful shutdown sentinels (`.stop`) allowing active posts to finish cleanly.
+- **Atomic IPC Status Beaconing (`InstaAddict/core/beacon.py`)**:
+  - Non-blocking daemon writing atomic `.status.json` and `.ipc/accounts/<username>.json` every ~5s.
+  - Instantaneous CLI query subcommand (`python run.py multi --status`).
+  - Cross-platform NTFS/Unix file lock retry readers eliminating contention crashes.
+- **Autonomous Health Monitor Watchdog (`InstaAddict/core/health_monitor.py`)**:
+  - Background watchdog detecting stale heartbeats (>45s), process crashes, and dead ADB connections.
+  - Exponential restart backoff with crash-loop throttling (max 3 consecutive attempts).
+- **Interactive Multi-Account TUI Dashboard (`InstaAddict/core/multi_dashboard.py`)**:
+  - Curses/Rich live dashboard with 3 view modes (Fleet Table, Account Cards, Telemetry Funnel).
+  - Dynamic hotkeys (`[Tab]` cycle views, `[C]` hot reload, `[Q]` quit) with <0.5% CPU overhead.
+  - Headless/plain logging mode (`--no-tui`) for CI, cron, and Docker deployments.
+- **Cross-Account Fleet Telemetry Aggregator (`InstaAddict/core/multi_telemetry.py`)**:
+  - Cross-account telemetry aggregation generating Markdown and JSON analytics reports.
+- **Two-Way Telegram Multi-Account Supervision (`InstaAddict/plugins/telegram.py`)**:
+  - Remote targeting commands (`/status @account`, `/restart @account`, `/post @account`) and media routing.
+- **Complete User & Operator Manual (`docs/USER_GUIDE.md`)**:
+  - 10-section production runbook covering single-account, multi-account fleet, Vision AI, content queue, safety shields, and troubleshooting.
+
+## v1.4.1 (Earlier) — Engagement Pipeline Hardening, Reels Ad Filtering & Invariant Robustness
 
 Patch release resolving false-positive Reels ad classification, inline follow button discovery in modern Instagram v446+, session state dictionary type invariants, range-safe percentage expression parsing, post-lifecycle comment decoupling for already-liked posts, and defensive profile filter null-guards. Also introduces InstaAddict-AI rebranding, dedicated CLI entrypoint, 3rd TUI view mode (Filter Intelligence), and post-session Rich terminal summary renderer.
 
