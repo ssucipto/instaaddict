@@ -275,3 +275,61 @@ def test_upload_to_ig_executes_aspect_ratio_adjustment(plugin, temp_images):
 
     # _adjust_aspect_ratio should have been called with 'landscape'
     plugin._adjust_aspect_ratio.assert_called_once_with(device, "landscape")
+
+
+def _write_synthetic_mp4(filepath: str, width: int, height: int) -> None:
+    """Helper to write a valid minimal MP4 header structure with specified track dimensions."""
+    import struct
+
+    matrix = (
+        b"\x00\x01\x00\x00"
+        + b"\x00" * 12
+        + b"\x00\x01\x00\x00"
+        + b"\x00" * 12
+        + b"\x40\x00\x00\x00"
+    )
+    tkhd_body = (
+        b"\x00\x00\x00\x00"
+        + b"\x00" * 20
+        + b"\x00" * 8
+        + b"\x00\x00"
+        + b"\x00\x00"
+        + b"\x00\x00"
+        + b"\x00\x00"
+        + matrix
+        + struct.pack(">II", width << 16, height << 16)
+    )
+    tkhd_box = struct.pack(">I4s", len(tkhd_body) + 8, b"tkhd") + tkhd_body
+    trak_box = struct.pack(">I4s", len(tkhd_box) + 8, b"trak") + tkhd_box
+    moov_box = struct.pack(">I4s", len(trak_box) + 8, b"moov") + trak_box
+    ftyp_box = struct.pack(">I4s", 16, b"ftyp") + b"isom\x00\x00\x02\x00"
+
+    with open(filepath, "wb") as f:
+        f.write(ftyp_box + moov_box)
+
+
+def test_parse_mp4_dimensions(tmp_path):
+    """Verifies that _parse_mp4_dimensions correctly extracts width and height from MP4 atoms."""
+    from InstaAddict.plugins.upload_posts import _parse_mp4_dimensions
+
+    mp4_file = str(tmp_path / "video.mp4")
+    _write_synthetic_mp4(mp4_file, 1080, 1920)
+    dims = _parse_mp4_dimensions(mp4_file)
+    assert dims == (1080, 1920)
+
+
+def test_detect_media_aspect_ratio_video_portrait(plugin, tmp_path):
+    """Verifies that _detect_media_aspect_ratio detects portrait (9:16) for vertical video."""
+    video_path = str(tmp_path / "reel.mp4")
+    _write_synthetic_mp4(video_path, 1080, 1920)
+    ratio = plugin._detect_media_aspect_ratio(video_path)
+    assert ratio == "portrait"
+
+
+def test_detect_media_aspect_ratio_video_landscape(plugin, tmp_path):
+    """Verifies that _detect_media_aspect_ratio detects landscape (16:9) for horizontal video."""
+    video_path = str(tmp_path / "wide.mp4")
+    _write_synthetic_mp4(video_path, 1920, 1080)
+    ratio = plugin._detect_media_aspect_ratio(video_path)
+    assert ratio == "landscape"
+

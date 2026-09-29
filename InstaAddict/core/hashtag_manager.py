@@ -416,6 +416,7 @@ class HashtagManager:
         tag: str,
         posts_found: bool = True,
         already_liked_exhausted: bool = False,
+        strikes_needed: int = 1,
     ) -> None:
         """R-PRN-1 & R-PRN-2: Records search/interaction outcomes to prune dead or saturated tags."""
         if not tag:
@@ -424,18 +425,26 @@ class HashtagManager:
 
         # R-PRN-1: Dead Tag Pruning
         if not posts_found:
-            dead_tags = self.master_data.setdefault("dead_tags", [])
-            if clean_tag not in dead_tags:
-                dead_tags.append(clean_tag)
-                # Remove from tier active lists
-                for tier in self.master_data.get("tiers", {}).values():
-                    tags = tier.get("tags", [])
-                    if clean_tag in tags:
-                        tags.remove(clean_tag)
-                logger.warning(
-                    f"[HashtagManager] Tag #{clean_tag} produced 0 results. Marked as DEAD and pruned."
+            zero_counts = self.master_data.setdefault("zero_post_counts", {})
+            cur_count = zero_counts.get(clean_tag, 0) + 1
+            zero_counts[clean_tag] = cur_count
+            self._dirty = True
+            if cur_count >= strikes_needed:
+                dead_tags = self.master_data.setdefault("dead_tags", [])
+                if clean_tag not in dead_tags:
+                    dead_tags.append(clean_tag)
+                    # Remove from tier active lists
+                    for tier in self.master_data.get("tiers", {}).values():
+                        tags = tier.get("tags", [])
+                        if clean_tag in tags:
+                            tags.remove(clean_tag)
+                    logger.warning(
+                        f"[HashtagManager] Tag #{clean_tag} produced 0 results across {cur_count} sessions. Marked as DEAD and pruned."
+                    )
+            else:
+                logger.info(
+                    f"[HashtagManager] Tag #{clean_tag} produced 0 results (strike {cur_count}/{strikes_needed}). Tag will only be pruned if confirmed empty again."
                 )
-                self._dirty = True
 
         # R-PRN-2: Saturation Benching
         elif already_liked_exhausted:

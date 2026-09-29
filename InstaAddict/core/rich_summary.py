@@ -69,7 +69,10 @@ def print_rich_session_summary(sessions: list, scrape_mode: Optional[str]) -> No
 
     console = Console(highlight=False, markup=True)
     latest = sessions[-1]
-    username = getattr(latest, "my_username", None) or "unknown"
+    username = getattr(latest, "my_username", None)
+    if not username or username == "unknown":
+        from InstaAddict.core.configuration import Configs
+        username = getattr(getattr(Configs, "args", None), "username", None) or "unknown"
     finish_time = getattr(latest, "finishTime", None) or datetime.now()
     start_time = getattr(latest, "startTime", datetime.now())
     duration_str = str(finish_time - start_time).split(".")[0]

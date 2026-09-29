@@ -598,5 +598,133 @@ class TestTelegramAudit055(unittest.TestCase):
         self.assertIn("local_media_path", sig.parameters, "local_media_path must be in signature")
 
 
+class TestUploadMechanismRemediationAudit133(unittest.TestCase):
+    """Regression and verification tests for Audit 133 upload mechanism hardening."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.plugin = UploadPostsPlugin()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_record_publication_and_rate_limit_ledger(self):
+        """AUDIT-133-G05: _record_publication writes to .upload_history.json and _is_rate_limited respects it."""
+        from InstaAddict.plugins.upload_posts import _record_publication, PUBLICATION_HISTORY_FILENAME
+
+        published_dir = os.path.join(self.test_dir, "published")
+        os.makedirs(published_dir, exist_ok=True)
+
+        _record_publication(published_dir, "test_dog.jpg", caption="Enjoying the sunny morning")
+
+        ledger_path = os.path.join(published_dir, PUBLICATION_HISTORY_FILENAME)
+        self.assertTrue(os.path.exists(ledger_path))
+
+        with open(ledger_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]["filename"], "test_dog.jpg")
+            self.assertIn("timestamp", data[0])
+
+        # With 12 hour rate limit, it should be rate limited immediately
+        self.assertTrue(self.plugin._is_rate_limited(published_dir, rate_limit_hours=12.0))
+        # With 0 hour rate limit, it should not be rate limited
+        self.assertFalse(self.plugin._is_rate_limited(published_dir, rate_limit_hours=0.0))
+
+    def test_rate_limit_prefers_history_ledger_over_reset_mtime(self):
+        """AUDIT-133-G05: Even if files are moved/reset, history ledger enforces accurate rate limit."""
+        from InstaAddict.plugins.upload_posts import _record_publication
+
+        published_dir = os.path.join(self.test_dir, "published")
+        os.makedirs(published_dir, exist_ok=True)
+
+        # File on disk has an old mtime (e.g. 24 hours ago)
+        old_file = os.path.join(published_dir, "old.jpg")
+        with open(old_file, "w") as f:
+            f.write("content")
+        old_time = (datetime.now() - timedelta(hours=24)).timestamp()
+        os.utime(old_file, (old_time, old_time))
+
+        # Ledger records a recent publication (e.g. 1 hour ago)
+        ledger_path = os.path.join(published_dir, ".upload_history.json")
+        recent_time = (datetime.now() - timedelta(hours=1)).timestamp()
+        with open(ledger_path, "w", encoding="utf-8") as f:
+            json.dump([{"filename": "recent.jpg", "timestamp": recent_time, "published_at": str(datetime.now())}], f)
+
+        # 12h rate limit should trigger because ledger shows 1h ago
+        self.assertTrue(self.plugin._is_rate_limited(published_dir, rate_limit_hours=12.0))
+        # 0.5h rate limit should NOT trigger (1h > 0.5h)
+        self.assertFalse(self.plugin._is_rate_limited(published_dir, rate_limit_hours=0.5))
+
+    def test_post_first_comment_navigates_profile_grid(self):
+        """AUDIT-133-G02: _post_first_comment navigates to Profile tab and selects grid item to avoid commenting on Home ads."""
+        device = MagicMock()
+        d = MagicMock()
+        device.deviceV2 = d
+
+        profile_btn = MagicMock()
+        profile_btn.exists.return_value = True
+
+        first_grid_item = MagicMock()
+        first_grid_item.exists.return_value = True
+
+        comment_btn = MagicMock()
+        comment_btn.exists.return_value = True
+
+        comment_box = MagicMock()
+        comment_box.exists.return_value = True
+
+        send_btn = MagicMock()
+        send_btn.exists.return_value = True
+
+        def d_mock(**kwargs):
+            desc = str(kwargs.get("descriptionMatches", ""))
+            res = str(kwargs.get("resourceIdMatches", ""))
+            if "Profile" in desc or "profile" in res:
+                return profile_btn
+            if "grid_item" in res or "row_feed_photo_item" in res:
+                return first_grid_item
+            if "omment" in desc.lower() or "omment" in res.lower():
+                return comment_btn
+            if "send" in desc.lower() or "post" in desc.lower() or "post" in res.lower():
+                return send_btn
+            if kwargs.get("focused") is True:
+                return comment_box
+            mock_elem = MagicMock()
+            mock_elem.exists.return_value = True
+            return mock_elem
+
+        d.side_effect = d_mock
+
+        with patch("InstaAddict.plugins.upload_posts.random_sleep"):
+            self.plugin._post_first_comment(device, "#dogs #puppy")
+
+        # Verify profile navigation was prioritized
+        profile_btn.click.assert_called_once()
+        first_grid_item.click.assert_called_once()
+        comment_btn.click.assert_called_once()
+        comment_box.set_text.assert_called_once_with("#dogs #puppy")
+        send_btn.click.assert_called_once()
+
+    def test_telegram_download_file_atomic_staging(self):
+        """AUDIT-133-G04: telegram_bot_download_file writes to .tmp and atomically replaces on success."""
+        from InstaAddict.plugins.telegram import telegram_bot_download_file
+
+        dest_file = os.path.join(self.test_dir, "downloaded.jpg")
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b"chunk1", b"chunk2"]
+        mock_response.__enter__.return_value = mock_response
+
+        with patch("InstaAddict.plugins.telegram.requests.get", return_value=mock_response):
+            success = telegram_bot_download_file("TOKEN", "photos/file_1.jpg", dest_file)
+
+        self.assertTrue(success)
+        self.assertTrue(os.path.exists(dest_file))
+        # Ensure temporary file is cleaned up after atomic replace
+        self.assertFalse(os.path.exists(f"{dest_file}.tmp"))
+        with open(dest_file, "rb") as f:
+            self.assertEqual(f.read(), b"chunk1chunk2")
+
+
 if __name__ == "__main__":
     unittest.main()

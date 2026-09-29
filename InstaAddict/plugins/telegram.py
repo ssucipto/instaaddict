@@ -54,6 +54,7 @@ def get_upload_cooldown_status(
     """
     Checks the latest uploaded post in accounts/<username>/content_queue/published
     to determine if the post cooldown is currently active.
+    Checks the persistent upload history ledger first, falling back to file mtime (AUDIT-133-G05).
     Returns: (is_limited: bool, elapsed_hours: float, remaining_hours: float)
     """
     if rate_limit_hours is None:
@@ -76,6 +77,38 @@ def get_upload_cooldown_status(
         return False, 999.0, 0.0
 
     latest_mtime: Optional[datetime] = None
+
+    # Tier 1: Check persistent history ledger (AUDIT-133-G05)
+    ledger_candidates = [
+        os.path.join(published_dir, ".upload_history.json"),
+        os.path.join(os.path.dirname(published_dir), "upload_history.json"),
+    ]
+    for ledger_path in ledger_candidates:
+        if os.path.exists(ledger_path):
+            try:
+                with open(ledger_path, "r", encoding="utf-8") as lf:
+                    history = json.load(lf)
+                    if isinstance(history, list):
+                        for item in history:
+                            ts = item.get("timestamp")
+                            pub_at = item.get("published_at")
+                            dt = None
+                            if ts:
+                                try:
+                                    dt = datetime.fromtimestamp(float(ts))
+                                except Exception:
+                                    dt = None
+                            elif pub_at:
+                                try:
+                                    dt = datetime.fromisoformat(str(pub_at))
+                                except Exception:
+                                    dt = None
+                            if dt and (latest_mtime is None or dt > latest_mtime):
+                                latest_mtime = dt
+            except Exception:
+                pass
+
+    # Tier 2: Check filesystem mtime
     allowed_exts = (".jpg", ".jpeg", ".png", ".mp4")
     for root, _, files in os.walk(published_dir):
         for file in files:
@@ -210,13 +243,15 @@ def _save_telegram_state(username: str, state: dict):
 
 
 def _get_pending_media(pending_dir: str) -> List[str]:
-    """Returns sorted list of pending media files by modification time (oldest to newest)."""
+    """Returns sorted list of pending media files by modification time (oldest to newest), excluding temp files."""
     if not os.path.exists(pending_dir):
         return []
     files = [
         f
         for f in os.listdir(pending_dir)
         if f.lower().endswith((".jpg", ".jpeg", ".png", ".mp4"))
+        and not f.startswith(".")
+        and not f.endswith(".tmp")
     ]
     files.sort(key=lambda f: os.path.getmtime(os.path.join(pending_dir, f)))
     return files
@@ -260,18 +295,25 @@ def telegram_bot_get_file_path(
 def telegram_bot_download_file(
     bot_api_token: str, file_path: str, dest_path: str
 ) -> bool:
-    """Stream download a media file from Telegram to local disk."""
+    """Stream download a media file from Telegram to local disk with atomic rename (AUDIT-133-G04)."""
+    tmp_path = f"{dest_path}.tmp"
     try:
         url = f"https://api.telegram.org/file/bot{bot_api_token}/{file_path}"
         with requests.get(url, stream=True, timeout=30) as r:
             r.raise_for_status()
-            with open(dest_path, "wb") as f:
+            with open(tmp_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
+        os.replace(tmp_path, dest_path)
         return True
     except Exception as e:
         logger.error(f"Failed to download media file from Telegram: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         return False
 
 

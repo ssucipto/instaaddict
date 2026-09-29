@@ -1009,5 +1009,209 @@ carryovers:
       - InstaAddict/core/device_facade.py
       - InstaAddict/core/bot_flow.py
 
+  - id: CO-080
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-01: Modern Android Keyguard unlock failure causing Session #5 early termination (0:00:44). Upgraded DeviceFacade.is_screen_locked() to parse isKeyguardShowing/mDreamingLockscreen and DeviceFacade.unlock() with adb shell wm dismiss-keyguard, input keyevent 224/82. Replaced fatal stop_bot() with daemon retry loop."
+    affected_files:
+      - InstaAddict/core/device_facade.py
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-081
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-02: Session summary and reporting showed @unknown and saved to accounts/unknown/ due to SessionState.my_username late initialization. Initialized my_username from configs.args.username fallback."
+    affected_files:
+      - InstaAddict/core/session_state.py
+      - InstaAddict/core/rich_summary.py
+
+  - id: CO-082
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-03: Watchdog Tier 2 task skip flag non-consumption caused cascade of abandoned tasks. Replaced non-destructive is_skip_task_requested() with consume_skip_task_request() in handle_sources, interact_reels, and action_unfollow_followers, and added heartbeats to search navigation."
+    affected_files:
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/plugins/interact_reels.py
+      - InstaAddict/plugins/action_unfollow_followers.py
+      - InstaAddict/core/views.py
+
+  - id: CO-083
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-04: False-positive DEAD hashtag pruning caused by Peek Preview touch duration and aggressive single-failure record_hashtag_result(posts_found=False). Added instantaneous adb tap, guarded with _check_if_no_posts(), required two-strike failure in HashtagManager, and restored 22 pruned hashtags."
+    affected_files:
+      - InstaAddict/core/navigation.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/core/hashtag_manager.py
+      - accounts/lolatheozjack/hashtags.yml
+
+  - id: CO-084
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-05: Unfollow job 0% yield across 106 minutes due to 1,449 non-bot cache hits sorted oldest-to-newest and parameter typo (sort_followers_newest_to_oldest vs sort_followings_by_latest). Added 40 consecutive cache hit saturation break and fixed parameter check."
+    affected_files:
+      - InstaAddict/plugins/action_unfollow_followers.py
+      - accounts/lolatheozjack/config.yml
+
+  - id: CO-085
+    audit_report: agent/reports/audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    date_raised: 2026-09-26
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-26'
+    verified_in_audit: audit-131-bot-stopping-and-dogfood-tuning-investigation.md
+    summary: "F-06: Dogfood Optimizer lacked rules for COOLDOWN starvation and unfollow cache saturation. Added automated recommendations for can-reinteract-after and sort-followings-by-latest."
+    affected_files:
+      - InstaAddict/core/dogfood.py
+      - accounts/lolatheozjack/config.yml
+
+  - id: CO-086
+    audit_report: agent/reports/audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    date_raised: 2026-09-29
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    summary: "F-01: Post-sleep bot process termination caused by unhandled DeviceFacade.JsonRpcError during profile recovery. Added (AppHasCrashed, JsonRpcError) handling across startup and inter-job loops with automated uiautomator daemon resurrection and post-sleep connection verification."
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/device_facade.py
+
+  - id: CO-087
+    audit_report: agent/reports/audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    date_raised: 2026-09-29
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    summary: "F-02: Biography filter starvation (46.9% rejections) caused by coupling specific_alphabet with empty biography check. Decoupled biography check into optional skip_if_empty_biography, preserved empty bios when mandatory words are unset, and normalized _find_alphabet to return empty string."
+    affected_files:
+      - InstaAddict/core/filter.py
+      - accounts/lolatheozjack/filters.yml
+
+  - id: CO-088
+    audit_report: agent/reports/audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-132-bot-stopping-crash-and-telemetry-optimization.md
+    summary: "F-03: Content queue upload failures caused by back-press discarding Instagram composer when bottom sheet Done button was absent. Replaced back-press with top preview tap (0.5, 0.2) and broadened Next button locators."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - accounts/lolatheozjack/content_queue/
+
+  - id: CO-089
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G01: MediaStore content URI resolution hardening with insert/query retries, preventing FileUriExposedException on Android API 24–36."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-090
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G02: Profile-targeted navigation in _post_first_comment to open own top grid post, eliminating hashtag commenting on sponsored Home feed ads."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-091
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G03: Pure-Python zero-dependency ISO BMFF MP4 header parser (_parse_mp4_dimensions) for native video dimension extraction and aspect ratio calculation."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - test/test_upload_aspect_ratio.py
+
+  - id: CO-092
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G04: Enforced atomic .tmp download staging and os.replace in Telegram file ingestion, and filtered .tmp files out of pending upload queue."
+    affected_files:
+      - InstaAddict/plugins/telegram.py
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-093
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G05: Implemented durable .upload_history.json ledger for upload rate-limiting, decoupling cooldowns from filesystem mtime."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - test/test_upload_posts.py
+
+  - id: CO-094
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G06: Expanded Share button heuristics for modern Reels composer and feed upload variants."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-095
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G07: Wrapped _upload_to_ig in try...finally ensuring ADB temporary files and MediaStore records are purged on exit."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+  - id: CO-096
+    audit_report: agent/reports/audit-133-upload-mechanism-gaps-and-shortcuts.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-133-upload-mechanism-gaps-and-shortcuts.md
+    summary: "G08: Enhanced upload failure exception logging and telemetry error diagnostics."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+
 
 

@@ -230,10 +230,21 @@ def start_bot(**kwargs):
         if device.is_screen_locked():
             device.unlock()
             if device.is_screen_locked():
-                logger.error(
-                    "Can't unlock your screen. There may be a passcode on it. If you would like your screen to be turned on and unlocked automatically, please remove the passcode."
+                logger.warning(
+                    "Screen reported locked after unlock attempt. Attempting to launch Instagram directly..."
                 )
-                stop_bot(device, sessions, session_state, was_sleeping=False)
+                if not open_instagram(device):
+                    logger.error(
+                        "Can't unlock your screen and failed to foreground Instagram. There may be a passcode on it. "
+                        "If you would like your screen to be turned on and unlocked automatically, please remove the passcode."
+                    )
+                    total_sessions_val = getattr(getattr(configs, "args", None), "total_sessions", -1)
+                    if total_sessions_val == -1 or can_repeat(len(sessions), total_sessions_val):
+                        logger.warning("Screen lock recovery: sleeping 5 minutes before retrying session cycle...")
+                        time.sleep(300)
+                        continue
+                    else:
+                        stop_bot(device, sessions, session_state, was_sleeping=False)
 
         logger.info("Device screen ON and unlocked.")
         if open_instagram(device):
@@ -324,12 +335,16 @@ def start_bot(**kwargs):
                     dashboard_manager.update_render()
                 startup_ok = True
                 break
-            except DeviceFacade.AppHasCrashed:
+            except (DeviceFacade.AppHasCrashed, DeviceFacade.JsonRpcError) as startup_err:
                 logger.warning(
-                    f"AppHasCrashed during startup (attempt {startup_attempt + 1}/3). Relaunching Instagram via open_instagram()...",
+                    f"{type(startup_err).__name__} during startup (attempt {startup_attempt + 1}/3). Resurrecting daemon and relaunching Instagram...",
                     extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                 )
                 session_state.totalCrashes += 1
+                try:
+                    device.ensure_uiautomator_alive()
+                except Exception:
+                    pass
                 open_instagram(device)
                 random_sleep(2, 4, modulable=False)
             except Exception as e:
@@ -477,6 +492,10 @@ def start_bot(**kwargs):
 
             if curr_user != session_state.my_username:
                 logger.debug("Not in your main profile. Initiating recovery...")
+                try:
+                    device.ensure_uiautomator_alive()
+                except Exception:
+                    pass
                 # Immediate pre-recovery popup sweep (CO-028 / CO-030)
                 UniversalActions.dismiss_dialog(device)
 
@@ -542,12 +561,16 @@ def start_bot(**kwargs):
                             if profile_view.getUsername(error=False) == session_state.my_username:
                                 on_profile = True
                                 break
-                    except DeviceFacade.AppHasCrashed:
+                    except (DeviceFacade.AppHasCrashed, DeviceFacade.JsonRpcError) as nav_err:
                         logger.warning(
-                            f"AppHasCrashed caught during profile recovery attempt {attempt + 1}/4. Executing self-healing relaunch...",
+                            f"{type(nav_err).__name__} caught during profile recovery attempt {attempt + 1}/4. Executing self-healing relaunch...",
                             extra={"color": f"{Style.BRIGHT}{Fore.YELLOW}"},
                         )
                         session_state.totalCrashes += 1
+                        try:
+                            device.ensure_uiautomator_alive()
+                        except Exception:
+                            pass
                         open_instagram(device)
                         random_sleep(2, 4, modulable=False)
                         UniversalActions.dismiss_dialog(device)
@@ -800,6 +823,15 @@ def start_bot(**kwargs):
                     device,
                 )
                 watchdog.resume()
+
+            # Wake-up health check & daemon resurrection after inter-session sleep
+            if device:
+                try:
+                    logger.info("Verifying device connection and UiAutomator health after sleep...")
+                    device.ensure_uiautomator_alive()
+                    UniversalActions.dismiss_dialog(device)
+                except Exception as post_sleep_err:
+                    logger.warning(f"Post-sleep device health verification error: {post_sleep_err}")
         else:
             break
 

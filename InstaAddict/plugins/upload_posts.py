@@ -5,8 +5,9 @@ import shutil
 import time
 import logging
 import subprocess
+import struct
 import yaml
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
 from InstaAddict.core.plugin_loader import Plugin
@@ -19,6 +20,98 @@ logger = logging.getLogger(__name__)
 # Constants
 ALLOWED_EXTENSIONS: tuple = (".jpg", ".jpeg", ".png", ".mp4")
 DEFAULT_RATE_LIMIT_HOURS: float = 12.0
+PUBLICATION_HISTORY_FILENAME: str = ".upload_history.json"
+
+
+def _parse_mp4_dimensions(media_path: str) -> Optional[Tuple[int, int]]:
+    """Extracts (width, height) of primary video track from an MP4 file by parsing ISO BMFF atoms.
+
+    Parses 'moov' -> 'trak' -> 'tkhd' box without any external binary dependencies.
+    """
+    if not media_path or not os.path.exists(media_path):
+        return None
+    try:
+        file_size = os.path.getsize(media_path)
+        with open(media_path, "rb") as f:
+            offset = 0
+            while offset < file_size:
+                f.seek(offset)
+                hdr = f.read(8)
+                if len(hdr) < 8:
+                    break
+                box_size, box_type = struct.unpack(">I4s", hdr)
+                if box_size == 1:
+                    hdr64 = f.read(8)
+                    if len(hdr64) < 8:
+                        break
+                    box_size = struct.unpack(">Q", hdr64)[0]
+                    hdr_len = 16
+                elif box_size == 0:
+                    box_size = file_size - offset
+                    hdr_len = 8
+                else:
+                    hdr_len = 8
+
+                if box_size < hdr_len:
+                    break
+
+                if box_type == b"moov":
+                    moov_content_len = min(box_size - hdr_len, 10 * 1024 * 1024)
+                    moov_bytes = f.read(moov_content_len)
+                    trak_idx = 0
+                    while True:
+                        trak_idx = moov_bytes.find(b"trak", trak_idx)
+                        if trak_idx == -1:
+                            break
+                        if trak_idx >= 4:
+                            trak_size = struct.unpack(">I", moov_bytes[trak_idx - 4 : trak_idx])[0]
+                            trak_bytes = moov_bytes[trak_idx - 4 : trak_idx - 4 + trak_size]
+                            tkhd_idx = trak_bytes.find(b"tkhd")
+                            if tkhd_idx != -1 and tkhd_idx + 8 <= len(trak_bytes):
+                                ver = trak_bytes[tkhd_idx + 4]
+                                skip = 32 if ver == 1 else 20
+                                dim_offset = tkhd_idx + 4 + 4 + skip + 52
+                                if dim_offset + 8 <= len(trak_bytes):
+                                    w_raw = struct.unpack(">I", trak_bytes[dim_offset : dim_offset + 4])[0] >> 16
+                                    h_raw = struct.unpack(">I", trak_bytes[dim_offset + 4 : dim_offset + 8])[0] >> 16
+                                    if w_raw > 0 and h_raw > 0:
+                                        return int(w_raw), int(h_raw)
+                        trak_idx += 4
+                    break
+                offset += box_size
+    except Exception as e:
+        logger.debug(f"_parse_mp4_dimensions error for {media_path}: {e}")
+    return None
+
+
+def _record_publication(published_dir: str, filename: str, caption: str = "") -> None:
+    """Appends successful publication record to durable history ledger (AUDIT-133-G05)."""
+    if not published_dir:
+        return
+    os.makedirs(published_dir, exist_ok=True)
+    ledger_path = os.path.join(published_dir, PUBLICATION_HISTORY_FILENAME)
+    entry = {
+        "filename": filename,
+        "published_at": datetime.now().isoformat(),
+        "timestamp": time.time(),
+        "caption": caption[:100] if caption else "",
+    }
+    history: List[Dict[str, Any]] = []
+    if os.path.exists(ledger_path):
+        try:
+            with open(ledger_path, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, list):
+                    history = loaded
+        except Exception as e:
+            logger.debug(f"Failed to read existing upload history ledger: {e}")
+            history = []
+    history.append(entry)
+    try:
+        with open(ledger_path, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        logger.debug(f"Failed to write upload history ledger: {e}")
 
 
 class UploadPostsPlugin(Plugin):
@@ -149,7 +242,7 @@ class UploadPostsPlugin(Plugin):
         return DEFAULT_RATE_LIMIT_HOURS
 
     def _is_rate_limited(self, published_dir: str, rate_limit_hours: float) -> bool:
-        """Enforces a global rate limit based on recent file publication timestamps."""
+        """Enforces a global rate limit based on persistent history ledger and file mtimes."""
         if rate_limit_hours <= 0:
             logger.info("Upload rate limit is disabled (<= 0 hours specified).")
             return False
@@ -162,6 +255,33 @@ class UploadPostsPlugin(Plugin):
         )
         latest_mtime: Optional[datetime] = None
 
+        # Tier 1: Check persistent history ledger (AUDIT-133-G05)
+        ledger_path = os.path.join(published_dir, PUBLICATION_HISTORY_FILENAME)
+        if os.path.exists(ledger_path):
+            try:
+                with open(ledger_path, "r", encoding="utf-8") as f:
+                    history = json.load(f)
+                    if isinstance(history, list):
+                        for item in history:
+                            ts = item.get("timestamp")
+                            pub_at = item.get("published_at")
+                            dt = None
+                            if ts:
+                                try:
+                                    dt = datetime.fromtimestamp(float(ts))
+                                except Exception:
+                                    dt = None
+                            elif pub_at:
+                                try:
+                                    dt = datetime.fromisoformat(str(pub_at))
+                                except Exception:
+                                    dt = None
+                            if dt and (latest_mtime is None or dt > latest_mtime):
+                                latest_mtime = dt
+            except Exception as e:
+                logger.debug(f"Failed to parse upload history ledger: {e}")
+
+        # Tier 2: Check filesystem mtime (fallback or whichever is newer)
         for root, _, files in os.walk(published_dir):
             for file in files:
                 if file.lower().endswith(ALLOWED_EXTENSIONS):
@@ -473,10 +593,14 @@ class UploadPostsPlugin(Plugin):
         if self._is_rate_limited(published_dir, rate_limit_hours):
             return
 
-        # Case-insensitive media discovery
+        # Case-insensitive media discovery, ignoring active temp files and hidden files (AUDIT-133-G04)
         all_files = sorted(os.listdir(pending_dir))
         media_files = [
-            f for f in all_files if f.lower().endswith(ALLOWED_EXTENSIONS)
+            f
+            for f in all_files
+            if f.lower().endswith(ALLOWED_EXTENSIONS)
+            and not f.startswith(".")
+            and not f.endswith(".tmp")
         ]
 
         if not media_files:
@@ -605,6 +729,9 @@ class UploadPostsPlugin(Plugin):
                     except OSError:
                         pass
 
+                # Record publication in persistent history ledger (AUDIT-133-G05)
+                _record_publication(published_dir, media_file, caption=caption)
+
                 if sessions and len(sessions) > 0:
                     current_session = sessions[-1]
                     if hasattr(current_session, "totalUploadsSuccess"):
@@ -688,43 +815,72 @@ class UploadPostsPlugin(Plugin):
             break
 
     def _post_first_comment(self, device: Any, hashtag_text: str) -> None:
-        """Post hashtags as the first comment on the just-published post (CO-020 / F-02).
+        """Post hashtags as the first comment on the just-published post (AUDIT-133-G02).
 
-        Navigates to the Home feed, opens the comment box on the first visible post
-        (which is the one just uploaded), types the hashtag block, and submits.
-        All exceptions are swallowed — a comment failure must never crash an upload.
+        Navigates to the user's Profile tab, selects the newest post from the grid
+        (top-left post, guaranteed to be the user's own post rather than an ad or feed post),
+        opens the comment box, types hashtags, and submits.
+        All exceptions are swallowed gracefully — a comment failure must never crash an upload.
         """
         if not hashtag_text or not hashtag_text.strip():
             return
         try:
             d = device.deviceV2
-            logger.info("First-comment mode: navigating to Home to post hashtag comment...")
+            logger.info("First-comment mode: navigating to Profile to safely post hashtag comment on own post...")
             random_sleep(3, 5)
 
-            # Navigate to Home tab
-            home_btn = d(descriptionMatches="(?i).*Home.*")
-            if home_btn.exists(timeout=5):
-                home_btn.click()
-                random_sleep(2, 3)
-            else:
-                logger.debug("_post_first_comment: Home tab not found — skipping first comment.")
-                return
+            # Step 1: Navigate to Profile tab
+            profile_btn = d(descriptionMatches="(?i).*(Profile|Account|Profile tab).*")
+            if not profile_btn.exists(timeout=3):
+                profile_btn = d(resourceIdMatches=".*profile_tab.*|.*tab_avatar.*")
 
-            # Find comment button on the first visible post
+            navigated_profile = False
+            if profile_btn.exists(timeout=4):
+                profile_btn.click()
+                random_sleep(2, 3)
+                navigated_profile = True
+            else:
+                logger.debug("_post_first_comment: Profile tab not found — falling back to Home tab...")
+                home_btn = d(descriptionMatches="(?i).*Home.*")
+                if home_btn.exists(timeout=5):
+                    home_btn.click()
+                    random_sleep(2, 3)
+                else:
+                    logger.debug("_post_first_comment: Home tab not found — skipping first comment.")
+                    return
+
+            # Step 2: If on Profile, tap the newest post in the media grid
+            if navigated_profile:
+                first_grid_item = d(
+                    resourceIdMatches=".*row_feed_photo_item.*|.*grid_item.*|.*media_image.*|.*image_view.*"
+                )
+                if first_grid_item.exists(timeout=3):
+                    logger.info("Opening newly published post from Profile grid...")
+                    first_grid_item.click()
+                    random_sleep(2, 3)
+
+            # Step 3: Find comment button
             comment_btn = d(descriptionMatches="(?i).*[Cc]omment.*")
-            if not comment_btn.exists(timeout=5):
+            if not comment_btn.exists(timeout=4):
+                comment_btn = d(
+                    resourceIdMatches=".*row_feed_button_comment.*|.*comment_button.*"
+                )
+            if not comment_btn.exists(timeout=3):
                 logger.debug("_post_first_comment: Comment button not found — skipping.")
                 return
             comment_btn.click()
             random_sleep(1, 2)
 
-            # Type hashtags into the comment input box
+            # Step 4: Type hashtags into comment box
             comment_input = d(focused=True)
             if not comment_input.exists(timeout=3):
-                # Fallback: try common comment edittext resource IDs
                 from InstaAddict.core.resources import ResourceID
                 resource_id = ResourceID()
                 comment_input = d(resourceId=resource_id.LAYOUT_COMMENT_THREAD_EDITTEXT)
+            if not comment_input.exists(timeout=3):
+                comment_input = d(
+                    resourceIdMatches=".*layout_comment_thread_edittext.*|.*comment_input.*"
+                )
             if not comment_input.exists(timeout=3):
                 logger.debug("_post_first_comment: Comment input not found — skipping.")
                 return
@@ -733,15 +889,24 @@ class UploadPostsPlugin(Plugin):
             comment_input.set_text(hashtag_text.strip())
             random_sleep(1, 2)
 
-            # Submit the comment
+            # Step 5: Submit the comment
             send_btn = d(descriptionMatches="(?i).*(send|post).*")
             if not send_btn.exists(timeout=3):
-                send_btn = d(resourceId="com.instagram.android:id/layout_comment_thread_post_button_click_area")
+                send_btn = d(
+                    resourceIdMatches=".*layout_comment_thread_post_button.*|.*comment_post_button.*"
+                )
             if send_btn.exists(timeout=3):
                 send_btn.click()
                 logger.info(f"First comment posted: {hashtag_text[:60]}...")
             else:
                 logger.debug("_post_first_comment: Send button not found — comment not submitted.")
+
+            random_sleep(1, 2)
+            if navigated_profile:
+                try:
+                    d.press("back")
+                except Exception:
+                    pass
 
         except Exception as e:
             logger.debug(f"_post_first_comment: Non-fatal exception during first comment attempt: {e}")
@@ -801,8 +966,9 @@ class UploadPostsPlugin(Plugin):
                 cmd, capture_output=True, text=True, check=True, timeout=10
             )
             matching_ids: List[int] = []
+            target_fn = filename.lower()
             for line in res.stdout.splitlines():
-                if filename in line:
+                if target_fn in line.lower():
                     m = re.search(r"_id=(\d+)", line)
                     if m:
                         matching_ids.append(int(m.group(1)))
@@ -813,10 +979,29 @@ class UploadPostsPlugin(Plugin):
         return None
 
     def _detect_media_aspect_ratio(self, media_path: str) -> str:
-        """Inspects media dimensions and classifies form factor as 'landscape', 'portrait', or 'square'."""
+        """Inspects media dimensions (images and videos) and classifies form factor (AUDIT-133-G03)."""
         if not media_path or not os.path.exists(media_path):
             return "square"
 
+        # Tier 1: Check for video file (.mp4) and parse ISO BMFF track headers
+        if media_path.lower().endswith(".mp4"):
+            video_dims = _parse_mp4_dimensions(media_path)
+            if video_dims:
+                width, height = video_dims
+                if width > 0 and height > 0:
+                    ratio = float(width) / float(height)
+                    logger.info(
+                        f"Video form factor analysis for {os.path.basename(media_path)}: "
+                        f"{width}x{height} (ratio: {ratio:.3f})"
+                    )
+                    if ratio > 1.05:
+                        return "landscape"
+                    elif ratio < 0.95:
+                        return "portrait"
+                    else:
+                        return "square"
+
+        # Tier 2: Inspect image dimensions via PIL
         try:
             from PIL import Image
 
@@ -926,9 +1111,12 @@ class UploadPostsPlugin(Plugin):
                     )
                     return True
                 else:
-                    logger.debug("Done button not found; closing bottom sheet via back key...")
-                    d.press("back")
-                    random_sleep(1, 2)
+                    logger.debug("Done button not found; tapping top screen area to close bottom sheet...")
+                    try:
+                        d.click(0.5, 0.2)
+                        random_sleep(1, 2)
+                    except Exception:
+                        pass
                     return True
         except Exception as e:
             logger.debug(f"Tier 1 Ratio tool selection encountered exception: {e}")
@@ -975,290 +1163,309 @@ class UploadPostsPlugin(Plugin):
             else ("image/png" if filename.lower().endswith(".png") else "image/jpeg")
         )
         device_path: str = f"/sdcard/Pictures/{filename}"
+        media_id: Optional[str] = None
 
-        # 1. Push media to device storage
-        logger.info(f"Pushing {filename} to device ({device_path})...")
-        pushed = self._execute_adb(serial, ["push", media_path, device_path])
-        if not pushed:
-            logger.error(f"Failed pushing media to device storage: {device_path}")
-            return False
+        try:
+            # 1. Push media to device storage
+            logger.info(f"Pushing {filename} to device ({device_path})...")
+            pushed = self._execute_adb(serial, ["push", media_path, device_path])
+            if not pushed:
+                logger.error(f"Failed pushing media to device storage: {device_path}")
+                return False
 
-        # 2. Trigger media scanner broadcast for indexing
-        self._execute_adb(
-            serial,
-            [
-                "shell",
-                "am",
-                "broadcast",
-                "-a",
-                "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
-                "-d",
-                f"file://{device_path}",
-            ],
-        )
-        random_sleep(1, 2)
-
-        # 3. Query MediaStore ID
-        media_id = self._get_mediastore_id(serial, filename, is_video)
-        if not media_id:
-            # Fallback insert into MediaStore if broadcast scan did not index immediately
-            uri = (
-                "content://media/external/video/media"
-                if is_video
-                else "content://media/external/images/media"
-            )
+            # 2. Trigger media scanner broadcast for indexing
             self._execute_adb(
                 serial,
                 [
                     "shell",
-                    "content",
-                    "insert",
-                    "--uri",
-                    uri,
-                    "--bind",
-                    f"_data:s:{device_path}",
-                    "--bind",
-                    f"mime_type:s:{mime_type}",
+                    "am",
+                    "broadcast",
+                    "-a",
+                    "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                    "-d",
+                    f"file://{device_path}",
                 ],
             )
             random_sleep(1, 2)
-            media_id = self._get_mediastore_id(serial, filename, is_video)
 
-        if media_id:
+            # 3. Query MediaStore ID with retries and content insert fallback
+            media_id = self._get_mediastore_id(serial, filename, is_video)
+            if not media_id:
+                # Fallback insert into MediaStore if broadcast scan did not index immediately
+                uri = (
+                    "content://media/external/video/media"
+                    if is_video
+                    else "content://media/external/images/media"
+                )
+                self._execute_adb(
+                    serial,
+                    [
+                        "shell",
+                        "content",
+                        "insert",
+                        "--uri",
+                        uri,
+                        "--bind",
+                        f"_data:s:{device_path}",
+                        "--bind",
+                        f"mime_type:s:{mime_type}",
+                    ],
+                )
+                random_sleep(1, 2)
+                media_id = self._get_mediastore_id(serial, filename, is_video)
+
             base_uri = (
                 "content://media/external/video/media"
                 if is_video
                 else "content://media/external/images/media"
             )
-            stream_uri = f"{base_uri}/{media_id}"
-        else:
-            stream_uri = f"file://{device_path}"
+            if media_id:
+                stream_uri = f"{base_uri}/{media_id}"
+            else:
+                stream_uri = f"file://{device_path}"
 
-        logger.info(f"Target media stream URI: {stream_uri}")
+            logger.info(f"Target media stream URI: {stream_uri}")
 
-        # 4. Launch Instagram ADD_TO_FEED intent
-        logger.info("Launching Instagram ADD_TO_FEED intent...")
-        intent_args = [
-            "shell",
-            "am",
-            "start",
-            "-a",
-            "com.instagram.share.ADD_TO_FEED",
-            "-t",
-            mime_type,
-            "--eu",
-            "android.intent.extra.STREAM",
-            stream_uri,
-            "-n",
-            "com.instagram.android/com.instagram.share.handleractivity.ShareHandlerActivity",
-        ]
-        launched = self._execute_adb(serial, intent_args)
-        if not launched:
-            logger.warning(
-                "ADD_TO_FEED launch failed, attempting android.intent.action.SEND fallback..."
-            )
-            fallback_args = [
+            # 4. Launch Instagram ADD_TO_FEED intent
+            logger.info("Launching Instagram ADD_TO_FEED intent...")
+            intent_args = [
                 "shell",
                 "am",
                 "start",
                 "-a",
-                "android.intent.action.SEND",
+                "com.instagram.share.ADD_TO_FEED",
                 "-t",
                 mime_type,
                 "--eu",
                 "android.intent.extra.STREAM",
                 stream_uri,
-                "-p",
-                "com.instagram.android",
+                "-n",
+                "com.instagram.android/com.instagram.share.handleractivity.ShareHandlerActivity",
             ]
-            self._execute_adb(serial, fallback_args)
+            launched = self._execute_adb(serial, intent_args)
+            if not launched:
+                logger.warning(
+                    "ADD_TO_FEED launch failed, attempting android.intent.action.SEND fallback..."
+                )
+                fallback_args = [
+                    "shell",
+                    "am",
+                    "start",
+                    "-a",
+                    "android.intent.action.SEND",
+                    "-t",
+                    mime_type,
+                    "--eu",
+                    "android.intent.extra.STREAM",
+                    stream_uri,
+                    "-p",
+                    "com.instagram.android",
+                ]
+                self._execute_adb(serial, fallback_args)
 
-        random_sleep(3, 5)
+            random_sleep(3, 5)
 
-        d = device.deviceV2
-        app_id = getattr(device, "app_id", "com.instagram.android")
-        res_attr = getattr(device, "ResourceID", None)
-        if res_attr is None or isinstance(res_attr, type):
-            resource_id = ResourceID(app_id)
-        else:
-            resource_id = res_attr
+            d = device.deviceV2
+            app_id = getattr(device, "app_id", "com.instagram.android")
+            res_attr = getattr(device, "ResourceID", None)
+            if res_attr is None or isinstance(res_attr, type):
+                resource_id = ResourceID(app_id)
+            else:
+                resource_id = res_attr
 
-        # 4b. Dismiss any initial informational composer modal dialog if present
-        ok_btn = d(
-            textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss|Cancel|Maybe later|Skip|Keep editing)$"
-        )
-        if ok_btn.exists(timeout=2):
-            logger.info("Dismissing initial informational composer modal dialog...")
-            ok_btn.click()
-            random_sleep(1, 2)
-
-        # 4c. Adjust aspect ratio to preserve native form factor (unless force_square is requested)
-        if not force_square:
-            form_factor = self._detect_media_aspect_ratio(media_path)
-            if form_factor in ("landscape", "portrait"):
-                self._adjust_aspect_ratio(device, form_factor)
-        else:
-            logger.info(
-                "Force square mode active (--upload-force-square); bypassing aspect ratio adjustment."
-            )
-
-        # 5. Advance composer steps (Crop/Audio -> Filters -> Share Sheet)
-        max_steps = 6
-        share_sheet_reached = False
-        for step in range(max_steps):
-            # Check if Share Sheet is visible
-            caption_input = d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW)
-            share_footer = d(resourceId=resource_id.SHARE_FOOTER_BUTTON)
-            if caption_input.exists(timeout=2) or share_footer.exists(timeout=2):
-                logger.info("Reached Instagram post Share Sheet.")
-                share_sheet_reached = True
-                break
-
-            # Check if "Sharing posts" or modal is blocking
+            # 4b. Dismiss any initial informational composer modal dialog if present
             ok_btn = d(
                 textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss|Cancel|Maybe later|Skip|Keep editing)$"
             )
             if ok_btn.exists(timeout=2):
-                logger.info("Dismissing informational composer modal dialog...")
+                logger.info("Dismissing initial informational composer modal dialog...")
                 ok_btn.click()
                 random_sleep(1, 2)
-                continue
 
-            # Tap Next button
-            next_btn = d(resourceId=resource_id.MEDIA_THUMBNAIL_TRAY_BUTTON)
-            if not next_btn.exists(timeout=2):
-                next_btn = d(
-                    resourceId=resource_id.MEDIA_THUMBNAIL_TRAY_BUTTON_TEXT
-                )
-            if not next_btn.exists(timeout=2):
-                next_btn = d(
-                    resourceIdMatches=".*creation_next_button.*|.*next_button.*|.*action_bar_button_action.*"
-                )
-            if not next_btn.exists(timeout=2):
-                next_btn = d(textMatches="(?i)^Next$")
-            if not next_btn.exists(timeout=2):
-                next_btn = d(descriptionMatches="(?i)^Next$")
-
-            if next_btn.exists(timeout=3):
+            # 4c. Adjust aspect ratio to preserve native form factor (unless force_square is requested)
+            if not force_square:
+                form_factor = self._detect_media_aspect_ratio(media_path)
+                if form_factor in ("landscape", "portrait"):
+                    self._adjust_aspect_ratio(device, form_factor)
+            else:
                 logger.info(
-                    f"Advancing composer step {step + 1} (tapping Next)..."
-                )
-                next_btn.click()
-                random_sleep(2, 4)
-            else:
-                logger.debug(f"Step {step + 1}: Waiting for composer screen...")
-                random_sleep(1, 2)
-
-        if not share_sheet_reached:
-            # Check one more time with broad locators
-            if (
-                d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW).exists(
-                    timeout=3
-                )
-                or d(resourceId=resource_id.SHARE_FOOTER_BUTTON).exists(
-                    timeout=3
-                )
-                or d(descriptionMatches="(?i)Share").exists(timeout=3)
-            ):
-                share_sheet_reached = True
-
-        if not share_sheet_reached:
-            logger.error("Failed to navigate to post Share Sheet.")
-            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
-            return False
-
-        # 6. Set caption if provided
-        if caption:
-            caption_box = d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW)
-            if not caption_box.exists(timeout=3):
-                caption_box = d(
-                    classNameMatches=".*EditText.*|.*AutoCompleteTextView.*"
+                    "Force square mode active (--upload-force-square); bypassing aspect ratio adjustment."
                 )
 
-            if caption_box.exists(timeout=5):
-                logger.info(f"Setting post caption ({len(caption)} characters)...")
-                try:
-                    caption_box.set_text(caption)
-                except Exception as set_err:
-                    logger.warning(
-                        f"set_text failed on caption box ({set_err}). Attempting clipboard paste fallback..."
+            # 5. Advance composer steps (Crop/Audio -> Filters -> Share Sheet)
+            max_steps = 6
+            share_sheet_reached = False
+            for step in range(max_steps):
+                # Check if Share Sheet is visible
+                caption_input = d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW)
+                share_footer = d(resourceId=resource_id.SHARE_FOOTER_BUTTON)
+                if caption_input.exists(timeout=2) or share_footer.exists(timeout=2):
+                    logger.info("Reached Instagram post Share Sheet.")
+                    share_sheet_reached = True
+                    break
+
+                # Check if "Sharing posts" or modal is blocking
+                ok_btn = d(
+                    textMatches="(?i)^(OK|Continue|Not now|Got it|Dismiss|Cancel|Maybe later|Skip|Keep editing)$"
+                )
+                if ok_btn.exists(timeout=2):
+                    logger.info("Dismissing informational composer modal dialog...")
+                    ok_btn.click()
+                    random_sleep(1, 2)
+                    continue
+
+                # Tap Next button
+                next_btn = d(resourceId=resource_id.MEDIA_THUMBNAIL_TRAY_BUTTON)
+                if not next_btn.exists(timeout=2):
+                    next_btn = d(
+                        resourceId=resource_id.MEDIA_THUMBNAIL_TRAY_BUTTON_TEXT
                     )
+                if not next_btn.exists(timeout=2):
+                    next_btn = d(
+                        resourceIdMatches=".*creation_next_button.*|.*next_button.*|.*action_bar_button_action.*|.*action_bar_right_button.*"
+                    )
+                if not next_btn.exists(timeout=2):
+                    next_btn = d(textMatches="(?i)^(Next|>|Share|Continue|Done)$")
+                if not next_btn.exists(timeout=2):
+                    next_btn = d(descriptionMatches="(?i)^(Next|>|Share|Continue|Done)$")
+
+                if next_btn.exists(timeout=3):
+                    logger.info(
+                        f"Advancing composer step {step + 1} (tapping Next)..."
+                    )
+                    next_btn.click()
+                    random_sleep(2, 4)
+                else:
+                    logger.debug(f"Step {step + 1}: Waiting for composer screen...")
+                    random_sleep(1, 2)
+
+            if not share_sheet_reached:
+                # Check one more time with broad locators
+                if (
+                    d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW).exists(
+                        timeout=3
+                    )
+                    or d(resourceId=resource_id.SHARE_FOOTER_BUTTON).exists(
+                        timeout=3
+                    )
+                    or d(descriptionMatches="(?i)Share").exists(timeout=3)
+                ):
+                    share_sheet_reached = True
+
+            if not share_sheet_reached:
+                logger.error("Failed to navigate to post Share Sheet.")
+                return False
+
+            # 6. Set caption if provided
+            if caption:
+                caption_box = d(resourceId=resource_id.CAPTION_INPUT_TEXT_VIEW)
+                if not caption_box.exists(timeout=3):
+                    caption_box = d(
+                        classNameMatches=".*EditText.*|.*AutoCompleteTextView.*"
+                    )
+
+                if caption_box.exists(timeout=5):
+                    logger.info(f"Setting post caption ({len(caption)} characters)...")
                     try:
-                        d.set_clipboard(caption)
-                        caption_box.click()
-                        random_sleep(0.5, 1.0)
-                        d.paste()
-                    except Exception as paste_err:
-                        logger.error(f"Clipboard paste fallback failed: {paste_err}")
-                random_sleep(1, 2)
-            else:
-                logger.warning(
-                    "Caption input field not found on Share Sheet. Proceeding without caption."
+                        caption_box.set_text(caption)
+                    except Exception as set_err:
+                        logger.warning(
+                            f"set_text failed on caption box ({set_err}). Attempting clipboard paste fallback..."
+                        )
+                        try:
+                            d.set_clipboard(caption)
+                            caption_box.click()
+                            random_sleep(0.5, 1.0)
+                            d.paste()
+                        except Exception as paste_err:
+                            logger.error(f"Clipboard paste fallback failed: {paste_err}")
+                    random_sleep(1, 2)
+                else:
+                    logger.warning(
+                        "Caption input field not found on Share Sheet. Proceeding without caption."
+                    )
+
+            # 7. Tap Share (with Reels & Feed locators - AUDIT-133-G06)
+            share_btn = d(resourceId=resource_id.SHARE_FOOTER_BUTTON)
+            if not share_btn.exists(timeout=3):
+                share_btn = d(
+                    textMatches="(?i)^(Share|Share to Reels|Share Reel|Share to Feed|Post)$"
+                )
+            if not share_btn.exists(timeout=2):
+                share_btn = d(
+                    descriptionMatches="(?i)^(Share|Share to Reels|Share Reel|Share to Feed|Post)$"
+                )
+            if not share_btn.exists(timeout=2):
+                share_btn = d(
+                    resourceIdMatches=".*share_button.*|.*upload_button.*|.*share_footer_button.*|.*action_bar_button_action.*"
                 )
 
-        # 7. Tap Share
-        share_btn = d(resourceId=resource_id.SHARE_FOOTER_BUTTON)
-        if not share_btn.exists(timeout=3):
-            share_btn = d(textMatches="(?i)^Share$")
-        if not share_btn.exists(timeout=2):
-            share_btn = d(descriptionMatches="(?i)^Share$")
+            if share_btn.exists(timeout=5):
+                logger.info("Tapping Share button to publish post...")
+                share_btn.click()
+                logger.info(
+                    "Share clicked. Polling for upload completion (max 30s)..."
+                )
 
-        if share_btn.exists(timeout=5):
-            logger.info("Tapping Share button to publish post...")
-            share_btn.click()
-            logger.info(
-                "Share clicked. Polling for upload completion (max 30s)..."
-            )
-
-            # Active verification loop — poll every 3s for up to 30s (CO-022 / F-04)
-            _IG_MAIN_ACTIVITIES = {
-                ".activity.MainTabActivity",
-                "com.instagram.mainactivity.MainActivity",
-                "com.instagram.mainactivity.LauncherActivity",
-            }
-            upload_confirmed = False
-            for _tick in range(10):
-                time.sleep(3)
-                try:
-                    # Check 1: Home tab visible
-                    if d(descriptionMatches="(?i).*Home.*").exists(timeout=1):
-                        upload_confirmed = True
-                        break
-                    # Check 2: Returned to main IG activity
-                    cur_app = d.app_current()
-                    if cur_app and cur_app.get("activity") in _IG_MAIN_ACTIVITIES:
-                        upload_confirmed = True
-                        break
-                    # Check 3: Progress bar / finalizing overlay gone
-                    if not d(resourceIdMatches=".*progress.*").exists(timeout=0):
-                        # No progress bar found — may have already completed
+                # Active verification loop — poll every 3s for up to 30s (CO-022 / F-04)
+                _IG_MAIN_ACTIVITIES = {
+                    ".activity.MainTabActivity",
+                    "com.instagram.mainactivity.MainActivity",
+                    "com.instagram.mainactivity.LauncherActivity",
+                }
+                upload_confirmed = False
+                for _tick in range(10):
+                    time.sleep(3)
+                    try:
+                        # Check 1: Home tab visible
                         if d(descriptionMatches="(?i).*Home.*").exists(timeout=1):
                             upload_confirmed = True
                             break
-                except Exception as tick_err:
-                    logger.debug(f"Upload poll tick {_tick + 1} error: {tick_err}")
+                        # Check 2: Returned to main IG activity
+                        cur_app = d.app_current()
+                        if cur_app and cur_app.get("activity") in _IG_MAIN_ACTIVITIES:
+                            upload_confirmed = True
+                            break
+                        # Check 3: Progress bar / finalizing overlay gone
+                        if not d(resourceIdMatches=".*progress.*").exists(timeout=0):
+                            # No progress bar found — may have already completed
+                            if d(descriptionMatches="(?i).*Home.*").exists(timeout=1):
+                                upload_confirmed = True
+                                break
+                    except Exception as tick_err:
+                        logger.debug(f"Upload poll tick {_tick + 1} error: {tick_err}")
 
-            if upload_confirmed:
-                logger.info("Post uploaded successfully (confirmed).")
+                if upload_confirmed:
+                    logger.info("Post uploaded successfully (confirmed).")
+                else:
+                    logger.info(
+                        "Upload completion could not be confirmed within 30s — post likely published."
+                    )
+
+                # Post-upload popup sweep (CO-029 / F-02):
+                try:
+                    from InstaAddict.core.views import UniversalActions
+                    UniversalActions.dismiss_dialog(device, max_sweeps=3)
+                    random_sleep(1, 2)
+                    UniversalActions.dismiss_dialog(device, max_sweeps=2)
+                except Exception as dismiss_err:
+                    logger.debug(f"Post-upload dialog sweep encountered error: {dismiss_err}")
+
+                return True
             else:
-                logger.info(
-                    "Upload completion could not be confirmed within 30s — post likely published."
+                logger.error("Cannot locate Share button on Share Sheet.")
+                return False
+        finally:
+            # Deterministic device cleanup (AUDIT-133-G07 / R-06)
+            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
+            if media_id:
+                uri = (
+                    "content://media/external/video/media"
+                    if is_video
+                    else "content://media/external/images/media"
                 )
-
-            # Post-upload popup sweep (CO-029 / F-02):
-            # Instagram frequently presents "Rate Instagram", "Turn on notifications", or "Share to Facebook"
-            # immediately after publishing. Clear them so subsequent jobs can interact cleanly.
-            try:
-                from InstaAddict.core.views import UniversalActions
-                UniversalActions.dismiss_dialog(device, max_sweeps=3)
-                random_sleep(1, 2)
-                UniversalActions.dismiss_dialog(device, max_sweeps=2)
-            except Exception as dismiss_err:
-                logger.debug(f"Post-upload dialog sweep encountered error: {dismiss_err}")
-
-            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
-            return True
-        else:
-            logger.error("Cannot locate Share button on Share Sheet.")
-            self._execute_adb(serial, ["shell", "rm", "-f", device_path], timeout=15)
-            return False
+                self._execute_adb(
+                    serial,
+                    ["shell", "content", "delete", "--uri", uri, "--where", f"_id={media_id}"],
+                    timeout=10,
+                )

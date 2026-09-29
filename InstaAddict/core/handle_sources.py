@@ -642,11 +642,17 @@ def handle_posts(
             try:
                 from InstaAddict.core.hashtag_manager import HashtagManager
 
-                HashtagManager.get_instance(
-                    username=getattr(session_state, "my_username", None)
-                ).record_hashtag_result(target, posts_found=False)
+                is_truly_empty = UniversalActions(device)._check_if_no_posts()
+                if is_truly_empty:
+                    HashtagManager.get_instance(
+                        username=getattr(session_state, "my_username", None)
+                    ).record_hashtag_result(target, posts_found=False, strikes_needed=2)
+                else:
+                    logger.debug(
+                        f"nav_to_hashtag_or_place failed for {target} but page is not empty. Skipping without marking as DEAD."
+                    )
             except Exception as e:
-                logger.debug(f"HashtagManager record dead tag failed: {e}")
+                logger.debug(f"HashtagManager record dead tag check failed: {e}")
         return
 
     post_description = ""

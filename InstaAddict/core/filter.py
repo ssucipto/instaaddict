@@ -49,6 +49,7 @@ FIELD_MIN_POSTS = "min_posts"
 FIELD_MIN_LIKERS = "min_likers"
 FIELD_MAX_LIKERS = "max_likers"
 FIELD_MUTUAL_FRIENDS = "mutual_friends"
+FIELD_SKIP_EMPTY_BIOGRAPHY = "skip_if_empty_biography"
 
 IGNORE_CHARSETS = ["MATHEMATICAL"]
 
@@ -488,18 +489,30 @@ class Filter:
             .split()
         )
 
-        if not cleaned_biography and (
-            len(field_mandatory_words) > 0
-            or field_bio_language is not None
-            or field_specific_alphabet is not None
-        ):
-            logger.info(
-                f"@{username} has an empty biography, that means there isn't any mandatory things that can be checked. Skip.",
-                extra={"color": f"{Fore.CYAN}"},
+        field_skip_empty_biography = False
+        if self.conditions:
+            field_skip_empty_biography = bool(
+                self.conditions.get(FIELD_SKIP_EMPTY_BIOGRAPHY, False)
+                or self.conditions.get("skip_empty_biography", False)
             )
-            return profile_data, self.return_check_profile(
-                username, profile_data, SkipReason.BIOGRAPHY_IS_EMPTY
-            )
+
+        if not cleaned_biography:
+            if len(field_mandatory_words) > 0:
+                logger.info(
+                    f"@{username} has an empty biography, but mandatory words are required. Skip.",
+                    extra={"color": f"{Fore.CYAN}"},
+                )
+                return profile_data, self.return_check_profile(
+                    username, profile_data, SkipReason.BIOGRAPHY_IS_EMPTY
+                )
+            if field_skip_empty_biography:
+                logger.info(
+                    f"@{username} has an empty biography and skip_if_empty_biography is enabled. Skip.",
+                    extra={"color": f"{Fore.CYAN}"},
+                )
+                return profile_data, self.return_check_profile(
+                    username, profile_data, SkipReason.BIOGRAPHY_IS_EMPTY
+                )
         if (
             len(field_blacklist_words) > 0
             or len(field_mandatory_words) > 0
@@ -549,7 +562,7 @@ class Filter:
                 logger.debug("Checking primary character set of account biography...")
                 alphabet = self._find_alphabet(cleaned_biography)
 
-                if alphabet not in field_specific_alphabet and alphabet != "":
+                if alphabet not in field_specific_alphabet and alphabet != "" and alphabet != "UNKNOWN":
                     logger.info(
                         f"@{username}'s biography alphabet is not in {', '.join(field_specific_alphabet)}. ({alphabet}), skip.",
                         extra={"color": f"{Fore.CYAN}"},
@@ -593,7 +606,7 @@ class Filter:
             logger.debug("Checking primary character set of name...")
             if profile_data.fullname != "":
                 alphabet = self._find_alphabet(profile_data.fullname)
-                if alphabet not in field_specific_alphabet and alphabet != "":
+                if alphabet not in field_specific_alphabet and alphabet != "" and alphabet != "UNKNOWN":
                     logger.info(
                         f"@{username}'s name alphabet is not in {', '.join(field_specific_alphabet)}. ({alphabet}), skip.",
                         extra={"color": f"{Fore.CYAN}"},
@@ -756,7 +769,7 @@ class Filter:
     @staticmethod
     def _find_alphabet(biography: str) -> str:
         a_dict = {}
-        max_alph = "UNKNOWN"
+        max_alph = ""
         try:
             for x in range(len(biography)):
                 if biography[x].isalpha():

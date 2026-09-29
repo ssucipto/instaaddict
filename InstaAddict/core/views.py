@@ -247,6 +247,12 @@ class TabBarView:
     def _navigateTo(self, tab: TabBarTabs):
         tab_name = tab.name
         logger.debug(f"Navigate to {tab_name}")
+        try:
+            from InstaAddict.core.watchdog import record_heartbeat
+
+            record_heartbeat("navigation", f"Navigating to {tab_name}")
+        except Exception:
+            pass
         button = None
         UniversalActions.close_keyboard(self.device)
 
@@ -626,6 +632,12 @@ class SearchView:
         with PerformanceTracker.get_instance().measure("view", "search_query"):
             target = emoji.emojize(target, use_aliases=True)
             logger.info(f"Navigate to {target}")
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat("search_navigation", f"Searching for {target}")
+            except Exception:
+                pass
             search_edit_text = self._getSearchEditText()
             if search_edit_text is not None:
                 logger.debug("Pressing on searchbar.")

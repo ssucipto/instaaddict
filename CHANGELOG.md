@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.4.2 (2026-09-29) — Upload Mechanism Hardening, Scoped Storage Compliance & Bot Stopping Optimization
+
+Production hardening release remediating 8 architectural gaps and shortcuts in the automated upload pipeline (Audit #133, Review #065, Review #066), eliminating Home feed ad commenting risks, adding zero-dependency ISO BMFF MP4 header parsing, and hardening bot stopping and session recovery.
+
+### Fixed & Remediated
+- **Scoped Storage & MediaStore URI Resolution (`InstaAddict/plugins/upload_posts.py`)**:
+  - Hardened MediaStore content URI resolution by pairing `content insert` with `content query --where "_data='...'"` fallback, eliminating `FileUriExposedException` on Android 7.0 through 16 (AUDIT-133-G01, CO-089).
+- **Ad Commenting Elimination (`InstaAddict/plugins/upload_posts.py`)**:
+  - Re-architected post-publish first commenting to navigate to the user's Profile tab and open the topmost grid item, completely preventing the bot from leaving hashtag comments on sponsored Home feed ads (AUDIT-133-G02, CO-090).
+- **Atomic Telegram Ingestion Staging (`InstaAddict/plugins/telegram.py`, `InstaAddict/plugins/upload_posts.py`)**:
+  - Enforced atomic file staging in Telegram download pipelines via `.tmp` staging and `os.replace`, and excluded `.tmp` files from pending upload discovery to prevent race conditions during file transmission (AUDIT-133-G04, CO-092).
+- **Durable Upload Rate-Limiting Ledger (`InstaAddict/plugins/upload_posts.py`)**:
+  - Migrated cooldown checking from fragile filesystem `mtime` to a durable `.upload_history.json` ledger, preventing premature uploads after file touch or sync events (AUDIT-133-G05, CO-093).
+- **Reels Composer Share Button Heuristics (`InstaAddict/plugins/upload_posts.py`)**:
+  - Expanded Share button regex to `(?i)^(Share|Share to Reels|Share Reel|Share to Feed|Post)$` across resource IDs, supporting modern Instagram composer variants (AUDIT-133-G06, CO-094).
+- **Device Storage & MediaStore Leak Prevention (`InstaAddict/plugins/upload_posts.py`)**:
+  - Wrapped upload staging in `try...finally` to ensure remote temporary files on `/sdcard/Pictures/` and their respective MediaStore entries are unconditionally purged on both success and failure (AUDIT-133-G07, CO-095).
+- **Bot Stopping & Watchdog Recovery (`InstaAddict/core/bot_flow.py`, `InstaAddict/core/device_facade.py`, `InstaAddict/core/dogfood.py`)**:
+  - Hardened watchdog heartbeats and subscreen escape sequences against unhandled RPC errors and daemon stalls.
+
+### Added
+- **Zero-Dependency ISO BMFF MP4 Box Parser (`InstaAddict/plugins/upload_posts.py`, `test/test_upload_aspect_ratio.py`)**:
+  - Implemented pure-Python MP4 header parser extracting track header (`moov -> trak -> tkhd`) 16.16 fixed-point dimensions to enable accurate aspect ratio detection for video uploads (AUDIT-133-G03, CO-091).
+- **Comprehensive Test Coverage (`test/test_upload_aspect_ratio.py`, `test/test_upload_posts.py`, `test/test_bot_stopping_and_dogfood_tuning.py`)**:
+  - Added unit test suites verifying synthetic MP4 dimension extraction, atomic download staging, ledger durability, and end-to-end mock uploads (469 passed, 100% green).
+
 ## v1.4.1 (2026-09-25) — Milestone 11 Multi-Account Fleet Orchestration & Comprehensive Operator Guide
 
 Major milestone release delivering full multi-process fleet orchestration, atomic IPC status beaconing, autonomous emulator and process health monitoring, real-time live TUI dashboard, zero-downtime hot reloading, 21 production safeguards (GAP-01 to GAP-21), and the complete 10-section User & Operator Guide (`docs/USER_GUIDE.md`).

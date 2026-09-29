@@ -1,5 +1,5 @@
 project: InstaAddict-AI
-version: 1.4.1
+version: 1.4.2
 type: cli-tool
 description: 'Human-like Instagram automation bot powered by ADB and UIAutomator2,
   automating interactions (following, liking, commenting, watching stories) directly

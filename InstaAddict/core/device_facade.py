@@ -129,6 +129,54 @@ def _apply_uiautomator2_compatibility_patches():
     except Exception as e:
         logger.debug(f"Failed to patch _Service.start: {e}")
 
+    # 5. Patch reset_uiautomator to recover gracefully on modern AndroidX devices without raising EnvironmentError
+    try:
+        _orig_reset_uiautomator = uiautomator2.Device.reset_uiautomator
+
+        def patched_reset_uiautomator(dev_self, reason="unknown", depth=0):
+            try:
+                return _orig_reset_uiautomator(dev_self, reason=reason, depth=depth)
+            except Exception as reset_err:
+                logger.warning(
+                    f"uiautomator2 reset_uiautomator failed ({reset_err}). Triggering AndroidX resurrection fallback..."
+                )
+                runner = "androidx.test.runner.AndroidJUnitRunner"
+                try:
+                    res = dev_self.shell(["pm", "list", "instrumentation"]).output
+                    if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
+                        runner = "android.support.test.runner.AndroidJUnitRunner"
+                except Exception:
+                    pass
+                try:
+                    dev_self.shell(["/data/local/tmp/atx-agent", "server", "--stop"])
+                    dev_self.shell(["/data/local/tmp/atx-agent", "server", "--nouia", "-d", "--addr", "127.0.0.1:7912"])
+                except Exception:
+                    pass
+                try:
+                    dev_self.shell(["pkill", "-f", "com.github.uiautomator"])
+                except Exception:
+                    pass
+                try:
+                    dev_self.shell(
+                        f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
+                    )
+                except Exception:
+                    pass
+                sleep(2)
+                try:
+                    if dev_self._is_alive():
+                        logger.info("Resurrection fallback succeeded; uiautomator is alive.")
+                        return True
+                except Exception:
+                    pass
+                if depth >= 2:
+                    raise
+                return False
+
+        uiautomator2.Device.reset_uiautomator = patched_reset_uiautomator
+    except Exception as e:
+        logger.debug(f"Failed to patch reset_uiautomator: {e}")
+
 
 # Apply compatibility patches at module load
 _apply_uiautomator2_compatibility_patches()
@@ -297,41 +345,38 @@ class DeviceFacade:
             self.deviceV2.dump_hierarchy(compressed=False)
             return True
         except Exception as e:
-            err_str = str(e).lower()
-            if (
-                "nullpointerexception" in err_str
-                or "deadobjectexception" in err_str
-                or "accessibilityserviceinfo" in err_str
-                or "timed out" in err_str
-                or "not respond" in err_str
-            ):
-                logger.warning(
-                    f"Detected disconnected/crashed UiAutomation service ({e}). Performing automated resurrection..."
+            logger.warning(
+                f"Detected disconnected/crashed UiAutomation service ({e}). Performing automated resurrection..."
+            )
+            runner = "androidx.test.runner.AndroidJUnitRunner"
+            try:
+                res = self.deviceV2.shell(["pm", "list", "instrumentation"]).output
+                if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
+                    runner = "android.support.test.runner.AndroidJUnitRunner"
+            except Exception:
+                pass
+            try:
+                self.deviceV2.shell(["/data/local/tmp/atx-agent", "server", "--stop"])
+                self.deviceV2.shell(["/data/local/tmp/atx-agent", "server", "--nouia", "-d", "--addr", "127.0.0.1:7912"])
+            except Exception:
+                pass
+            try:
+                self.deviceV2.shell(["pkill", "-f", "com.github.uiautomator"])
+            except Exception:
+                pass
+            try:
+                self.deviceV2.shell(
+                    f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
                 )
-                runner = "androidx.test.runner.AndroidJUnitRunner"
-                try:
-                    res = self.deviceV2.shell(["pm", "list", "instrumentation"]).output
-                    if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
-                        runner = "android.support.test.runner.AndroidJUnitRunner"
-                except Exception:
-                    pass
-                try:
-                    self.deviceV2.shell(["pkill", "-f", "com.github.uiautomator"])
-                except Exception:
-                    pass
-                try:
-                    self.deviceV2.shell(
-                        f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
-                    )
-                except Exception as launch_err:
-                    logger.debug(f"Failed to launch instrumentation: {launch_err}")
-                sleep(2)
-                try:
-                    self.deviceV2.dump_hierarchy(compressed=False)
-                    logger.info("UiAutomation service successfully resurrected.")
-                    return True
-                except Exception as r_err:
-                    logger.warning(f"Secondary UiAutomation resurrection attempt failed: {r_err}")
+            except Exception as launch_err:
+                logger.debug(f"Failed to launch instrumentation: {launch_err}")
+            sleep(2)
+            try:
+                self.deviceV2.dump_hierarchy(compressed=False)
+                logger.info("UiAutomation service successfully resurrected.")
+                return True
+            except Exception as r_err:
+                logger.warning(f"Secondary UiAutomation resurrection attempt failed: {r_err}")
             return False
 
     def _get_current_app(self):
@@ -468,8 +513,19 @@ class DeviceFacade:
                 timeout=10,
             )
             if data and data.stdout:
-                flag = search("mDreamingLockscreen=(true|false)", data.stdout)
-                return flag is not None and flag.group(1) == "true"
+                # Modern Android (SDK 28+ / Android 9-15+): isKeyguardShowing=(true|false)
+                keyguard_match = search(r"isKeyguardShowing=(true|false)", data.stdout)
+                if keyguard_match:
+                    return keyguard_match.group(1).lower() == "true"
+                # Legacy Android: mDreamingLockscreen=(true|false)
+                flag = search(r"mDreamingLockscreen=(true|false)", data.stdout)
+                if flag:
+                    return flag.group(1).lower() == "true"
+                # Fallback check for active dream lockscreen
+                showing_dream = search(r"mShowingDream=(true|false)", data.stdout)
+                if showing_dream and showing_dream.group(1).lower() == "true":
+                    return True
+                return False
             else:
                 logger.debug("dumpsys window returned nothing.")
                 return None
@@ -517,13 +573,44 @@ class DeviceFacade:
                 attempts += 1
 
     def unlock(self):
+        """Dismiss keyguard and unlock screen using native ADB keyguard dismissal, keyevents, and fallback swipes."""
+        serial = getattr(self.deviceV2, "serial", None)
+        adb_prefix = ["adb"]
+        if serial:
+            adb_prefix.extend(["-s", str(serial)])
+
+        # Step 1: Direct native ADB wm dismiss-keyguard (instant and works across Android 8-15+)
+        try:
+            run(adb_prefix + ["shell", "wm", "dismiss-keyguard"], shell=False, timeout=5, stdout=PIPE, stderr=PIPE)
+            sleep(0.5)
+        except Exception as e:
+            logger.debug(f"wm dismiss-keyguard error: {e}")
+
+        # Step 2: Wakeup + Keycode MENU (82) / WAKEUP (224)
+        try:
+            run(adb_prefix + ["shell", "input", "keyevent", "224"], shell=False, timeout=3, stdout=PIPE, stderr=PIPE)
+            run(adb_prefix + ["shell", "input", "keyevent", "82"], shell=False, timeout=3, stdout=PIPE, stderr=PIPE)
+            sleep(0.5)
+        except Exception as e:
+            logger.debug(f"keyevent unlock error: {e}")
+
+        locked = self.is_screen_locked()
+        logger.debug(f"Screen locked after native unlock: {locked}")
+        if locked is False:
+            return
+
+        # Step 3: Swipe UP gesture fallback
         self.swipe(Direction.UP, 0.8)
-        sleep(2)
-        logger.debug(f"Screen locked: {self.is_screen_locked()}")
-        if self.is_screen_locked():
-            self.swipe(Direction.RIGHT, 0.8)
-            sleep(2)
-            logger.debug(f"Screen locked: {self.is_screen_locked()}")
+        sleep(1)
+        locked = self.is_screen_locked()
+        logger.debug(f"Screen locked after swipe UP: {locked}")
+        if locked is False:
+            return
+
+        # Step 4: Swipe RIGHT gesture fallback
+        self.swipe(Direction.RIGHT, 0.8)
+        sleep(1)
+        logger.debug(f"Screen locked after swipe RIGHT: {self.is_screen_locked()}")
 
     def screen_off(self):
         self.deviceV2.screen_off()
@@ -1025,6 +1112,33 @@ class DeviceFacade:
                         pass
                 return exists
             except Exception as e:
+                err_str = str(e).lower()
+                if any(k in err_str for k in ("gateway", "jsonrpc", "closed", "connection", "instrument", "deadobject", "nullpointer", "time used")):
+                    logger.warning(
+                        f"exists() encountered RPC/daemon error ({e}). Attempting self-healing resurrection..."
+                    )
+                    try:
+                        if hasattr(self.deviceV2, "shell"):
+                            runner = "androidx.test.runner.AndroidJUnitRunner"
+                            try:
+                                res = self.deviceV2.shell(["pm", "list", "instrumentation"]).output
+                                if "androidx.test.runner.AndroidJUnitRunner" not in res and "android.support.test.runner.AndroidJUnitRunner" in res:
+                                    runner = "android.support.test.runner.AndroidJUnitRunner"
+                            except Exception:
+                                pass
+                            try:
+                                self.deviceV2.shell(["/data/local/tmp/atx-agent", "server", "--stop"])
+                                self.deviceV2.shell(["/data/local/tmp/atx-agent", "server", "--nouia", "-d", "--addr", "127.0.0.1:7912"])
+                            except Exception:
+                                pass
+                            self.deviceV2.shell(["pkill", "-f", "com.github.uiautomator"])
+                            self.deviceV2.shell(
+                                f"nohup am instrument -w -r -e debug false -e class com.github.uiautomator.stub.Stub com.github.uiautomator.test/{runner} > /dev/null 2>&1 &"
+                            )
+                            sleep(2)
+                            return bool(self.viewV2.exists(self.get_ui_timeout(ui_timeout)))
+                    except Exception as retry_err:
+                        logger.debug(f"Self-healing resurrection retry in exists() failed: {retry_err}")
                 raise DeviceFacade.JsonRpcError(e)
 
         def count_items(self) -> int:

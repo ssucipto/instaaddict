@@ -234,6 +234,20 @@ class DogfoodOptimizer:
                         "suggested_value": "broaden languages",
                     }
                 )
+
+            cooldown_count = total_skip_reasons.get("COOLDOWN", 0)
+            if cooldown_count / total_skips >= 0.35:
+                pct = round(cooldown_count / total_skips * 100, 1)
+                recommendations.append(
+                    {
+                        "category": "Source Pool Exhaustion",
+                        "severity": "HIGH",
+                        "issue": f"{pct}% ({cooldown_count}/{total_skips}) of profile skips were due to COOLDOWN (can-reinteract-after). Target pool is exhausted.",
+                        "action": "Reduce can-reinteract-after from 48h to 24h in config.yml, or add 10+ new target bloggers/hashtags.",
+                        "parameter": "can-reinteract-after",
+                        "suggested_value": "24",
+                    }
+                )
         elif total_interactions > 20 and success_rate < 40.0:
             recommendations.append(
                 {
@@ -263,16 +277,28 @@ class DogfoodOptimizer:
                     }
                 )
             elif dur > 300.0 and att == 0:
-                recommendations.append(
-                    {
-                        "category": "Task Performance Standards",
-                        "severity": "MEDIUM",
-                        "issue": f"Job '{j_name}' ran for {round(dur, 1)}s without finding any interaction targets.",
-                        "action": f"Verify sources pool for '{j_name}' or check UI layout compatibility.",
-                        "parameter": f"job.{j_name}",
-                        "suggested_value": "check sources pool",
-                    }
-                )
+                if j_name == "unfollow-non-followers":
+                    recommendations.append(
+                        {
+                            "category": "Unfollow Optimization",
+                            "severity": "HIGH",
+                            "issue": f"Job 'unfollow-non-followers' ran for {round(dur, 1)}s with 0 unfollows, likely saturated by scrolling through cached personal non-bot followings.",
+                            "action": "Set sort-followers-latest: true in config.yml to unfollow recent non-reciprocal accounts instead of oldest personal contacts.",
+                            "parameter": "sort-followers-latest",
+                            "suggested_value": "true",
+                        }
+                    )
+                else:
+                    recommendations.append(
+                        {
+                            "category": "Task Performance Standards",
+                            "severity": "MEDIUM",
+                            "issue": f"Job '{j_name}' ran for {round(dur, 1)}s without finding any interaction targets.",
+                            "action": f"Verify sources pool for '{j_name}' or check UI layout compatibility.",
+                            "parameter": f"job.{j_name}",
+                            "suggested_value": "check sources pool",
+                        }
+                    )
 
         # 5. Evaluate Crash Forensics & Foreground State
         launcher_crashes = (

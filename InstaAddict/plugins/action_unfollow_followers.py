@@ -412,7 +412,9 @@ class ActionUnfollowFollowers(Plugin):
                 )
 
             if sort_container_obj.exists() and not sorted:
-                newest_param = getattr(self.args, "sort_followers_newest_to_oldest", None)
+                newest_param = getattr(self.args, "sort_followings_by_latest", False) or getattr(self.args, "sort_followers_newest_to_oldest", False)
+                if getattr(self.args, "sort_followings_by_earliest", False):
+                    newest_param = False
                 self.sort_followings_by_date(
                     device, newest_param
                 )
@@ -442,6 +444,8 @@ class ActionUnfollowFollowers(Plugin):
                 )
 
         unfollowed_count = 0
+        consecutive_cached_count = 0
+        max_consecutive_cached = 40
         total_unfollows_limit_reached = False
         posts_end_detector.notify_new_page()
         prev_screen_iterated_followings = []
@@ -536,6 +540,7 @@ class ActionUnfollowFollowers(Plugin):
                 username_key = username.casefold() if username else ""
                 if username_key not in checked:
                     checked[username_key] = None
+                    consecutive_cached_count = 0
 
                     if storage.is_user_in_whitelist(username):
                         logger.info(f"@{username} is in whitelist. Skip.")
@@ -656,6 +661,16 @@ class ActionUnfollowFollowers(Plugin):
                         return
                 else:
                     logger.debug(f"Already checked {username} (or in non-bot cache).")
+                    consecutive_cached_count += 1
+                    if consecutive_cached_count >= max_consecutive_cached:
+                        logger.info(
+                            f"Encountered {consecutive_cached_count} consecutive followings already in non-bot cache. "
+                            "Breaking out of unfollow loop to avoid excessive scrolling through protected personal accounts.",
+                            extra={"color": f"{Fore.YELLOW}"},
+                        )
+                        if hasattr(storage, "save_non_bot_followings"):
+                            storage.save_non_bot_followings()
+                        return
 
             if hasattr(storage, "save_non_bot_followings"):
                 storage.save_non_bot_followings()

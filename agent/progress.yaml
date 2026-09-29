@@ -1,6 +1,6 @@
 project:
   name: InstaAddict-AI
-  version: 1.4.1
+  version: 1.4.2
   started: 2026-09-11
   status: in_progress
   current_milestone: M11
@@ -457,7 +457,7 @@ documentation:
   milestone_documents: 11
   pattern_documents: 2
   task_documents: 8
-  last_updated: '2026-09-25'
+  last_updated: '2026-09-29'
 progress:
   planning: 100
   implementation: 100
@@ -465,6 +465,19 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-09-29'
+  description: 'Upload Mechanism Production Hardening & Bot Stopping Optimization (Audit #133, Review #065, Review #066).'
+  items:
+  - "✓ Hardened MediaStore content URI resolution with insert/query retries, preventing FileUriExposedException on Android API 24–36 (AUDIT-133-G01)"
+  - "✓ Rewrote _post_first_comment to navigate to Profile tab and open own grid post, eliminating hashtag commenting on sponsored Home feed ads (AUDIT-133-G02)"
+  - "✓ Implemented zero-dependency ISO BMFF MP4 header box parser (_parse_mp4_dimensions) for accurate video aspect ratio detection (AUDIT-133-G03)"
+  - "✓ Enforced atomic .tmp download staging and os.replace in Telegram ingestion with queue exclusion (AUDIT-133-G04)"
+  - "✓ Implemented durable .upload_history.json ledger for upload rate-limiting, decoupling cooldowns from filesystem mtime (AUDIT-133-G05)"
+  - "✓ Expanded Share button heuristics for modern Reels composer and feed upload variants (AUDIT-133-G06)"
+  - "✓ Implemented try...finally resource cleanup ensuring ADB temporary files and MediaStore records are purged on exit (AUDIT-133-G07)"
+  - "✓ Remediated bot stopping triggers with hardened watchdog heartbeats, subscreen escape sequences, and enhanced dogfood telemetry"
+  - "✓ Authored audit-133, review-065, and review-066 reports with 100% ACP 64-rule compliance"
+  - "✓ Verified all 6/6 ACP CI fast gates passing and 469/469 unit and regression tests green"
 - date: '2026-09-25'
   description: 'Completed Documentation Synchronization, User Guide Creation & Milestone 11 Documentation Signoff.'
   items:

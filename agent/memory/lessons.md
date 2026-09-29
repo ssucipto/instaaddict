@@ -2,6 +2,18 @@
 # Populated automatically when developer says "log it" or "wrong, log this"
 # Max 5 entries loaded per session, filtered to current task_type + priority:high
 
+- date: 2026-09-29
+  task_type: audit
+  mistake: Profile recovery and startup loops in bot_flow.py caught only DeviceFacade.AppHasCrashed, allowing DeviceFacade.JsonRpcError to escape and crash the bot process when waking from long inter-session sleep with a dead uiautomator2 daemon. Furthermore, uiautomator2's internal reset hardcoded deprecated android.support test runner failing on Android 14+, filter.py skipped profiles with empty biographies whenever specific_alphabet was configured even without mandatory words, and upload_posts.py pressed the back key discarding the Instagram composer when the bottom sheet Done button was absent.
+  correction: Handle (DeviceFacade.AppHasCrashed, DeviceFacade.JsonRpcError) in all recovery loops with automated uiautomator daemon resurrection and post-sleep connection verification, patch reset_uiautomator to use androidx runner, decouple biography filter so empty bios pass unless mandatory words or skip_if_empty_biography are set, and replace back-presses in upload_posts with safe preview area taps.
+  priority: high
+
+- date: 2026-09-26
+  task_type: audit
+  mistake: Following scheduled overnight sleep, Android 14+ Keyguard (dumpsys window isKeyguardShowing=true) remained active and touch swipes failed to dismiss it, triggering fatal stop_bot() after 44 seconds. Furthermore, Watchdog Tier 2 task skips were checked via non-destructive is_skip_task_requested() instead of consume_skip_task_request(), leaving the skip flag set and cascading skips across all tasks, and hashtag posts were pruned as DEAD on single failure without verifying post count.
+  correction: Upgrade DeviceFacade.unlock() to execute native 'adb shell wm dismiss-keyguard' and KEYEVENT_WAKEUP (224) / KEYEVENT_MENU (82), replace fatal screen lock termination with daemon retry loop, always call consume_skip_task_request() to atomically consume task skip signals, and require a two-strike failure with _check_if_no_posts() before pruning hashtags as DEAD.
+  priority: high
+
 - date: 2026-09-24
   task_type: audit
   mistake: Navigating to hashtags clicked thumbnails blindly without verifying OpenedPostView.is_post_opened(), and handle_posts() lacked a consecutive unidentifiable author circuit breaker while unconditionally emitting BotWatchdog heartbeats on empty passes. This blinded the watchdog and allowed 3x Direction.UP author-search swipes and 1x downward scroll swipes to cancel each other out, locking the screen onto the same 6 thumbnails in an infinite 4+ hour loop.

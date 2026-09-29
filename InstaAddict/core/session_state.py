@@ -61,7 +61,7 @@ class SessionState:
     def __init__(self, configs=None):
         self.id = str(uuid.uuid4())
         self.args = configs.args if configs and hasattr(configs, "args") else {}
-        self.my_username = None
+        self.my_username = getattr(self.args, "username", None) if hasattr(self.args, "username") else None
         self.my_posts_count = None
         self.my_followers_count = None
         self.my_following_count = None
