@@ -466,6 +466,20 @@ progress:
   overall: 100
 recent_work:
 - date: '2026-09-29'
+  description: 'Remediated Audit #134 findings across unfollow sorting, watchdog recovery sleep, upload commenting safety, and Telegram ingestion.'
+  items:
+  - "✓ Unified sorting parameter resolution in ActionUnfollowFollowers to preserve None default (newest_to_oldest=True)"
+  - "✓ Eradicated Home feed fallback in _post_first_comment, strictly requiring Profile tab and own post grid to prevent commenting on sponsored ads"
+  - "✓ Wrapped 5-minute screen lock recovery sleep in bot_flow with watchdog.pause() and watchdog.resume() to eliminate false-positive watchdog kills"
+  - "✓ Ensured parent directory creation in telegram_bot_download_file to prevent FileNotFoundError during atomic file staging"
+  - "✓ Implemented zero-post strike resets in HashtagManager upon successful interactions or already-liked detection"
+  - "✓ Short-circuited empty and whitespace biographies in Filter._find_language to prevent repeated LangDetectException churn"
+  - "✓ Supported both argparse Namespace and dict configurations in SessionState for reliable my_username resolution"
+  - "✓ Optimized MediaStore Android content query with '_id DESC' sorting in UploadPostsPlugin"
+  - "✓ Added 5 unit tests to test_bot_stopping_and_dogfood_tuning.py; verified 474/474 tests pass 100% green"
+  - "✓ Passed all 6/6 ACP CI fast gates with zero warnings and zero errors"
+  - "✓ Authored audit-134, review-067, and review-068 reports; updated audit carryovers CO-097..CO-104 as fixed"
+- date: '2026-09-29'
   description: 'Upload Mechanism Production Hardening & Bot Stopping Optimization (Audit #133, Review #065, Review #066).'
   items:
   - "✓ Hardened MediaStore content URI resolution with insert/query retries, preventing FileUriExposedException on Android API 24–36 (AUDIT-133-G01)"
