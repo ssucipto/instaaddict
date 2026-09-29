@@ -834,30 +834,28 @@ class UploadPostsPlugin(Plugin):
             if not profile_btn.exists(timeout=3):
                 profile_btn = d(resourceIdMatches=".*profile_tab.*|.*tab_avatar.*")
 
-            navigated_profile = False
-            if profile_btn.exists(timeout=4):
-                profile_btn.click()
-                random_sleep(2, 3)
-                navigated_profile = True
-            else:
-                logger.debug("_post_first_comment: Profile tab not found — falling back to Home tab...")
-                home_btn = d(descriptionMatches="(?i).*Home.*")
-                if home_btn.exists(timeout=5):
-                    home_btn.click()
-                    random_sleep(2, 3)
-                else:
-                    logger.debug("_post_first_comment: Home tab not found — skipping first comment.")
-                    return
-
-            # Step 2: If on Profile, tap the newest post in the media grid
-            if navigated_profile:
-                first_grid_item = d(
-                    resourceIdMatches=".*row_feed_photo_item.*|.*grid_item.*|.*media_image.*|.*image_view.*"
+            if not profile_btn.exists(timeout=4):
+                logger.warning(
+                    "_post_first_comment: Profile tab not found. Aborting first comment to prevent commenting on Home feed ads."
                 )
-                if first_grid_item.exists(timeout=3):
-                    logger.info("Opening newly published post from Profile grid...")
-                    first_grid_item.click()
-                    random_sleep(2, 3)
+                return
+
+            profile_btn.click()
+            random_sleep(2, 3)
+
+            # Step 2: Tap the newest post in the user's Profile media grid
+            first_grid_item = d(
+                resourceIdMatches=".*row_feed_photo_item.*|.*grid_item.*|.*media_image.*|.*image_view.*"
+            )
+            if not first_grid_item.exists(timeout=4):
+                logger.warning(
+                    "_post_first_comment: Profile grid items not found. Aborting first comment."
+                )
+                return
+
+            logger.info("Opening newly published post from Profile grid...")
+            first_grid_item.click()
+            random_sleep(2, 3)
 
             # Step 3: Find comment button
             comment_btn = d(descriptionMatches="(?i).*[Cc]omment.*")
@@ -902,11 +900,12 @@ class UploadPostsPlugin(Plugin):
                 logger.debug("_post_first_comment: Send button not found — comment not submitted.")
 
             random_sleep(1, 2)
-            if navigated_profile:
-                try:
-                    d.press("back")
-                except Exception:
-                    pass
+            try:
+                d.press("back")
+                random_sleep(1, 2)
+                d.press("back")
+            except Exception:
+                pass
 
         except Exception as e:
             logger.debug(f"_post_first_comment: Non-fatal exception during first comment attempt: {e}")
@@ -960,6 +959,8 @@ class UploadPostsPlugin(Plugin):
             uri,
             "--projection",
             "_id:_data",
+            "--sort",
+            "'_id DESC'",
         ]
         try:
             res = subprocess.run(

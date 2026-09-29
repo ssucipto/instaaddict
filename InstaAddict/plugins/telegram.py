@@ -298,6 +298,9 @@ def telegram_bot_download_file(
     """Stream download a media file from Telegram to local disk with atomic rename (AUDIT-133-G04)."""
     tmp_path = f"{dest_path}.tmp"
     try:
+        parent_dir = os.path.dirname(dest_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
         url = f"https://api.telegram.org/file/bot{bot_api_token}/{file_path}"
         with requests.get(url, stream=True, timeout=30) as r:
             r.raise_for_status()

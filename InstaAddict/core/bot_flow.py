@@ -241,7 +241,11 @@ def start_bot(**kwargs):
                     total_sessions_val = getattr(getattr(configs, "args", None), "total_sessions", -1)
                     if total_sessions_val == -1 or can_repeat(len(sessions), total_sessions_val):
                         logger.warning("Screen lock recovery: sleeping 5 minutes before retrying session cycle...")
-                        time.sleep(300)
+                        watchdog.pause()
+                        try:
+                            time.sleep(300)
+                        finally:
+                            watchdog.resume()
                         continue
                     else:
                         stop_bot(device, sessions, session_state, was_sleeping=False)

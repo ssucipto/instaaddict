@@ -386,7 +386,11 @@ class ActionUnfollowFollowers(Plugin):
                 resourceId=self.ResourceID.SORTING_ENTRY_ROW_OPTION
             )
             if sort_container_obj.exists() and not sorted:
-                newest_param = getattr(self.args, "sort_followers_newest_to_oldest", None)
+                newest_param = None
+                if getattr(self.args, "sort_followings_by_earliest", False):
+                    newest_param = False
+                elif getattr(self.args, "sort_followings_by_latest", False) or getattr(self.args, "sort_followers_newest_to_oldest", False):
+                    newest_param = True
                 sorted = self.sort_followings_by_date(
                     device, newest_param
                 )
@@ -412,9 +416,11 @@ class ActionUnfollowFollowers(Plugin):
                 )
 
             if sort_container_obj.exists() and not sorted:
-                newest_param = getattr(self.args, "sort_followings_by_latest", False) or getattr(self.args, "sort_followers_newest_to_oldest", False)
+                newest_param = None
                 if getattr(self.args, "sort_followings_by_earliest", False):
                     newest_param = False
+                elif getattr(self.args, "sort_followings_by_latest", False) or getattr(self.args, "sort_followers_newest_to_oldest", False):
+                    newest_param = True
                 self.sort_followings_by_date(
                     device, newest_param
                 )

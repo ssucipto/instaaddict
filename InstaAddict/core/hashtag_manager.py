@@ -448,6 +448,10 @@ class HashtagManager:
 
         # R-PRN-2: Saturation Benching
         elif already_liked_exhausted:
+            zero_counts = self.master_data.get("zero_post_counts")
+            if isinstance(zero_counts, dict) and clean_tag in zero_counts:
+                del zero_counts[clean_tag]
+                self._dirty = True
             saturated = self.master_data.setdefault("saturated_tags", {})
             current_count = saturated.get(clean_tag, 0)
             if isinstance(current_count, int):
@@ -465,7 +469,11 @@ class HashtagManager:
                     saturated[clean_tag] = new_count
                 self._dirty = True
         else:
-            # Successful session with interactions: reset saturation counter
+            # Successful session with interactions: reset saturation and zero-post counters
+            zero_counts = self.master_data.get("zero_post_counts")
+            if isinstance(zero_counts, dict) and clean_tag in zero_counts:
+                del zero_counts[clean_tag]
+                self._dirty = True
             saturated = self.master_data.setdefault("saturated_tags", {})
             if clean_tag in saturated and isinstance(saturated[clean_tag], int):
                 del saturated[clean_tag]

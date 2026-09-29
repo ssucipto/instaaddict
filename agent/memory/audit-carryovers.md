@@ -1212,6 +1212,100 @@ carryovers:
     affected_files:
       - InstaAddict/plugins/upload_posts.py
 
+  - id: CO-097
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F01: Unified sorting parameter resolution in action_unfollow_followers.py to preserve None when flags are omitted, defaulting to newest_to_oldest=True."
+    affected_files:
+      - InstaAddict/plugins/action_unfollow_followers.py
+
+  - id: CO-098
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F02: Removed Home feed fallback in _post_first_comment to prevent posting comments on sponsored feed ads, strictly requiring Profile tab and media grid."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+      - test/test_bot_stopping_and_dogfood_tuning.py
+
+  - id: CO-099
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F03: Wrapped screen lock recovery sleep (300s) in bot_flow.py with watchdog.pause() and watchdog.resume() to prevent premature false-positive kills."
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-100
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F04: Added parent directory creation (os.makedirs) in telegram_bot_download_file to avoid FileNotFoundError during atomic file ingestion."
+    affected_files:
+      - InstaAddict/plugins/telegram.py
+      - test/test_bot_stopping_and_dogfood_tuning.py
+
+  - id: CO-101
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F05: Cleared temporary zero-post strikes in HashtagManager when posts_found=True or already_liked_exhausted, preventing permanent strike accumulation."
+    affected_files:
+      - InstaAddict/core/hashtag_manager.py
+      - test/test_bot_stopping_and_dogfood_tuning.py
+
+  - id: CO-102
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F06: Fast-pathed empty and whitespace biographies in Filter._find_language to avoid 5 repeated LangDetectException exceptions per profile."
+    affected_files:
+      - InstaAddict/core/filter.py
+      - test/test_bot_stopping_and_dogfood_tuning.py
+
+  - id: CO-103
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F07: Handled both Namespace and dictionary instances of self.args in SessionState.__init__ to reliably resolve my_username."
+    affected_files:
+      - InstaAddict/core/session_state.py
+      - test/test_bot_stopping_and_dogfood_tuning.py
+
+  - id: CO-104
+    audit_report: agent/reports/audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    date_raised: 2026-09-29
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-09-29'
+    verified_in_audit: audit-134-all-today-implementations-gaps-and-inconsistencies.md
+    summary: "F08: Added '--sort', \"'_id DESC'\" to Android content query in upload_posts.py to prioritize newest entries and optimize MediaStore search."
+    affected_files:
+      - InstaAddict/plugins/upload_posts.py
+
+
 
 
 

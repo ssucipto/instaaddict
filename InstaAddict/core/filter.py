@@ -789,6 +789,8 @@ class Filter:
     @staticmethod
     def _find_language(biography: str) -> str:
         """Language detection algorithm is non-deterministic, which means that if you try to run it on a text which is either too short or too ambiguous, you might get different results everytime you run it."""
+        if not biography or not biography.strip():
+            return ""
         language = ""
         results = []
         try:

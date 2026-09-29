@@ -314,6 +314,78 @@ class TestDeviceFacadeResurrectionAndSelfHealing(unittest.TestCase):
         self.assertEqual(mock_u2_view.exists.call_count, 2)
 
 
+class TestAudit134Remediations(unittest.TestCase):
+    def test_find_language_empty_string(self):
+        from InstaAddict.core.filter import Filter
+        self.assertEqual(Filter._find_language(""), "")
+        self.assertEqual(Filter._find_language("   "), "")
+
+    def test_record_hashtag_result_resets_zero_strikes(self):
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            HashtagManager._instances.clear()
+            mgr = HashtagManager("test_user", account_dir=tmp_dir)
+            mgr.master_data = {"tiers": {"local": {"tags": ["dogsofperth"]}}, "zero_post_counts": {"dogsofperth": 1}}
+            # Posts found should clear the strike
+            mgr.record_hashtag_result("dogsofperth", posts_found=True)
+            self.assertNotIn("dogsofperth", mgr.master_data.get("zero_post_counts", {}))
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            HashtagManager._instances.clear()
+
+    def test_session_state_init_from_dict_and_namespace(self):
+        # Namespace
+        class MockConfig:
+            class MockArgs:
+                username = "test_ns_user"
+            args = MockArgs()
+
+        s1 = SessionState(MockConfig())
+        self.assertEqual(s1.my_username, "test_ns_user")
+
+        # Dict
+        class MockDictConfig:
+            args = {"username": "test_dict_user"}
+
+        s2 = SessionState(MockDictConfig())
+        self.assertEqual(s2.my_username, "test_dict_user")
+
+    @patch("InstaAddict.plugins.telegram.requests.get")
+    def test_telegram_download_creates_parent_directory(self, mock_get):
+        from InstaAddict.plugins.telegram import telegram_bot_download_file
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            dest_dir = os.path.join(tmp_dir, "nonexistent", "sub", "dir")
+            dest_file = os.path.join(dest_dir, "media.jpg")
+
+            mock_resp = MagicMock()
+            mock_resp.iter_content.return_value = [b"chunk1", b"chunk2"]
+            mock_resp.__enter__.return_value = mock_resp
+            mock_get.return_value = mock_resp
+
+            ok = telegram_bot_download_file("mock_token", "photos/file.jpg", dest_file)
+            self.assertTrue(ok)
+            self.assertTrue(os.path.exists(dest_file))
+            with open(dest_file, "rb") as f:
+                self.assertEqual(f.read(), b"chunk1chunk2")
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    def test_post_first_comment_aborts_without_profile(self):
+        from InstaAddict.plugins.upload_posts import UploadPostsPlugin
+        plugin = UploadPostsPlugin()
+        mock_device = MagicMock()
+        mock_u2 = MagicMock()
+        mock_device.deviceV2 = mock_u2
+
+        # Profile button does not exist
+        mock_u2.return_value.exists.return_value = False
+
+        # Should cleanly return without crashing or searching for Home tab
+        plugin._post_first_comment(mock_device, "#hashtag")
+        mock_u2.return_value.click.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
 
