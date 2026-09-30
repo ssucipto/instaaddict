@@ -301,7 +301,28 @@ def start_bot(**kwargs):
 
             UniversalActions.close_keyboard(device)
         else:
-            break
+            total_sessions_val = getattr(getattr(configs, "args", None), "total_sessions", -1)
+            if total_sessions_val == -1 or can_repeat(len(sessions), total_sessions_val):
+                logger.error(
+                    "Unable to open Instagram. Initiating autonomous self-healing recovery loop..."
+                )
+                watchdog.pause()
+                try:
+                    try:
+                        close_instagram(device)
+                    except Exception:
+                        pass
+                    if hasattr(device, "_recover_adb"):
+                        try:
+                            device._recover_adb()
+                        except Exception:
+                            pass
+                    time.sleep(300)
+                finally:
+                    watchdog.resume()
+                continue
+            else:
+                break
         startup_ok = False
         for startup_attempt in range(3):
             try:
@@ -782,6 +803,26 @@ def start_bot(**kwargs):
                 dashboard_manager.stop()
                 disable_tui_logging()
             print_full_report(sessions, configs.args.scrape_to_file)
+
+            # Closed-loop Dogfood Auto-Tuning
+            try:
+                from InstaAddict.core.dogfood import DogfoodOptimizer
+                u_name = getattr(session_state, "my_username", None)
+                cfg_p = f"accounts/{u_name}/config.yml" if u_name and os.path.exists(f"accounts/{u_name}/config.yml") else "config.yml"
+                flt_p = f"accounts/{u_name}/filters.yml" if u_name and os.path.exists(f"accounts/{u_name}/filters.yml") else "filters.yml"
+                optimizer = DogfoodOptimizer(
+                    username=u_name,
+                    config_path=cfg_p,
+                    filters_path=flt_p,
+                )
+                tune_res = optimizer.apply_tuning(backup=True)
+                if tune_res.get("applied"):
+                    logger.info(
+                        f"[AUTOTUNE] Applied closed-loop self-tuning after session: {tune_res['applied']}"
+                    )
+            except Exception as tune_err:
+                logger.debug(f"Post-session auto-tuning skipped or encountered: {tune_err}")
+
             inside_working_hours, time_left = SessionState.inside_working_hours(
                 configs.args.working_hours, configs.args.time_delta_session
             )

@@ -155,9 +155,43 @@ def restart(
                 f"UiAutomator resurrection check during restart encountered: {e}"
             )
     if not open_instagram(device):
-        print_full_report(sessions, configs.args.scrape_to_file)
-        sessions.persist(directory=session_state.my_username)
-        sys.exit(2)
+        import time
+
+        logger.error(
+            "open_instagram() failed during restart recovery. Initiating autonomous backoff recovery..."
+        )
+        print_full_report(
+            sessions,
+            configs.args.scrape_to_file if configs and hasattr(configs, "args") else False,
+        )
+        if session_state and hasattr(session_state, "my_username") and session_state.my_username:
+            sessions.persist(directory=session_state.my_username)
+        revived = False
+        for recovery_attempt in range(1, 4):
+            backoff_secs = 60 * recovery_attempt
+            logger.warning(
+                f"[AUTONOMOUS RECOVERY] Waiting {backoff_secs}s before re-attempting Instagram restart ({recovery_attempt}/3)..."
+            )
+            time.sleep(backoff_secs)
+            if hasattr(device, "_recover_adb"):
+                try:
+                    device._recover_adb()
+                except Exception:
+                    pass
+            if hasattr(device, "ensure_uiautomator_alive"):
+                try:
+                    device.ensure_uiautomator_alive()
+                except Exception:
+                    pass
+            if open_instagram(device):
+                logger.info("[AUTONOMOUS RECOVERY] Instagram successfully revived after backoff!")
+                revived = True
+                break
+        if not revived:
+            logger.critical(
+                "[AUTONOMOUS RECOVERY] Instagram could not be revived after 3 backoff cycles. Yielding control to session supervisor loop."
+            )
+            return False
     try:
         TabBarView(device).navigateToProfile()
     except Exception as e:

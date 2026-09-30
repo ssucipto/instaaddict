@@ -3377,7 +3377,15 @@ class ProfileView(ActionBarView):
         followers_button = self.device.find(
             resourceIdMatches=ResourceID.ROW_PROFILE_HEADER_FOLLOWERS_CONTAINER
         )
-        if followers_button.exists(Timeout.LONG):
+        if not followers_button.exists(Timeout.SHORT):
+            followers_button = self.device.find(
+                descriptionMatches=case_insensitive_re(r".*follower.*")
+            )
+        if not followers_button.exists(Timeout.SHORT):
+            followers_button = self.device.find(
+                textMatches=case_insensitive_re(r".*[0-9]+(\.[0-9]+)?[kmb]?\s*followers.*")
+            )
+        if followers_button.exists(Timeout.MEDIUM):
             followers_button.click()
             followers_tab = self.device.find(
                 resourceIdMatches=ResourceID.UNIFIED_FOLLOW_LIST_TAB_LAYOUT

@@ -39,7 +39,34 @@ def cmd_init(args):
 
 
 def cmd_run(args):
-    start_bot()
+    import time
+    supervisor_active = getattr(args, "supervisor", True)
+    consecutive_crashes = 0
+    while True:
+        try:
+            start_bot()
+            break
+        except KeyboardInterrupt:
+            print("\nInstaAddict stopped by user.")
+            break
+        except SystemExit as se:
+            if se.code == 0 or not supervisor_active:
+                raise se
+            consecutive_crashes += 1
+            backoff = min(300, 15 * (2 ** min(consecutive_crashes - 1, 4)))
+            print(
+                f"[SUPERVISOR] Process exited with code {se.code}. Autonomous supervisor restarting in {backoff}s (incident #{consecutive_crashes})..."
+            )
+            time.sleep(backoff)
+        except Exception as e:
+            if not supervisor_active:
+                raise e
+            consecutive_crashes += 1
+            backoff = min(300, 15 * (2 ** min(consecutive_crashes - 1, 4)))
+            print(
+                f"[SUPERVISOR] Unhandled error: {e}. Autonomous supervisor restarting in {backoff}s (incident #{consecutive_crashes})..."
+            )
+            time.sleep(backoff)
 
 
 def cmd_dump(args):
@@ -195,6 +222,7 @@ _commands = [
         help="start the bot!",
         flags=[
             dict(args=["--config"], nargs="?", help="provide the config.yml path"),
+            dict(args=["--no-supervisor"], dest="supervisor", action="store_false", default=True, help="disable automatic supervisor recovery loop"),
         ],
     ),
     dict(

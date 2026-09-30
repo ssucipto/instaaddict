@@ -483,11 +483,85 @@ class DeviceFacade:
         if self.deviceV2.screenrecord.stop(crash=crash):
             logger.warning("Screen recorder has been stopped successfully!")
 
-    def screenshot(self, path=None):
-        if path is None:
-            return self.deviceV2.screenshot()
+    def take_screenshot(self, format: str = "pillow", path: Optional[str] = None):
+        """Dual-engine screenshot capture pipeline.
+        1. Attempts uiautomator2 screenshot (pillow or raw format).
+        2. Validates image buffer (>= 500 bytes with PNG/JPEG magic headers).
+        3. If uiautomator2 screencap is corrupted or returns error output (such as
+           b'screencap: exit status 1\\n' on Android 15/16 emulators), transparently
+           falls back to high-speed `adb exec-out screencap -p`.
+        """
+        import io
+        from PIL import Image
+
+        raw_bytes = None
+        pillow_img = None
+
+        # Try uiautomator2 first
+        try:
+            if format == "raw":
+                res = self.deviceV2.screenshot(format="raw")
+                if isinstance(res, (bytes, bytearray)) and (res.startswith(b"\x89PNG") or res.startswith(b"\xff\xd8\xff")):
+                    raw_bytes = bytes(res)
+                else:
+                    logger.debug(f"u2 raw screencap invalid ({len(res) if res else 0} bytes). Falling back to ADB exec-out...")
+            else:
+                img = self.deviceV2.screenshot()
+                if img is not None and hasattr(img, "size") and img.size[0] > 0 and img.size[1] > 0:
+                    pillow_img = img
+                else:
+                    logger.debug("u2 pillow screencap returned None or 0-size image. Falling back to ADB exec-out...")
+        except Exception as e:
+            logger.debug(f"u2 screenshot attempt raised: {e}. Falling back to ADB exec-out...")
+
+        # If u2 failed, fallback to direct ADB exec-out screencap -p
+        if raw_bytes is None and pillow_img is None:
+            try:
+                cmd = ["adb"]
+                serial = getattr(self, "device_id", None)
+                if not serial and hasattr(self.deviceV2, "serial") and self.deviceV2.serial:
+                    serial = str(self.deviceV2.serial)
+                if serial:
+                    cmd.extend(["-s", str(serial)])
+                cmd.extend(["exec-out", "screencap", "-p"])
+                proc = run(cmd, stdout=PIPE, stderr=PIPE, shell=False, timeout=10)
+                if proc.stdout and (proc.stdout.startswith(b"\x89PNG") or proc.stdout.startswith(b"\xff\xd8\xff")):
+                    raw_bytes = proc.stdout
+                    logger.debug(f"ADB exec-out screencap fallback succeeded ({len(raw_bytes)} bytes).")
+                else:
+                    logger.error(f"ADB exec-out screencap produced invalid payload ({len(proc.stdout) if proc.stdout else 0} bytes). Stderr: {proc.stderr}")
+            except Exception as adb_err:
+                logger.error(f"ADB exec-out screencap fallback failed: {adb_err}")
+
+        # Materialize requested output format
+        if format == "raw":
+            if raw_bytes is None:
+                if pillow_img is not None:
+                    buf = io.BytesIO()
+                    pillow_img.save(buf, format="PNG")
+                    raw_bytes = buf.getvalue()
+                else:
+                    return b""
+            if path:
+                with open(path, "wb") as f:
+                    f.write(raw_bytes)
+            return raw_bytes
         else:
-            self.deviceV2.screenshot(path)
+            if pillow_img is None:
+                if raw_bytes is not None:
+                    try:
+                        pillow_img = Image.open(io.BytesIO(raw_bytes))
+                    except Exception as pil_err:
+                        logger.error(f"Failed decoding screenshot raw bytes to Pillow Image: {pil_err}")
+                        return None
+                else:
+                    return None
+            if path:
+                pillow_img.save(path)
+            return pillow_img
+
+    def screenshot(self, path=None):
+        return self.take_screenshot(format="pillow", path=path)
 
     def dump_hierarchy(self, path):
         xml_dump = self.deviceV2.dump_hierarchy()
@@ -1281,7 +1355,7 @@ class DeviceFacade:
                         typed_text = self.get_text(error=False)
                         # Instagram strips spaces out of hashtag searches, so we don't need to throw an error if the stripped version matches
                         if typed_text.replace(" ", "") != text.replace(" ", ""):
-                            logger.warning(
+                            logger.debug(
                                 f"Typed text '{typed_text}' does not match expected '{text}', falling back to direct set_text."
                             )
                             self.viewV2.set_text(text)

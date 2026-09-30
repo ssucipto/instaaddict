@@ -205,7 +205,11 @@ class InteractReelsPlugin(Plugin):
                 is_target = False
 
                 if should_eval:
-                    raw_png = d.screenshot(format="raw")
+                    raw_png = (
+                        device.take_screenshot(format="raw")
+                        if hasattr(device, "take_screenshot")
+                        else d.screenshot(format="raw")
+                    )
                     reels_topic = getattr(configs.args, "reels_topic", None) or "dogs or animals"
                     comment_text = evaluate_and_comment_reel(
                         raw_png, topic=reels_topic

@@ -306,7 +306,7 @@ def open_instagram(device):
     else:
         logger.debug("Instagram called successfully.")
 
-    max_tries = 3
+    max_tries = 6
     n = 0
     while True:
         try:
@@ -325,6 +325,37 @@ def open_instagram(device):
         curr_pkg = curr.get("package", "")
         if curr_pkg == target_app:
             break
+
+        # Check for interfering overlay apps (e.g. Google Play Store com.android.vending, browser, dialogs)
+        system_pkgs = (
+            "android",
+            "com.android.systemui",
+            "com.google.android.apps.nexuslauncher",
+            "com.android.launcher3",
+            "com.google.android.inputmethod.latin",
+        )
+        if curr_pkg and curr_pkg != target_app and curr_pkg not in system_pkgs:
+            logger.warning(
+                f"Detected interfering non-target foreground package '{curr_pkg}'. Force-stopping package to clear overlay/dialog..."
+            )
+            try:
+                if hasattr(device, "shell"):
+                    device.shell(f"am force-stop {curr_pkg}")
+                elif hasattr(device, "deviceV2") and hasattr(device.deviceV2, "app_stop"):
+                    device.deviceV2.app_stop(curr_pkg)
+            except Exception as stop_err:
+                logger.debug(f"Failed to force-stop interfering package {curr_pkg}: {stop_err}")
+            try:
+                if hasattr(device, "back"):
+                    device.back()
+            except Exception:
+                pass
+            try:
+                from InstaAddict.core.views import UniversalActions
+                UniversalActions.dismiss_dialog(device)
+            except Exception:
+                pass
+
         if n >= max_tries:
             logger.critical(
                 f"Unable to open Instagram. Bot will stop. Current package name: {curr_pkg or 'unknown'} (Looking for {target_app})"

@@ -1305,6 +1305,89 @@ carryovers:
     affected_files:
       - InstaAddict/plugins/upload_posts.py
 
+  - id: CO-105
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Proactively force-stop interfering foreground packages (com.android.vending, overlays) in open_instagram() and eradicate sys.exit(2) from restart() with backoff sleep recovery."
+    affected_files:
+      - InstaAddict/core/utils.py
+      - InstaAddict/core/decorators.py
+
+  - id: CO-106
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Implement resilient dual-engine screenshot pipeline in DeviceFacade falling back to adb exec-out screencap -p on short or corrupt u2 buffers (screencap: exit status 1)."
+    affected_files:
+      - InstaAddict/core/device_facade.py
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/plugins/interact_reels.py
+
+  - id: CO-107
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Replace lingering click in nav_to_hashtag_or_place() with fast ADB input tap (<20ms) and implement direct in-peek interaction recovery."
+    affected_files:
+      - InstaAddict/core/navigation.py
+
+  - id: CO-108
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Modernize navigateToFollowers() in views.py with adaptive content-desc and text regex matching for Instagram v447+ profiles."
+    affected_files:
+      - InstaAddict/core/views.py
+
+  - id: CO-109
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Optimize set_text input focus in device_facade.py to eliminate placeholder text mismatch warning log churn."
+    affected_files:
+      - InstaAddict/core/device_facade.py
+
+  - id: CO-110
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Implement single-account autonomous supervisor retry wrapper in __main__.py and default non-interactive auto-proceed on untested IG version prompts."
+    affected_files:
+      - InstaAddict/__main__.py
+      - InstaAddict/core/bot_flow.py
+
+  - id: CO-111
+    audit_report: agent/reports/audit-135-autonomous-self-healing-and-reliability-architecture.md
+    date_raised: 2026-10-01
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-01'
+    verified_in_audit: audit-137-post-impl-autonomous-self-healing-resilience.md
+    summary: "Hook closed-loop autonomous DogfoodOptimizer.apply_tuning() into post-session completion sequence to prevent cooldown starvation and quota penalties."
+    affected_files:
+      - InstaAddict/core/bot_flow.py
+      - InstaAddict/core/dogfood.py
+
+
 
 
 

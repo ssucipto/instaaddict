@@ -17,21 +17,31 @@ class DogfoodOptimizer:
     tuning recommendations.
     """
 
-    def __init__(self, username: str, window_sessions: int = 5):
-        self.username = username
+    def __init__(
+        self,
+        username: str = "",
+        window_sessions: int = 5,
+        config_path: Optional[str] = None,
+        filters_path: Optional[str] = None,
+    ):
+        self.username = username or ""
         self.window_sessions = window_sessions
-        self.account_dir = os.path.join("accounts", username)
+        self.account_dir = os.path.join("accounts", username) if username else "."
         self.sessions_path = os.path.join(self.account_dir, "sessions.json")
         self.history_path = os.path.join(self.account_dir, "history.md")
-        self.error_log_path = os.path.join("logs", f"{username}_error_trace.log")
+        self.error_log_path = (
+            os.path.join("logs", f"{username}_error_trace.log")
+            if username
+            else os.path.join("logs", "error_trace.log")
+        )
         self.suggestions_json_path = os.path.join(
             self.account_dir, "tuning_suggestions.json"
         )
         self.suggestions_md_path = os.path.join(
             self.account_dir, "tuning_suggestions.md"
         )
-        self.config_path = os.path.join(self.account_dir, "config.yml")
-        self.filters_path = os.path.join(self.account_dir, "filters.yml")
+        self.config_path = config_path or os.path.join(self.account_dir, "config.yml")
+        self.filters_path = filters_path or os.path.join(self.account_dir, "filters.yml")
 
     def analyze(self, window_sessions: Optional[int] = None) -> Dict[str, Any]:
         """Runs the dog-feeding diagnostic and outputs tuning suggestions.
@@ -769,6 +779,10 @@ class DogfoodOptimizer:
                 params_to_adjust["evaluate-percentage"] = -15
             elif param == "min_followers":
                 params_to_adjust["min_followers"] = 0.7
+            elif param == "can-reinteract-after":
+                params_to_adjust["can-reinteract-after"] = 24
+            elif param == "sort-followers-latest":
+                params_to_adjust["sort-followers-latest"] = "true"
 
         if not params_to_adjust:
             logger.info("[AUTOTUNE] No actionable parameter tuning required at this time.")
@@ -847,6 +861,48 @@ class DogfoodOptimizer:
                             result["applied"].append(
                                 {
                                     "parameter": prefix.strip().rstrip(":"),
+                                    "old_value": curr_val,
+                                    "new_value": new_val,
+                                }
+                            )
+                            modified = True
+
+                # Check can-reinteract-after
+                if "can-reinteract-after" in params_to_adjust:
+                    m = re.match(r"^(\s*can-reinteract-after\s*:\s*)([0-9]+)(.*)$", line)
+                    if m:
+                        prefix, curr_val, suffix = m.group(1), int(m.group(2)), m.group(3)
+                        new_val = int(params_to_adjust["can-reinteract-after"])
+                        if new_val != curr_val:
+                            new_line = (
+                                f"{prefix}{new_val}{suffix}\n"
+                                if not suffix.endswith("\n")
+                                else f"{prefix}{new_val}{suffix}"
+                            )
+                            result["applied"].append(
+                                {
+                                    "parameter": "can-reinteract-after",
+                                    "old_value": curr_val,
+                                    "new_value": new_val,
+                                }
+                            )
+                            modified = True
+
+                # Check sort-followers-latest
+                if "sort-followers-latest" in params_to_adjust:
+                    m = re.match(r"^(\s*sort-followers-latest\s*:\s*)(true|false)(.*)$", line, re.IGNORECASE)
+                    if m:
+                        prefix, curr_val, suffix = m.group(1), m.group(2).lower(), m.group(3)
+                        new_val = str(params_to_adjust["sort-followers-latest"]).lower()
+                        if new_val != curr_val:
+                            new_line = (
+                                f"{prefix}{new_val}{suffix}\n"
+                                if not suffix.endswith("\n")
+                                else f"{prefix}{new_val}{suffix}"
+                            )
+                            result["applied"].append(
+                                {
+                                    "parameter": "sort-followers-latest",
                                     "old_value": curr_val,
                                     "new_value": new_val,
                                 }

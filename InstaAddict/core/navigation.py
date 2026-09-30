@@ -108,8 +108,9 @@ def nav_to_hashtag_or_place(device, target, current_job):
             random_sleep(inf=1, sup=2, modulable=False)
 
             if opened_post_view.is_peek_preview_opened():
-                logger.info("Peek Preview detected on thumbnail. Dismissing...")
-                opened_post_view.dismiss_peek()
+                logger.info("Peek Preview detected on thumbnail. Enabling direct peek engagement.")
+                opened_post_view.is_peek = True
+                return True
 
             if opened_post_view.is_post_opened():
                 logger.info(f"First post for {target} successfully opened.")

@@ -167,9 +167,35 @@ def get_vision_comment(device, _reserved: str = '') -> str:
         return ""
         
     try:
-        raw_screenshot = device.deviceV2.screenshot(format='raw')
+        raw_screenshot = None
+        if hasattr(device, "take_screenshot"):
+            try:
+                res = device.take_screenshot(format="raw")
+                if isinstance(res, (bytes, bytearray)):
+                    raw_screenshot = res
+            except Exception:
+                pass
+        if raw_screenshot is None:
+            if hasattr(device, "deviceV2") and hasattr(device.deviceV2, "screenshot"):
+                try:
+                    res = device.deviceV2.screenshot(format="raw")
+                    if isinstance(res, (bytes, bytearray)):
+                        raw_screenshot = res
+                except Exception:
+                    pass
+        if raw_screenshot is None:
+            raw_screenshot = b""
     except Exception as e:
         logger.error(f"Failed to capture screen: {e}")
+        return ""
+
+    if not raw_screenshot or (
+        isinstance(raw_screenshot, (bytes, bytearray))
+        and not (raw_screenshot.startswith(b"\x89PNG") or raw_screenshot.startswith(b"\xff\xd8\xff"))
+    ):
+        logger.warning(
+            f"Screen capture buffer invalid ({len(raw_screenshot) if raw_screenshot else 0} bytes). Skipping Vision AI comment."
+        )
         return ""
         
     SESSION_API_CALLS += 1
@@ -415,6 +441,15 @@ def evaluate_and_comment_reel(img_bytes, topic="dogs or animals") -> str:
     if not api_key or api_key == "INSERT_YOUR_KEY_HERE":
         logger.warning("No Gemini API key found in .env. Skipping Vision AI Filter.")
         VISION_API_DEAD = True
+        return ""
+
+    if not img_bytes or (
+        isinstance(img_bytes, (bytes, bytearray))
+        and not (img_bytes.startswith(b"\x89PNG") or img_bytes.startswith(b"\xff\xd8\xff"))
+    ):
+        logger.warning(
+            f"Reel screenshot buffer invalid ({len(img_bytes) if img_bytes else 0} bytes). Skipping Vision AI evaluation."
+        )
         return ""
 
     SESSION_API_CALLS += 1
