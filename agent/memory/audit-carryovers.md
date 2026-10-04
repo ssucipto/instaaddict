@@ -1387,6 +1387,93 @@ carryovers:
       - InstaAddict/core/bot_flow.py
       - InstaAddict/core/dogfood.py
 
+  - id: CO-112
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: critical
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Configure Gemini safety thresholds to BLOCK_NONE/BLOCK_ONLY_HIGH with automated fallback regeneration to eliminate finish_reason=2 comment dropouts."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+
+  - id: CO-113
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Implement resilient comment composer focus sequence (tap before typing) for Instagram v447+ Compose bottom sheets."
+    affected_files:
+      - InstaAddict/core/interaction.py
+      - InstaAddict/plugins/interact_reels.py
+
+  - id: CO-114
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Pass post caption, hashtags, and author username into get_vision_comment() and evaluate_and_comment_reel() for multimodal understanding."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/handle_sources.py
+      - InstaAddict/plugins/interact_reels.py
+
+  - id: CO-115
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Implement community comment reading (ROW_COMMENT_TEXTVIEW_COMMENT / hierarchy) to extract top 2-3 comments and feed to AI."
+    affected_files:
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/views.py
+
+  - id: CO-116
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Implement persistent CommentMemory (comment_history.json) with strict Jaccard/overlap deduplication and expand length to 6-18 words."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+      - InstaAddict/core/storage.py
+      - InstaAddict/core/interaction.py
+
+  - id: CO-117
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Implement Sentiment & Tone Classifier (SYMPATHETIC, CELEBRATORY, PLAYFUL, INQUISITIVE, APPRECIATIVE) in prompt architecture."
+    affected_files:
+      - InstaAddict/core/gemini_vision.py
+
+  - id: CO-118
+    audit_report: agent/reports/audit-138-intelligent-contextual-commenting-and-telemetry-upgrade.md
+    date_raised: 2026-10-04
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-04'
+    verified_in_audit: audit-140-post-impl-intelligent-contextual-commenting.md
+    summary: "Create rich multi-tier fallback comment library (100+ templates categorized by sentiment) to eliminate repetition during API rate limits."
+    affected_files:
+      - InstaAddict/core/interaction.py
+      - InstaAddict/core/gemini_vision.py
+
+
+
 
 
 

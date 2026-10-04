@@ -204,6 +204,26 @@ class InteractReelsPlugin(Plugin):
                 comment_text = ""
                 is_target = False
 
+                reel_caption = ""
+                try:
+                    c_elem = device.find(resourceIdMatches=ResourceID.CLIPS_CAPTION_COMPONENT)
+                    if not c_elem.exists():
+                        c_elem = device.find(resourceIdMatches=".*clips_caption.*|.*caption_component.*")
+                    if c_elem.exists():
+                        reel_caption = c_elem.get_text() or ""
+                except Exception as ce:
+                    logger.debug(f"Reel caption extraction error: {ce}")
+
+                reel_author = ""
+                try:
+                    a_elem = device.find(resourceIdMatches=ResourceID.CLIPS_AUTHOR_USERNAME)
+                    if not a_elem.exists():
+                        a_elem = device.find(resourceIdMatches=".*clips_author.*|.*author_username.*")
+                    if a_elem.exists():
+                        reel_author = a_elem.get_text() or ""
+                except Exception as ae:
+                    logger.debug(f"Reel author extraction error: {ae}")
+
                 if should_eval:
                     raw_png = (
                         device.take_screenshot(format="raw")
@@ -211,8 +231,13 @@ class InteractReelsPlugin(Plugin):
                         else d.screenshot(format="raw")
                     )
                     reels_topic = getattr(configs.args, "reels_topic", None) or "dogs or animals"
+                    current_user = getattr(sessions[-1], "my_username", None) if sessions else None
                     comment_text = evaluate_and_comment_reel(
-                        raw_png, topic=reels_topic
+                        raw_png,
+                        topic=reels_topic,
+                        caption=reel_caption,
+                        author=reel_author,
+                        account_name=current_user,
                     )
                     if comment_text:
                         is_target = True
@@ -338,6 +363,8 @@ class InteractReelsPlugin(Plugin):
                                 session_state=sessions[-1],
                                 media_type=MediaType.REEL,
                                 explicit_comment=comment_text or None,
+                                caption=reel_caption,
+                                author=reel_author,
                             )
                         except Exception as e:
                             logger.error(f"Reels Stalker Comment Error: {e}")

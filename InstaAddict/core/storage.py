@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timedelta
 from enum import Enum, unique
@@ -16,6 +17,7 @@ FILENAME_HISTORY_FILTER_USERS = "history_filters_users.json"
 FILENAME_INTERACTED_USERS = "interacted_users.json"
 FILENAME_NON_BOT_FOLLOWINGS = "non_bot_followings.json"
 FILENAME_FOLLOWERS_CACHE = "followers_cache.json"
+FILENAME_COMMENT_HISTORY = "comment_history.json"
 OLD_FILTER = "filter.json"
 FILTER = "filters.yml"
 USER_LAST_INTERACTION = "last_interaction"
@@ -25,6 +27,119 @@ FILENAME_WHITELIST = "whitelist.txt"
 FILENAME_BLACKLIST = "blacklist.txt"
 FILENAME_COMMENTS = "comments_list.txt"
 FILENAME_MESSAGES = "pm_list.txt"
+
+
+class CommentMemory:
+    """Manages persistent comment history per account to prevent duplicate or repetitive comments."""
+
+    _instances = {}
+
+    def __init__(self, account_path_or_username: Optional[str] = None):
+        if not account_path_or_username:
+            account_path_or_username = "default"
+        if os.path.isabs(account_path_or_username) or os.path.exists(account_path_or_username):
+            self.account_path = account_path_or_username
+        else:
+            self.account_path = os.path.join(ACCOUNTS, account_path_or_username)
+
+        os.makedirs(self.account_path, exist_ok=True)
+        self.history_path = os.path.join(self.account_path, FILENAME_COMMENT_HISTORY)
+        self.comments = []
+        self._load()
+
+    @classmethod
+    def get_instance(cls, account_path_or_username: Optional[str] = None) -> "CommentMemory":
+        key = account_path_or_username or "default"
+        if key not in cls._instances:
+            cls._instances[key] = cls(key)
+        return cls._instances[key]
+
+    @classmethod
+    def reset_instances(cls) -> None:
+        """Reset instances cache (useful for isolated unit testing)."""
+        cls._instances.clear()
+
+    def _load(self) -> None:
+        if os.path.isfile(self.history_path):
+            try:
+                with open(self.history_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        self.comments = data
+                    elif isinstance(data, dict) and "comments" in data:
+                        self.comments = data["comments"]
+            except Exception as e:
+                logger.warning(f"Failed to load comment history from {self.history_path}: {e}")
+                self.comments = []
+        else:
+            self.comments = []
+
+    def _save(self) -> None:
+        try:
+            with atomic_write(self.history_path, overwrite=True, encoding="utf-8") as f:
+                json.dump(self.comments, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Failed to save comment history to {self.history_path}: {e}")
+
+    def add_comment(
+        self,
+        comment: str,
+        target_username: str = "",
+        sentiment: str = "",
+        post_type: str = "",
+    ) -> None:
+        if not comment or not str(comment).strip():
+            return
+        entry = {
+            "comment": comment.strip(),
+            "timestamp": datetime.now().isoformat(),
+            "target_username": target_username or "",
+            "sentiment": sentiment or "",
+            "post_type": post_type or "",
+        }
+        self.comments.append(entry)
+        if len(self.comments) > 500:
+            self.comments = self.comments[-500:]
+        self._save()
+
+    def get_recent_comments(self, limit: int = 50) -> list:
+        if not self.comments:
+            return []
+        sub = self.comments[-limit:]
+        return [c["comment"] for c in sub if isinstance(c, dict) and "comment" in c]
+
+    @staticmethod
+    def _tokenize(text: str) -> set:
+        if not text:
+            return set()
+        cleaned = re.sub(r"[^\w\s]", " ", text.lower())
+        tokens = set(cleaned.split())
+        return {t for t in tokens if len(t) > 1}
+
+    def is_similar_to_recent(
+        self,
+        new_comment: str,
+        threshold: float = 0.55,
+        limit: int = 50,
+    ) -> bool:
+        if not new_comment or not str(new_comment).strip():
+            return False
+        clean_new = new_comment.strip().lower()
+        new_tokens = self._tokenize(clean_new)
+        recent = self.get_recent_comments(limit=limit)
+
+        for past in recent:
+            clean_past = past.strip().lower()
+            if clean_new == clean_past:
+                return True
+            past_tokens = self._tokenize(clean_past)
+            if not new_tokens or not past_tokens:
+                continue
+            intersection = len(new_tokens.intersection(past_tokens))
+            union = len(new_tokens.union(past_tokens))
+            if union > 0 and (intersection / union) >= threshold:
+                return True
+        return False
 
 
 class Storage:
@@ -128,6 +243,7 @@ class Storage:
             self.blacklist = []
 
         self.report_path = os.path.join(self.account_path, REPORTS)
+        self.comment_memory = CommentMemory.get_instance(self.account_path)
 
     def can_be_reinteract(
         self,

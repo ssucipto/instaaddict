@@ -974,6 +974,20 @@ def handle_posts(
                                                 if hasattr(opened_post_view, "detect_opened_media_type")
                                                 else MediaType.PHOTO
                                             )
+                                            post_caption = ""
+                                            try:
+                                                caption_node = device.find(
+                                                    resourceIdMatches=f"{ResourceID.ROW_FEED_COMMENT_TEXTVIEW_LAYOUT}|{ResourceID.ROW_FEED_HEADLINE}|.*row_feed_comment_textview_layout.*"
+                                                )
+                                                if not caption_node.exists():
+                                                    caption_node = device.find(
+                                                        resourceIdMatches=ResourceID.ROW_FEED_TEXT
+                                                    )
+                                                if caption_node.exists():
+                                                    post_caption = caption_node.get_text() or ""
+                                            except Exception as ce:
+                                                logger.debug(f"Caption extraction debug: {ce}")
+
                                             my_user = getattr(session_state, "my_username", None) or "FEED_INTERACTOR"
                                             commented = _comment(
                                                 device,
@@ -982,6 +996,8 @@ def handle_posts(
                                                 args=getattr(self, "args", None),
                                                 session_state=session_state,
                                                 media_type=media_type,
+                                                caption=post_caption,
+                                                author=username or "",
                                             )
                                             if commented:
                                                 logger.info(

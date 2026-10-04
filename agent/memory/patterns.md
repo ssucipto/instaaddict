@@ -54,3 +54,9 @@
   description: "Supervise N independent mobile automation bot processes across separate Android emulators with atomic status beaconing, targeted ADB reconnects, bounded log rotation, and zero-downtime hot-reloads."
   context: "Multi-account mobile app automation where running multiple accounts in threads or via sequential in-app account switching causes global singleton collisions, memory leaks, crash cascades, and shared quota starvation."
   solution: "Isolate each account into a distinct OS subprocess targeting an emulator via --device; write telemetry atomically to .status.json using tmpfile rename; handle Windows file-lock sharing violations via retry loops; assert sys.boot_completed and init.svc.bootanim before start; bound stdout logs to 10MB; suppress global adb kill-server in favor of adb -s <id> reconnect; and implement zero-downtime configuration reload with diff-based process recycling."
+
+- date: 2026-10-04
+  name: multimodal-sentiment-commenting-with-anti-repetition-jaccard-memory
+  description: "Eliminate repetitive bot commenting and Compose v447+ -32002 client errors using Jaccard word-overlap memory (0.55 threshold), 5-bucket sentiment classification with fallback libraries, community comment context, and pre-typing focus taps."
+  context: "Social media automation (Instagram) where repetitive generic comments trigger platform spam detection, and modern Compose EditText elements drop input or raise -32002 errors when typed into without prior focus taps."
+  solution: "Maintain a persistent CommentMemory ring buffer per account calculating Jaccard similarity; classify captions into 5 emotional sentiment archetypes (sympathetic, celebratory, playful, inquisitive, appreciative) with 100+ fallback templates; extract community comments to inform Gemini VLM prompts; recover gracefully on FinishReason:2 safety blocks with text-only sentiment fallbacks; and execute explicit focus clicks on comment input fields prior to set_text."

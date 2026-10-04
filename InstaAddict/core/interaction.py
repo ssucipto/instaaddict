@@ -25,7 +25,12 @@ from InstaAddict.core.report import print_scrape_report, print_short_report
 from InstaAddict.core.resources import ClassName
 from InstaAddict.core.resources import ResourceID as resources
 from InstaAddict.core.session_state import SessionState
-from InstaAddict.core.gemini_vision import get_vision_comment
+from InstaAddict.core.gemini_vision import (
+    get_vision_comment,
+    classify_sentiment,
+    generate_sentiment_fallback,
+)
+from InstaAddict.core.storage import CommentMemory
 from InstaAddict.core.utils import (
     append_to_file,
     get_value,
@@ -694,7 +699,14 @@ def _comment(
     session_state: SessionState,
     media_type: MediaType,
     explicit_comment: str = None,
+    caption: str = "",
+    author: str = "",
 ) -> bool:
+    global ResourceID
+    if ResourceID is None:
+        app_id = getattr(args, "app_id", "com.instagram.android") if args else "com.instagram.android"
+        ResourceID = resources(app_id)
+
     if not session_state.check_limit(
         limit_type=session_state.Limit.COMMENTS, output=False
     ):
@@ -709,7 +721,14 @@ def _comment(
         else:
             # VISION AI: Take snapshot of view BEFORE opening comment box (obfuscation guard)
             logger.info("Executing Vision-AI Context Assessment...")
-            smart_ai_comment = get_vision_comment(device, "current_post_target")
+            smart_ai_comment = get_vision_comment(
+                device,
+                "current_post_target",
+                caption=caption,
+                author=author,
+                media_type=str(media_type),
+                account_name=my_username,
+            )
 
         universal_actions = UniversalActions(device)
         # we have to do a little swipe for preventing get the previous post comments button (which is covered by top bar, but present in hierarchy!!)
@@ -747,6 +766,21 @@ def _comment(
             if comment_button.exists():
                 logger.info("Open comments of post.")
                 comment_button.click()
+
+                # CO-115: Read top community comments to ensure tone and originality
+                community_comments = []
+                try:
+                    for c_elem in device.find_all(
+                        resourceId=ResourceID.ROW_COMMENT_TEXTVIEW_COMMENT
+                    ):
+                        c_text = c_elem.get_text()
+                        if c_text and c_text.strip():
+                            community_comments.append(c_text.strip())
+                            if len(community_comments) >= 3:
+                                break
+                except Exception as ce:
+                    logger.debug(f"Could not read community comments: {ce}")
+
                 comment_box = device.find(
                     resourceId=ResourceID.LAYOUT_COMMENT_THREAD_EDITTEXT,
                     enabled="true",
@@ -757,22 +791,45 @@ def _comment(
                         enabled="true",
                     )
                 if not comment_box.exists():
+                    comment_box = device.find(
+                        resourceIdMatches=f"{ResourceID.LAYOUT_COMMENT_THREAD_EDITTEXT}|{ResourceID.LAYOUT_COMMENT_THREAD_EDITTEXT_MULTILINE}|.*layout_comment_thread_edittext.*"
+                    )
+                if not comment_box.exists():
                     any_edittext = device.find(
                         classNameMatches=".*EditText.*|.*AutoCompleteTextView.*"
                     )
                     if any_edittext.exists():
+                        comment_box = any_edittext
                         logger.debug(
-                            f"[DEBUG comment box] found an EditText-like widget but the selector missed it. Bounds: {any_edittext.get_bounds()}"
+                            f"[DEBUG comment box] found an EditText-like widget. Bounds: {any_edittext.get_bounds()}"
                         )
                     else:
                         logger.debug(
                             "[DEBUG comment box] no EditText-like widget found on screen at all."
                         )
+
                 if comment_box.exists():
+                    # CO-113: Ensure IME focus before typing to prevent Compose -32002 errors
+                    try:
+                        comment_box.click()
+                        random_sleep(0.3, 0.6, modulable=False)
+                    except Exception as ce:
+                        logger.debug(f"Pre-type focus click encountered: {ce}")
+
+                    if not smart_ai_comment:
+                        try:
+                            mem = CommentMemory.get_instance(my_username)
+                            post_sentiment = classify_sentiment(caption)
+                            smart_ai_comment = generate_sentiment_fallback(
+                                sentiment=post_sentiment, author=author, memory=mem
+                            )
+                        except Exception as fe:
+                            logger.debug(f"Sentiment fallback generation failed: {fe}")
+
                     comment = (
                         smart_ai_comment
                         if smart_ai_comment
-                        else load_random_comment(my_username, media_type)
+                        else load_random_comment(my_username, media_type, caption=caption, author=author)
                     )
                     if not comment:
                         UniversalActions.close_keyboard(device)
@@ -788,9 +845,24 @@ def _comment(
                         extra={"color": f"{Fore.CYAN}"},
                     )
 
-                    comment_box.set_text(
-                        comment, Mode.PASTE if args.dont_type else Mode.TYPE
-                    )
+                    try:
+                        comment_box.set_text(
+                            comment, Mode.PASTE if args.dont_type else Mode.TYPE
+                        )
+                    except Exception as te:
+                        logger.warning(
+                            f"Initial set_text failed ({te}), retrying after focus tap..."
+                        )
+                        try:
+                            comment_box.click()
+                            random_sleep(0.5, 0.8, modulable=False)
+                            comment_box.set_text(comment, Mode.TYPE)
+                        except Exception as te2:
+                            logger.error(f"Failed to enter text into comment box: {te2}")
+                            UniversalActions.close_keyboard(device)
+                            device.back()
+                            return False
+
                     time.sleep(sleep_duration)
 
                     # Ghost Typing DOM Wake-up Hack
@@ -890,6 +962,14 @@ def _comment(
 
                 if comment_confirmed:
                     session_state.totalComments += 1
+                    try:
+                        CommentMemory.get_instance(my_username).add_comment(
+                            comment,
+                            target_username=author,
+                            post_type=str(media_type),
+                        )
+                    except Exception as me:
+                        logger.debug(f"Failed to record comment to CommentMemory: {me}")
 
                 logger.info("Go back to post view.")
                 device.back()
@@ -1043,7 +1123,58 @@ def load_random_message(my_username: str) -> Optional[str]:
     return None
 
 
-def load_random_comment(my_username: str, media_type: MediaType) -> Optional[str]:
+def load_random_comment(
+    my_username: str,
+    media_type: MediaType,
+    caption: str = "",
+    author: str = "",
+) -> Optional[str]:
+    mem = None
+    try:
+        mem = CommentMemory.get_instance(my_username)
+    except Exception:
+        pass
+
+    lines = _load_and_clean_txt_file(my_username, storage.FILENAME_COMMENTS)
+    candidates = []
+    if lines and len(lines) > 0:
+        try:
+            photo_header = lines.index("%PHOTO")
+            video_header = lines.index("%VIDEO")
+            carousel_header = lines.index("%CAROUSEL")
+            photo_comments = lines[photo_header + 1 : video_header]
+            video_comments = lines[video_header + 1 : carousel_header]
+            carousel_comments = lines[carousel_header + 1 :]
+            if media_type == MediaType.PHOTO and photo_comments:
+                candidates = photo_comments
+            elif media_type in (MediaType.VIDEO, MediaType.IGTV, MediaType.REEL) and video_comments:
+                candidates = video_comments
+            elif media_type == MediaType.CAROUSEL and carousel_comments:
+                candidates = carousel_comments
+        except ValueError:
+            non_header_lines = [l for l in lines if not l.startswith("%")]
+            if non_header_lines:
+                candidates = non_header_lines
+
+    # Filter candidates with CommentMemory to avoid repetition
+    if candidates:
+        shuffled = list(candidates)
+        shuffle(shuffled)
+        for cand in shuffled:
+            spun = emoji.emojize(spintax.spin(cand), use_aliases=True)
+            if mem is not None and mem.is_similar_to_recent(spun):
+                continue
+            return spun
+
+    # If no lines or all candidates repetitive, use sentiment fallback generator!
+    try:
+        sentiment = classify_sentiment(caption)
+        fallback = generate_sentiment_fallback(sentiment=sentiment, author=author, memory=mem)
+        if fallback:
+            return fallback
+    except Exception:
+        pass
+
     DEFAULT_COMMENTS = [
         "Ripper shot mate! :paw_prints:",
         "Heaps good! :dog:",
@@ -1053,33 +1184,9 @@ def load_random_comment(my_username: str, media_type: MediaType) -> Optional[str
         "Looking sharp mate! :fire:",
         "Love this heaps! :clap:",
     ]
-    lines = _load_and_clean_txt_file(my_username, storage.FILENAME_COMMENTS)
-    if lines is None or len(lines) == 0:
-        chosen = choice(DEFAULT_COMMENTS)
-        return emoji.emojize(spintax.spin(chosen), use_aliases=True)
-    try:
-        photo_header = lines.index("%PHOTO")
-        video_header = lines.index("%VIDEO")
-        carousel_header = lines.index("%CAROUSEL")
-        photo_comments = lines[photo_header + 1 : video_header]
-        video_comments = lines[video_header + 1 : carousel_header]
-        carousel_comments = lines[carousel_header + 1 :]
-        random_comment = ""
-        if media_type == MediaType.PHOTO:
-            random_comment = choice(photo_comments) if len(photo_comments) > 0 else ""
-        elif media_type in (MediaType.VIDEO, MediaType.IGTV, MediaType.REEL):
-            random_comment = choice(video_comments) if len(video_comments) > 0 else ""
-        elif media_type == MediaType.CAROUSEL:
-            random_comment = choice(carousel_comments) if len(carousel_comments) > 0 else ""
-        if random_comment != "":
-            return emoji.emojize(spintax.spin(random_comment), use_aliases=True)
-    except ValueError:
-        non_header_lines = [l for l in lines if not l.startswith("%")]
-        if non_header_lines:
-            return emoji.emojize(spintax.spin(choice(non_header_lines)), use_aliases=True)
-
     chosen = choice(DEFAULT_COMMENTS)
     return emoji.emojize(spintax.spin(chosen), use_aliases=True)
+
 
 
 def _follow(device, username, follow_percentage, args, session_state, swipe_amount):
