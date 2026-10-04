@@ -174,6 +174,17 @@ class TabBarView:
                     self.device.back()
 
                 random_sleep(0.8, 1.4, modulable=False)
+                # Safeguard: if back dropped app into background launcher, restore immediately
+                if hasattr(self.device, "_ig_is_opened") and not self.device._ig_is_opened():
+                    logger.warning("Instagram dropped to background after back key. Restoring via open_instagram()...")
+                    try:
+                        from InstaAddict.core.utils import open_instagram
+
+                        open_instagram(self.device)
+                        random_sleep(1.0, 2.0, modulable=False)
+                    except Exception as e:
+                        logger.debug(f"open_instagram recovery failed: {e}")
+
                 if self.is_tab_bar_visible():
                     logger.info(
                         f"Tab bar successfully restored after {attempt} back step(s)."
@@ -473,13 +484,22 @@ class HashTagView:
 
     def _getRecentTab(self):
         obj = self.device.find(
-            className=ClassName.TEXT_VIEW,
-            textMatches=case_insensitive_re(TabBarText.RECENT_CONTENT_DESC),
+            classNameMatches=ClassName.BUTTON_OR_TEXTVIEW_REGEX,
+            textMatches=case_insensitive_re(r"^(Recent|Recent top posts)$"),
         )
-        if obj.exists(Timeout.LONG):
+        if not obj.exists(Timeout.SHORT):
+            obj = self.device.find(
+                descriptionMatches=case_insensitive_re(r"^(Recent|Recent top posts)$"),
+            )
+        if not obj.exists(Timeout.SHORT):
+            obj = self.device.find(
+                className=ClassName.TEXT_VIEW,
+                textMatches=case_insensitive_re(TabBarText.RECENT_CONTENT_DESC),
+            )
+        if obj.exists(Timeout.SHORT):
             logger.debug("Recent Tab exists.")
         else:
-            logger.debug("Recent Tab doesn't exists.")
+            logger.debug("Recent Tab doesn't exist.")
         return obj
 
 
@@ -516,10 +536,20 @@ class PlacesView:
     _getFistImageView = _getFirstImageView
 
     def _getRecentTab(self):
-        return self.device.find(
-            className=ClassName.TEXT_VIEW,
-            textMatches=case_insensitive_re(TabBarText.RECENT_CONTENT_DESC),
+        obj = self.device.find(
+            classNameMatches=ClassName.BUTTON_OR_TEXTVIEW_REGEX,
+            textMatches=case_insensitive_re(r"^(Recent|Recent top posts)$"),
         )
+        if not obj.exists(Timeout.SHORT):
+            obj = self.device.find(
+                descriptionMatches=case_insensitive_re(r"^(Recent|Recent top posts)$"),
+            )
+        if not obj.exists(Timeout.SHORT):
+            obj = self.device.find(
+                className=ClassName.TEXT_VIEW,
+                textMatches=case_insensitive_re(TabBarText.RECENT_CONTENT_DESC),
+            )
+        return obj
 
     def _getInformBody(self):
         return self.device.find(
@@ -3374,18 +3404,36 @@ class ProfileView(ActionBarView):
 
     def navigateToFollowers(self):
         logger.info("Navigate to followers.")
-        followers_button = self.device.find(
-            resourceIdMatches=ResourceID.ROW_PROFILE_HEADER_FOLLOWERS_CONTAINER
-        )
-        if not followers_button.exists(Timeout.SHORT):
-            followers_button = self.device.find(
-                descriptionMatches=case_insensitive_re(r".*follower.*")
+        followers_button = None
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            try:
+                from InstaAddict.core.watchdog import record_heartbeat
+
+                record_heartbeat("profile_view", f"polling followers container attempt {attempt + 1}")
+            except Exception:
+                pass
+            btn = self.device.find(
+                resourceIdMatches=ResourceID.ROW_PROFILE_HEADER_FOLLOWERS_CONTAINER
             )
-        if not followers_button.exists(Timeout.SHORT):
-            followers_button = self.device.find(
-                textMatches=case_insensitive_re(r".*[0-9]+(\.[0-9]+)?[kmb]?\s*followers.*")
-            )
-        if followers_button.exists(Timeout.MEDIUM):
+            if not btn.exists(Timeout.SHORT):
+                btn = self.device.find(
+                    descriptionMatches=case_insensitive_re(r".*follower.*")
+                )
+            if not btn.exists(Timeout.SHORT):
+                btn = self.device.find(
+                    textMatches=case_insensitive_re(r".*[0-9]+(\.[0-9]+)?[kmb]?\s*followers.*")
+                )
+            if btn.exists(Timeout.SHORT):
+                followers_button = btn
+                break
+            if attempt < max_attempts - 1:
+                logger.debug(
+                    f"Waiting for profile followers container to render (attempt {attempt + 1}/{max_attempts})..."
+                )
+                random_sleep(1.0, 2.0, modulable=False)
+
+        if followers_button and followers_button.exists(Timeout.SHORT):
             followers_button.click()
             followers_tab = self.device.find(
                 resourceIdMatches=ResourceID.UNIFIED_FOLLOW_LIST_TAB_LAYOUT

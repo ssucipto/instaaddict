@@ -859,6 +859,8 @@ def handle_posts(
                     "Post already liked, SKIP.", extra={"color": f"{Fore.CYAN}"}
                 )
                 already_liked_count += 1
+                nr_consecutive_already_interacted += 1
+                _record_source_skip(session_state, "ALREADY_LIKED")
             elif random_choice(interact_percentage):
                 can_interact = False
                 if storage.is_user_in_blacklist(username):
@@ -930,6 +932,7 @@ def handle_posts(
                                 liked = post_view_list._check_if_liked()
                             if liked:
                                 session_state.totalLikes += 1
+                                nr_consecutive_already_interacted = 0
                                 if is_hashtag_job:
                                     try:
                                         from InstaAddict.core.hashtag_manager import HashtagManager
@@ -1093,6 +1096,24 @@ def handle_posts(
                 logger.info(
                     f"Skipped because your interact % is {interact_percentage}/100 and {username}'s post was unlucky!"
                 )
+
+            if nr_consecutive_already_interacted >= skipped_posts_limit:
+                logger.info(
+                    f"Reached the limit of {nr_consecutive_already_interacted} consecutive already interacted/liked posts in {current_job} ({target}). Going to next source!"
+                )
+                if is_hashtag_job:
+                    try:
+                        from InstaAddict.core.hashtag_manager import HashtagManager
+
+                        HashtagManager.get_instance(
+                            username=getattr(session_state, "my_username", None)
+                        ).record_hashtag_result(
+                            target, posts_found=True, already_liked_exhausted=True
+                        )
+                    except Exception as e:
+                        logger.debug(f"HashtagManager record saturation failed: {e}")
+                break
+
         if likes_failed == 10:
             logger.warning("You failed to do 10 likes! Soft-ban?!")
             return

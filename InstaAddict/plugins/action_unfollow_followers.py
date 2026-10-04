@@ -339,6 +339,18 @@ class ActionUnfollowFollowers(Plugin):
         sort_button = device.find(
             resourceId=self.ResourceID.SORTING_ENTRY_ROW_OPTION,
         )
+        if not sort_button.exists(Timeout.SHORT):
+            sort_button = device.find(
+                descriptionMatches=case_insensitive_re(r".*sort by.*|.*sorting.*")
+            )
+        if not sort_button.exists(Timeout.SHORT):
+            sort_button = device.find(
+                textMatches=case_insensitive_re(r".*sort by.*|.*default.*|.*latest.*|.*earliest.*")
+            )
+        if not sort_button.exists(Timeout.SHORT):
+            sort_button = device.find(
+                resourceIdMatches=case_insensitive_re(r".*sorting_entry_row.*|.*sort_button.*|.*sorting.*")
+            )
         if not sort_button.exists(Timeout.MEDIUM):
             logger.error(
                 "Cannot find button to sort followings. Continue without sorting."
@@ -349,6 +361,10 @@ class ActionUnfollowFollowers(Plugin):
         sort_options_recycler_view = device.find(
             resourceId=self.ResourceID.FOLLOW_LIST_SORTING_OPTIONS_RECYCLER_VIEW
         )
+        if not sort_options_recycler_view.exists(Timeout.SHORT):
+            sort_options_recycler_view = device.find(
+                resourceIdMatches=case_insensitive_re(r".*sorting_options.*|.*bottom_sheet.*|.*recycler.*")
+            )
         if not sort_options_recycler_view.exists(Timeout.MEDIUM):
             logger.error(
                 "Cannot find options to sort followings. Continue without sorting."
@@ -452,6 +468,8 @@ class ActionUnfollowFollowers(Plugin):
         unfollowed_count = 0
         consecutive_cached_count = 0
         max_consecutive_cached = 40
+        consecutive_non_bot_skips = 0
+        max_consecutive_non_bot_skips = 30
         total_unfollows_limit_reached = False
         posts_end_detector.notify_new_page()
         prev_screen_iterated_followings = []
@@ -550,6 +568,16 @@ class ActionUnfollowFollowers(Plugin):
 
                     if storage.is_user_in_whitelist(username):
                         logger.info(f"@{username} is in whitelist. Skip.")
+                        consecutive_non_bot_skips += 1
+                        if consecutive_non_bot_skips >= max_consecutive_non_bot_skips:
+                            logger.info(
+                                f"Encountered {consecutive_non_bot_skips} consecutive non-bot/whitelisted followings without finding bot-followed targets. "
+                                "Breaking out of unfollow loop to avoid unproductive scrolling.",
+                                extra={"color": f"{Fore.YELLOW}"},
+                            )
+                            if hasattr(storage, "save_non_bot_followings"):
+                                storage.save_non_bot_followings()
+                            return
                         continue
 
                     # Fast O(1) Follower Check for Non-Followers Unfollow Restrictions
@@ -579,6 +607,16 @@ class ActionUnfollowFollowers(Plugin):
                             logger.debug(
                                 f"@{username} already recorded as not followed by this bot (cached). Skip."
                             )
+                            consecutive_non_bot_skips += 1
+                            if consecutive_non_bot_skips >= max_consecutive_non_bot_skips:
+                                logger.info(
+                                    f"Encountered {consecutive_non_bot_skips} consecutive non-bot followings without finding bot-followed targets. "
+                                    "Breaking out of unfollow loop to avoid unproductive scrolling.",
+                                    extra={"color": f"{Fore.YELLOW}"},
+                                )
+                                if hasattr(storage, "save_non_bot_followings"):
+                                    storage.save_non_bot_followings()
+                                return
                             continue
 
                         following_status = storage.get_following_status(username)
@@ -591,6 +629,16 @@ class ActionUnfollowFollowers(Plugin):
                             )
                             if hasattr(storage, "add_non_bot_following"):
                                 storage.add_non_bot_following(username, save=False)
+                            consecutive_non_bot_skips += 1
+                            if consecutive_non_bot_skips >= max_consecutive_non_bot_skips:
+                                logger.info(
+                                    f"Encountered {consecutive_non_bot_skips} consecutive non-bot followings without finding bot-followed targets. "
+                                    "Breaking out of unfollow loop to avoid unproductive scrolling.",
+                                    extra={"color": f"{Fore.YELLOW}"},
+                                )
+                                if hasattr(storage, "save_non_bot_followings"):
+                                    storage.save_non_bot_followings()
+                                return
                             continue
                         elif not storage.can_be_unfollowed(
                             last_interaction,
@@ -623,6 +671,7 @@ class ActionUnfollowFollowers(Plugin):
                                 f"Skip @{username}. Following status: {following_status.name}."
                             )
                             continue
+                    consecutive_non_bot_skips = 0
                     if unfollow_restriction in [
                         UnfollowRestriction.ANY,
                         UnfollowRestriction.FOLLOWED_BY_SCRIPT,
@@ -668,9 +717,13 @@ class ActionUnfollowFollowers(Plugin):
                 else:
                     logger.debug(f"Already checked {username} (or in non-bot cache).")
                     consecutive_cached_count += 1
-                    if consecutive_cached_count >= max_consecutive_cached:
+                    consecutive_non_bot_skips += 1
+                    if (
+                        consecutive_cached_count >= max_consecutive_cached
+                        or consecutive_non_bot_skips >= max_consecutive_non_bot_skips
+                    ):
                         logger.info(
-                            f"Encountered {consecutive_cached_count} consecutive followings already in non-bot cache. "
+                            f"Encountered consecutive followings already in non-bot cache ({consecutive_non_bot_skips} skips). "
                             "Breaking out of unfollow loop to avoid excessive scrolling through protected personal accounts.",
                             extra={"color": f"{Fore.YELLOW}"},
                         )

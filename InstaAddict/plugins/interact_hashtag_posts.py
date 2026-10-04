@@ -180,8 +180,17 @@ class InteractHashtagPosts(Plugin):
                 )
                 self.state.is_job_completed = True
 
+            job_attempts = 0
             while not self.state.is_job_completed and not limit_reached:
+                job_attempts += 1
                 job()
+                if not self.state.is_job_completed and job_attempts >= 2:
+                    logger.warning(
+                        f"Hashtag {source} failed after {job_attempts} attempts. Advancing to next source.",
+                        extra={"color": f"{Fore.YELLOW}"},
+                    )
+                    self.state.is_job_completed = True
+                    break
 
             if limit_reached:
                 logger.info("Ending session.")

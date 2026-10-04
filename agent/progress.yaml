@@ -457,7 +457,7 @@ documentation:
   milestone_documents: 11
   pattern_documents: 2
   task_documents: 8
-  last_updated: '2026-09-29'
+  last_updated: '2026-10-05'
 progress:
   planning: 100
   implementation: 100
@@ -465,6 +465,17 @@ progress:
   documentation: 100
   overall: 100
 recent_work:
+- date: '2026-10-05'
+  description: 'Completed Dogfood Operational Hardening, Target Pool Scalability, and Navigation Resilience (Route-069, Audit #141/#142/#143, Review #073/#074).'
+  items:
+  - "✓ Resolved target pool starvation with 12h adaptive cooldown recommendation when cooldown <= 24h and COOLDOWN skips > 35% (CO-119)"
+  - "✓ Hardened ProfileView.navigateToFollowers() with progressive polling (5 attempts) and watchdog heartbeats to absorb P95=114s load latency (CO-120)"
+  - "✓ Added IG v447+ 'Recent top posts' / 'Recent' tab discovery, 10-consecutive saturation fast-skip, and 2-attempt cap per hashtag (CO-121)"
+  - "✓ Modernized unfollow sort locators for IG v447+ and enforced 30-consecutive non-bot skip circuit breaker in ActionUnfollowFollowers (CO-122)"
+  - "✓ Added Android launcher foreground verification (_ig_is_opened) and open_instagram() recovery during subscreen escape (CO-123)"
+  - "✓ Synchronized watchdog heartbeats across slow profile loads, navigation transitions, and list pagination (CO-124)"
+  - "✓ Added 9-case unit test suite in test/test_dogfood_operational_hardening.py (100% pass rate; 505/505 repo tests green)"
+  - "✓ Passed all ACP CI fast gates with zero warnings and zero errors"
 - date: '2026-09-29'
   description: 'Remediated Audit #134 findings across unfollow sorting, watchdog recovery sleep, upload commenting safety, and Telegram ingestion.'
   items:

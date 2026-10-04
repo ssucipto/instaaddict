@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import time
+import yaml
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -248,14 +249,35 @@ class DogfoodOptimizer:
             cooldown_count = total_skip_reasons.get("COOLDOWN", 0)
             if cooldown_count / total_skips >= 0.35:
                 pct = round(cooldown_count / total_skips * 100, 1)
+                curr_cooldown = 48
+                if os.path.exists(self.config_path):
+                    try:
+                        with open(self.config_path, "r", encoding="utf-8") as f:
+                            cfg_data = yaml.safe_load(f) or {}
+                            curr_cooldown = int(cfg_data.get("can-reinteract-after", 48))
+                    except Exception:
+                        pass
+                if curr_cooldown <= 24:
+                    action_msg = (
+                        f"Reduce can-reinteract-after from {curr_cooldown}h to 12h in config.yml, "
+                        "and expand target blogger and hashtag pools (or enable dynamic hashtag discovery)."
+                    )
+                    suggested_val = "12"
+                else:
+                    action_msg = (
+                        f"Reduce can-reinteract-after from {curr_cooldown}h to 24h in config.yml, "
+                        "or add 20+ new target bloggers/hashtags."
+                    )
+                    suggested_val = "24"
+
                 recommendations.append(
                     {
                         "category": "Source Pool Exhaustion",
                         "severity": "HIGH",
                         "issue": f"{pct}% ({cooldown_count}/{total_skips}) of profile skips were due to COOLDOWN (can-reinteract-after). Target pool is exhausted.",
-                        "action": "Reduce can-reinteract-after from 48h to 24h in config.yml, or add 10+ new target bloggers/hashtags.",
+                        "action": action_msg,
                         "parameter": "can-reinteract-after",
-                        "suggested_value": "24",
+                        "suggested_value": suggested_val,
                     }
                 )
         elif total_interactions > 20 and success_rate < 40.0:
@@ -780,7 +802,11 @@ class DogfoodOptimizer:
             elif param == "min_followers":
                 params_to_adjust["min_followers"] = 0.7
             elif param == "can-reinteract-after":
-                params_to_adjust["can-reinteract-after"] = 24
+                suggested = rec.get("suggested_value", 24)
+                try:
+                    params_to_adjust["can-reinteract-after"] = int(suggested)
+                except (ValueError, TypeError):
+                    params_to_adjust["can-reinteract-after"] = 24
             elif param == "sort-followers-latest":
                 params_to_adjust["sort-followers-latest"] = "true"
 

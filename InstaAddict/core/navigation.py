@@ -36,16 +36,27 @@ def check_if_english(device):
 
 def nav_to_blogger(device, username, current_job):
     """navigate to blogger (followers list or posts)"""
+    try:
+        from InstaAddict.core.watchdog import record_heartbeat
+
+        record_heartbeat("navigation", f"navigating to @{username or 'self'}")
+    except Exception:
+        pass
+
     _to_followers = bool(current_job.endswith("followers"))
     _to_following = bool(current_job.endswith("following"))
     if username is None:
         profile_view = TabBarView(device).navigateToProfile()
         if _to_followers:
             logger.info("Open your followers.")
-            profile_view.navigateToFollowers()
+            if not profile_view.navigateToFollowers():
+                logger.warning("Could not open your followers.")
+                return False
         elif _to_following:
             logger.info("Open your following.")
-            profile_view.navigateToFollowing()
+            if not profile_view.navigateToFollowing():
+                logger.warning("Could not open your following.")
+                return False
     else:
         search_view = TabBarView(device).navigateToSearch()
         if not search_view.navigate_to_target(username, current_job):
@@ -54,16 +65,27 @@ def nav_to_blogger(device, username, current_job):
         profile_view = ProfileView(device, is_own_profile=False)
         if _to_followers:
             logger.info(f"Open @{username} followers.")
-            profile_view.navigateToFollowers()
+            if not profile_view.navigateToFollowers():
+                logger.warning(f"Could not open @{username} followers.")
+                return False
         elif _to_following:
             logger.info(f"Open @{username} following.")
-            profile_view.navigateToFollowing()
+            if not profile_view.navigateToFollowing():
+                logger.warning(f"Could not open @{username} following.")
+                return False
 
     return True
 
 
 def nav_to_hashtag_or_place(device, target, current_job):
     """navigate to hashtag/place/feed list"""
+    try:
+        from InstaAddict.core.watchdog import record_heartbeat
+
+        record_heartbeat("navigation", f"navigating to {current_job} ({target})")
+    except Exception:
+        pass
+
     search_view = TabBarView(device).navigateToSearch()
     if not search_view.navigate_to_target(target, current_job):
         return False
@@ -73,7 +95,7 @@ def nav_to_hashtag_or_place(device, target, current_job):
     if current_job.endswith("recent"):
         logger.info("Switching to Recent tab.")
         recent_tab = TargetView(device)._getRecentTab()
-        if recent_tab.exists(Timeout.MEDIUM):
+        if recent_tab.exists(Timeout.SHORT):
             recent_tab.click()
         else:
             logger.info("Recent tab not found (Instagram modern layout defaults to primary feed), proceeding...")
