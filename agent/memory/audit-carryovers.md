@@ -1472,6 +1472,78 @@ carryovers:
       - InstaAddict/core/interaction.py
       - InstaAddict/core/gemini_vision.py
 
+  - id: CO-119
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Replenish exhausted target pool in config.yml (expand target bloggers and hashtags) and implement dynamic pool replenishment when COOLDOWN skips exceed 40%."
+    affected_files:
+      - accounts/lolatheozjack/config.yml
+      - InstaAddict/core/dogfood.py
+
+  - id: CO-120
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Harden ProfileView.navigateToFollowers() with progressive polling (up to 15s) to tolerate P95=114s profile load tail latencies without false-positive skips."
+    affected_files:
+      - InstaAddict/core/views.py
+
+  - id: CO-121
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Support v447+ Top/Recent-Top hashtag tabs and add 3-strike zero-yield fast-skip to prevent 2056s wasted job loops in hashtag-posts-recent."
+    affected_files:
+      - InstaAddict/plugins/interact_hashtag_posts.py
+      - InstaAddict/core/handle_sources.py
+
+  - id: CO-122
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Harden ActionUnfollowFollowers sorting locators for modern IG v447+ and enforce 30-consecutive-skip circuit breaker on cached non-bot followings."
+    affected_files:
+      - InstaAddict/plugins/action_unfollow_followers.py
+      - InstaAddict/core/resources.py
+
+  - id: CO-123
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: high
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Prevent 9 subscreen escape failures by verifying current foreground activity before back presses and invoking open_instagram() if launcher is detected."
+    affected_files:
+      - InstaAddict/core/views.py
+      - InstaAddict/core/navigation.py
+
+  - id: CO-124
+    audit_report: agent/reports/audit-141-dogfood-telemetry-lessons-and-improvements.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: pending
+    fix_applied_date: null
+    verified_in_audit: null
+    summary: "Synchronize watchdog heartbeat with slow profile loads and network pagination to reduce 639 false-positive watchdog interventions."
+    affected_files:
+      - InstaAddict/core/watchdog.py
+      - InstaAddict/core/handle_sources.py
+
+
 
 
 
