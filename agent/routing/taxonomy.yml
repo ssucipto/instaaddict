@@ -9,6 +9,8 @@ task_types:
   # ── COMMAND DOCS ────────────────────────────────────────────
   command-doc-write:
     executor: deepseek-v4-pro
+    antigravity_tier: flash
+    delegation_required: false
     complexity: medium
     context_required: [wiki/domain.yml#commands, memory/patterns.md]
     tokens_est: 8000
@@ -16,6 +18,8 @@ task_types:
 
   command-doc-update:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md]
     tokens_est: 3000
@@ -24,6 +28,8 @@ task_types:
   # ── BASH SCRIPTS ─────────────────────────────────────────────
   bash-script-create:
     executor: deepseek-v4-pro
+    antigravity_tier: pro
+    delegation_required: true
     complexity: medium
     context_required: [wiki/architecture.md#command-script-binding, memory/patterns.md]
     tokens_est: 10000
@@ -31,6 +37,8 @@ task_types:
 
   bash-script-fix:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md]
     tokens_est: 3500
@@ -38,6 +46,8 @@ task_types:
 
   bash-script-refactor:
     executor: deepseek-v4-pro
+    antigravity_tier: pro
+    delegation_required: true
     complexity: medium
     context_required: [wiki/architecture.md, memory/decisions.md]
     tokens_est: 12000
@@ -45,6 +55,8 @@ task_types:
 
   shell-scripting:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md]
     tokens_est: 4000
@@ -56,6 +68,8 @@ task_types:
   # ── YAML SCHEMAS ─────────────────────────────────────────────
   yaml-schema:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [wiki/domain.yml#schemas]
     tokens_est: 4000
@@ -64,6 +78,8 @@ task_types:
   # ── TESTING ──────────────────────────────────────────────────
   e2e-test-write:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/patterns.md, wiki/domain.yml#test_suites]
     tokens_est: 5000
@@ -71,6 +87,8 @@ task_types:
 
   test-run:
     executor: local-script
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [active-task-only]
     tokens_est: 0
@@ -79,6 +97,8 @@ task_types:
   # ── TYPESCRIPT ───────────────────────────────────────────────
   typescript-feature:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [wiki/architecture.md#dispatch-script-flow]
     tokens_est: 5000
@@ -87,6 +107,8 @@ task_types:
   # ── DESIGN & ARCHITECTURE ────────────────────────────────────
   design-document:
     executor: claude-sonnet
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md]
     tokens_est: 18000
@@ -94,6 +116,8 @@ task_types:
 
   design-spec:
     executor: copilot
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: medium
     context_required: [commands/acp.design-spec.md, wiki/domain.yml, memory/decisions.md]
     tokens_est: 15000
@@ -105,6 +129,8 @@ task_types:
 
   stakeholder-report:
     executor: copilot
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: low
     context_required: [commands/acp.stakeholder-report.md, progress.yaml]
     tokens_est: 5000
@@ -116,6 +142,8 @@ task_types:
 
   architecture-plan:
     executor: claude-sonnet
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md, memory/sessions.md]
     tokens_est: 20000
@@ -124,6 +152,8 @@ task_types:
   # ── DOCUMENTATION & CROSS-CUTTING ────────────────────────────
   documentation-sync:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md]
     tokens_est: 3000
@@ -131,6 +161,8 @@ task_types:
 
   preference-system:
     executor: deepseek-v4-pro
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [wiki/architecture.md, wiki/domain.yml, memory/decisions.md]
     tokens_est: 15000
@@ -139,6 +171,8 @@ task_types:
   # ── BUG FIXES ─────────────────────────────────────────────────
   bug-fix-simple:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md]
     tokens_est: 3000
@@ -146,6 +180,8 @@ task_types:
 
   bug-fix-complex:
     executor: deepseek-v4-pro
+    antigravity_tier: pro
+    delegation_required: true
     complexity: medium
     context_required: [wiki/architecture.md, memory/sessions.md, memory/decisions.md]
     tokens_est: 12000
@@ -154,6 +190,8 @@ task_types:
   # ── UPSTREAM SYNC ─────────────────────────────────────────────
   upstream-sync:
     executor: claude-sonnet
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [memory/decisions.md, wiki/architecture.md]
     tokens_est: 22000
@@ -167,6 +205,8 @@ task_types:
   # ── CROSS-CUTTING / MEMORY / PROCESS ─────────────────────────
   wiki-update:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [wiki/domain.yml, wiki/architecture.md]
     tokens_est: 4000
@@ -175,6 +215,8 @@ task_types:
 
   memory-write:
     executor: copilot
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/sessions.md, memory/lessons.md]
     tokens_est: 2000
@@ -183,6 +225,8 @@ task_types:
 
   changelog-update:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [CHANGELOG.md]
     tokens_est: 2000
@@ -191,6 +235,8 @@ task_types:
 
   progress-update:
     executor: deepseek-v4-flash
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [progress.yaml]
     tokens_est: 3000
@@ -199,6 +245,8 @@ task_types:
 
   ci-cd-setup:
     executor: copilot
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: medium
     context_required: [.github/workflows/, agent/core/identity.yml]
     tokens_est: 6000
@@ -209,6 +257,8 @@ task_types:
 
   adr-write:
     executor: copilot
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [memory/decisions.md]
     tokens_est: 3000
@@ -217,6 +267,8 @@ task_types:
 
   audit-run:
     executor: copilot
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: high
     context_required: [commands/acp.audit.md, memory/audit-carryovers.md]
     tokens_est: 8000
@@ -225,6 +277,8 @@ task_types:
 
   milestone-create:
     executor: copilot
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: medium
     context_required: ['milestones/milestone-1-{title}.template.md', progress.yaml]
     tokens_est: 5000
@@ -233,6 +287,8 @@ task_types:
 
   route-create:
     executor: copilot
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [routing/taxonomy.yml, routing/rules.md]
     tokens_est: 3000
@@ -241,6 +297,8 @@ task_types:
 
   upstream-parity-check:
     executor: deepseek-v4-flash
+    antigravity_tier: inherit
+    delegation_required: false
     complexity: medium
     context_required: [wiki/architecture.md, patterns/local.upstream-integration-runbook.md]
     tokens_est: 6000
@@ -251,6 +309,8 @@ task_types:
   # Added v6.11.0 (M55 — /acp-review command). Four variants by scope.
   code-review-full:
     executor: copilot
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [commands/acp.review.md, skills/code-review.md]
     tokens_est: 14000
@@ -262,6 +322,8 @@ task_types:
 
   code-review-targeted:
     executor: deepseek-v4-pro
+    antigravity_tier: flash
+    delegation_required: false
     complexity: medium
     context_required: [commands/acp.review.md, skills/code-review.md]
     tokens_est: 7000
@@ -272,6 +334,8 @@ task_types:
 
   code-review-security:
     executor: copilot
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [commands/acp.review.md, skills/code-review.md]
     tokens_est: 9000
@@ -282,6 +346,8 @@ task_types:
 
   code-review-ci:
     executor: qwen3-235b
+    antigravity_tier: flash
+    delegation_required: false
     complexity: low
     context_required: [commands/acp.review.md, skills/code-review.md]
     tokens_est: 3000
@@ -294,6 +360,8 @@ task_types:
   # Added v6.12.0 (M56 — /acp-integrity command). Phase 1 pattern matching.
   code-integrity-scan:
     executor: copilot
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [commands/acp.integrity.md, skills/code-integrity.md, wiki/integrity-rules.md]
     tokens_est: 8000
@@ -309,6 +377,8 @@ task_types:
   # Anthropic's 6 agent workflows (parallelization + orchestrator-workers).
   parallel:
     executor: deepseek-v4-pro     # Orchestrator — decomposes + aggregates
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [agent/routing/taxonomy.yml]
     tokens_est: 12000
@@ -322,6 +392,8 @@ task_types:
 
   orchestrator-workers:
     executor: deepseek-v4-pro     # Orchestrator
+    antigravity_tier: pro
+    delegation_required: true
     complexity: high
     context_required: [agent/routing/taxonomy.yml]
     tokens_est: 20000
@@ -393,3 +465,62 @@ skills_catalog:
     file: agent/skills/code-integrity.md
     description: AI code integrity & trustworthiness — hidden Unicode, exfiltration, supply chain, CI injection, Phase 1 pattern matching
     triggers: [code-integrity-scan]
+
+# ── Agystack Persona D Model Tier Mappings ─────────────────────
+# Maps ACP task categories to Antigravity model tiers (pro, flash, inherit)
+# and poteto-agent subagent delegation requirements.
+agystack_mappings:
+  tier_pro:
+    tier: pro
+    description: High-capability reasoning tier for architecture, security, and complex logic
+    delegation_required: true
+    task_types:
+      - architecture-plan
+      - design-document
+      - bash-script-create
+      - bash-script-refactor
+      - bug-fix-complex
+      - code-review-full
+      - code-review-security
+      - code-integrity-scan
+      - preference-system
+      - parallel
+      - orchestrator-workers
+      - upstream-sync
+
+  tier_flash:
+    tier: flash
+    description: Balanced fast tier for exploration, testing, schemas, and incremental fixes
+    delegation_required: false
+    task_types:
+      - command-doc-update
+      - command-doc-write
+      - bash-script-fix
+      - bug-fix-simple
+      - shell-scripting
+      - yaml-schema
+      - e2e-test-write
+      - test-run
+      - typescript-feature
+      - documentation-sync
+      - wiki-update
+      - memory-write
+      - changelog-update
+      - progress-update
+      - route-create
+      - adr-write
+      - code-review-ci
+      - code-review-targeted
+
+  tier_inherit:
+    tier: inherit
+    description: Active parent chat session tier for coordination, planning, and audits
+    delegation_required: false
+    task_types:
+      - audit-run
+      - milestone-create
+      - upstream-parity-check
+      - design-spec
+      - stakeholder-report
+      - ci-cd-setup
+

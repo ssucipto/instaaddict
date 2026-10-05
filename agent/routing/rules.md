@@ -38,3 +38,18 @@ When uncertain between command-doc-write and command-doc-update:
   - Updating/correcting existing content (< 20 net new lines) → command-doc-update
   - Rewriting > 50% of an existing command doc → command-doc-write
   - New route with no existing command doc at all → command-doc-write
+
+## Persona D: Antigravity + Agystack Execution Rules (v6.41.0)
+When operating inside Google Antigravity with the Agystack plugin active:
+1. **Coordinator Role**: The parent chat session serves as coordinator (planning, review, verification, and memory maintenance).
+2. **Subagent Delegation Invariant**: All non-trivial code modifications (> 50 lines on a single file, or multi-file code changes) MUST be delegated to `poteto-agent` via `invoke_subagent`. Small configuration edits, markdown documentation, `.gitignore`, and scratch scripts are permitted directly by the coordinator. When operating in an environment where subagent spawning is disallowed or subagent tools are unavailable, the coordinator satisfies this invariant by executing and owning the diff directly with heightened verification.
+3. **Model Tier Mapping**:
+   - `pro`: High-reasoning tasks (`architecture-plan`, `design-document`, `bash-script-create`, `bash-script-refactor`, `bug-fix-complex`, `code-review-full`, `code-review-security`, `code-integrity-scan`, `parallel orchestrator`).
+   - `flash`: Fast mechanical tasks (`command-doc-update`, `bash-script-fix`, `yaml-schema`, `e2e-test-write`, `typescript-feature`, `documentation-sync`, `wiki-update`, `memory-write`, `changelog-update`, `progress-update`).
+   - `inherit`: Interactive parent chat coordination, milestone tracking, and task routing.
+4. **Execution Protocol**:
+   - Coordinator authors `implementation_plan.md` in `<appDataDir>/brain/<conversation-id>/`.
+   - Code delegate writes implementation in isolated subagent context.
+   - Coordinator reviews diff, runs tests, executes `/deslop`, and verifies compliance with `/acp-ci`.
+   - Results stamped to `agent/memory/sessions.md` via `/acp-commit`.
+

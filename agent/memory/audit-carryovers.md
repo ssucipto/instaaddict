@@ -1543,11 +1543,97 @@ carryovers:
       - InstaAddict/core/watchdog.py
       - InstaAddict/core/handle_sources.py
 
+  - id: CO-125
+    audit_report: agent/reports/audit-144-agystack-plugin-and-acp-integration.md
+    date_raised: 2026-10-05
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-144
+    summary: "Establish Persona D ('Antigravity + Agystack Native') in agent/core/routing.yml, add model tier mappings in agent/routing/taxonomy.yml, and formalize subagent delegation in rules.md."
+    affected_files:
+      - agent/core/routing.yml
+      - agent/routing/taxonomy.yml
+      - agent/routing/rules.md
 
+  - id: CO-126
+    audit_report: agent/reports/audit-144-agystack-plugin-and-acp-integration.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-144
+    summary: "Create /acp-agystack command, .agents/skills/acp-agystack/SKILL.md wrapper, and scripts/acp_agystack_bridge.py for runtime dependency and model synchronization."
+    affected_files:
+      - agent/commands/acp.agystack.md
+      - .agents/skills/acp-agystack/SKILL.md
+      - scripts/acp_agystack_bridge.py
 
+  - id: CO-127
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: high
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Document Persona D architectural decision record in agent/memory/decisions.md as ADR-01 with alternatives, rationale, and closure condition."
+    affected_files:
+      - agent/memory/decisions.md
 
+  - id: CO-128
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Capture Agystack + ACP coordinator-delegate bridge pattern in agent/memory/patterns.md with context and solution architecture."
+    affected_files:
+      - agent/memory/patterns.md
 
+  - id: CO-129
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: low
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Remove phantom script reference in agent/commands/acp.agystack.md line 11 (bridge is agent-executed protocol, not standalone script)."
+    affected_files:
+      - agent/commands/acp.agystack.md
 
+  - id: CO-130
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Inline antigravity_tier and delegation_required fields across all 36 task types in agent/routing/taxonomy.yml for single-pass Persona D resolution."
+    affected_files:
+      - agent/routing/taxonomy.yml
 
+  - id: CO-131
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Formalize dual quality gate pipeline (/acp-review 64 rules -> /interrogate multi-model adversarial review -> /deslop -> /acp-ci) into agent/commands/acp.review.md and CI gating."
+    affected_files:
+      - agent/commands/acp.review.md
+      - agent/skills/crosscut.md
 
+  - id: CO-132
+    audit_report: agent/reports/audit-145-agystack-acp-integration-review-and-generalization.md
+    date_raised: 2026-10-05
+    severity: medium
+    status: fixed
+    fix_applied_date: '2026-10-05'
+    verified_in_audit: audit-145
+    summary: "Create reusable cross-platform handoff manifest template (agent/templates/handoff-manifest.template.md) and platform adapters in agent/wiki/cross-platform-adapters.md for Claude Code and Cursor."
+    affected_files:
+      - agent/templates/handoff-manifest.template.md
+      - agent/wiki/cross-platform-adapters.md
 

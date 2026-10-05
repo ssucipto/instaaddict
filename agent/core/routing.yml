@@ -1,7 +1,7 @@
-# Updated per session by dispatch script or manually
+# Updated per session by dispatch script, agystack setup, or manually
 # DO NOT mix static and dynamic content in the same file
 
 session:
-  executor: unset        # updated by acp-dispatch.ts at runtime
-  model: unset           # updated by acp-dispatch.ts at runtime
-  persona: unset         # A (copilot-only), B (deepseek-only), C (mixed)
+  executor: antigravity-agystack  # Antigravity native coordinator with poteto-agent delegation
+  model: gemini-3.8-flash        # active Antigravity session model tier or inherit
+  persona: D                     # A (copilot-only), B (deepseek-only), C (mixed), D (antigravity-agystack)

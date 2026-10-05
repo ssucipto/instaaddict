@@ -535,6 +535,26 @@ When CodeRabbit (or another LLM review) has **posted comments**, bucket them in 
 
 ---
 
+## Agystack Augmentation (when Persona D active)
+
+When operating under **Persona D** (`antigravity-agystack`), code review and diff verification integrate with Agystack's multi-model and deslop tools to form a 4-stage **Dual Quality Gate**:
+
+| Stage | Command / Tool | Owner / Tier | Purpose |
+|-------|----------------|--------------|---------|
+| **1. Standards Gate** | `/acp-review` (64 rules) | Deterministic + Coordinator | Enforce OWASP, TypeScript strict, error-handling, naming, and ACP conventions |
+| **2. Adversarial Gate** | `/interrogate` | Multi-model subagents (`pro`, `flash`) | Parallel blind reviews challenging edge cases, concurrency hazards, and architectural soundness |
+| **3. Cleanliness Gate** | `/deslop` | Coordinator / `poteto-agent` | Strip narrating comments, defensive boilerplate, dead compatibility code, and AI tells |
+| **4. Pre-Push CI Gate** | `/acp-ci` | Local runner | Run full test suite, linting, and typecheck before commit/push |
+
+When preparing PR diffs under Persona D:
+1. Run Phase 1 deterministic rules: `bash agent/scripts/acp.review-scan.sh`
+2. Run Phase 2 semantic checks across modified files
+3. For core business logic changes, invoke `/interrogate` to spawn independent reviewer subagents
+4. Apply `/deslop` to clean the diff before staging
+5. Run `/acp-ci` to verify zero regression across existing test suites
+
+---
+
 ## Optional Tool Delegation
 
 `SH-03` is delegated to `shellcheck` when it is installed locally. The scanner runs the normal `shellcheck -f gcc -S warning` pass, then promotes quote-safety findings `SC2046`, `SC2068`, and `SC2086` from a filtered style-level pass into `SH-03` findings. Sourced-library allowlists match `SH-01` so utility libraries and `e2e/` helpers do not create known-benign noise.

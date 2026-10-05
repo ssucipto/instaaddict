@@ -365,6 +365,15 @@ Design Context: No design document found for this task.
 - **Run tests** if specified
 - **Verify functionality** as you go
 
+> **Persona D Branch (Antigravity + Agystack Native)**:
+> If operating under Persona D (`antigravity-agystack`), evaluate the delegation threshold:
+> - **Non-trivial code modification** (> 50 lines on a single file, multi-file code changes, core business logic):
+>   1. Author `implementation_plan.md` in `<appDataDir>/brain/<conversation-id>/`
+>   2. Delegate implementation to `poteto-agent` via `invoke_subagent`
+>   3. Coordinator inspects delegate diff, runs `/deslop`, and verifies via `/acp-ci`
+> - **Trivial edits** (<= 50 lines, markdown documentation, `.gitignore`, single flag changes, scratch scripts):
+>   Implement directly in coordinator context without spawning a subagent.
+
 **DO NOT**:
 - ❌ Provide summaries of what you "will" do
 - ❌ Ask if the user wants to proceed
