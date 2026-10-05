@@ -1009,5 +1009,5 @@ active_handoff:
   date: '2026-10-05'
   to_executor: acp-enhanced-core-team
   from_executor: antigravity
-  git_commit: ccbf2c6f70db3d70f63cb98d103132d4ba2a0d60
+  git_commit: 310cef36ee5a903a99e2facd63a5553af89a3c49
   status: active
